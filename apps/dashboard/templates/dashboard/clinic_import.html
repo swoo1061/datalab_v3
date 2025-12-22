@@ -1,0 +1,252 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}병원 가이드 추가{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">🏥 병원 가이드 추가</h1>
+    <p class="page-subtitle">Notion에서 내보낸 MD 파일을 붙여넣어 병원 정보를 등록하세요</p>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- 입력 영역 -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">📄 MD 내용 입력</h3>
+    </div>
+    
+    <form id="importForm">
+      {% csrf_token %}
+      
+      <div class="form-group">
+        <label class="form-label">병원명 *</label>
+        <input type="text" name="clinic_name" id="clinicName" class="form-input" 
+               placeholder="예: 윈느성형외과" required>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">MD 내용 *</label>
+        <textarea name="md_content" id="mdContent" class="form-textarea" 
+                  style="min-height: 400px; font-family: monospace; font-size: 0.85rem;"
+                  placeholder="Notion에서 Export한 MD 파일 내용을 붙여넣으세요..." required></textarea>
+        <p class="form-hint">
+          Notion 페이지에서 ⋯ → Export → Markdown & CSV 선택 후 .md 파일 내용을 복사
+        </p>
+      </div>
+      
+      <div class="flex gap-2">
+        <button type="submit" class="btn btn-primary" id="importBtn">
+          📥 가이드 등록
+        </button>
+        <button type="button" class="btn btn-secondary" id="previewBtn">
+          👁️ 미리보기
+        </button>
+      </div>
+    </form>
+  </div>
+  
+  <!-- 미리보기 / 결과 -->
+  <div>
+    <!-- 파싱 결과 미리보기 -->
+    <div class="card" id="previewCard" style="display: none;">
+      <div class="card-header">
+        <h3 class="card-title">📋 파싱 결과</h3>
+      </div>
+      
+      <div id="previewContent">
+        <!-- 기본정보 -->
+        <div class="mb-4">
+          <h4 style="font-size: 0.9rem; color: var(--muted); margin-bottom: 8px;">기본 정보</h4>
+          <div id="previewBasic"></div>
+        </div>
+        
+        <!-- 의료진 -->
+        <div class="mb-4">
+          <h4 style="font-size: 0.9rem; color: var(--muted); margin-bottom: 8px;">의료진</h4>
+          <div id="previewDoctors"></div>
+        </div>
+        
+        <!-- 수가표 -->
+        <div class="mb-4">
+          <h4 style="font-size: 0.9rem; color: var(--muted); margin-bottom: 8px;">수가표</h4>
+          <div id="previewPrices"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 등록 결과 -->
+    <div class="card" id="resultCard" style="display: none;">
+      <div class="card-header">
+        <h3 class="card-title">✅ 등록 완료</h3>
+      </div>
+      <div id="resultContent"></div>
+      <div class="flex gap-2" style="margin-top: 16px;">
+        <a href="{% url 'dashboard:generate_review_v2' %}" class="btn btn-primary">
+          ✨ 리뷰 생성하러 가기
+        </a>
+        <a href="{% url 'dashboard:clinic_list' %}" class="btn btn-secondary">
+          📋 병원 목록 보기
+        </a>
+      </div>
+    </div>
+    
+    <!-- 사용 가이드 -->
+    <div class="card" style="margin-top: 20px;">
+      <div class="card-header">
+        <h3 class="card-title">💡 사용 가이드</h3>
+      </div>
+      <div style="font-size: 0.9rem; color: var(--muted); line-height: 1.8;">
+        <p><strong>1. Notion에서 Export</strong></p>
+        <p style="margin-left: 16px; margin-bottom: 12px;">
+          병원 가이드 페이지 → ⋯ (더보기) → Export → Markdown & CSV
+        </p>
+        
+        <p><strong>2. MD 파일 열기</strong></p>
+        <p style="margin-left: 16px; margin-bottom: 12px;">
+          다운받은 .zip 압축 풀고 → .md 파일 메모장으로 열기
+        </p>
+        
+        <p><strong>3. 내용 복사 & 붙여넣기</strong></p>
+        <p style="margin-left: 16px; margin-bottom: 12px;">
+          전체 선택 (Ctrl+A) → 복사 (Ctrl+C) → 여기에 붙여넣기
+        </p>
+        
+        <p><strong>지원하는 데이터:</strong></p>
+        <ul style="margin-left: 32px;">
+          <li>병원 기본정보 (위치, 운영시간, 주차)</li>
+          <li>의료진 정보 (이름, 코드, 상담스타일)</li>
+          <li>상담실장 정보</li>
+          <li>수가표</li>
+          <li>수술 후 주의사항</li>
+          <li>사후관리 시스템</li>
+          <li>언급 가능/불가 병원</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// 미리보기 (클라이언트 사이드 간단 파싱)
+document.getElementById('previewBtn').addEventListener('click', function() {
+  const content = document.getElementById('mdContent').value;
+  if (!content.trim()) {
+    alert('MD 내용을 입력해주세요.');
+    return;
+  }
+  
+  // 간단한 파싱 (서버 파싱과 동일하진 않음)
+  const previewCard = document.getElementById('previewCard');
+  const previewBasic = document.getElementById('previewBasic');
+  const previewDoctors = document.getElementById('previewDoctors');
+  const previewPrices = document.getElementById('previewPrices');
+  
+  // 기본정보 추출
+  let basicInfo = [];
+  const locationMatch = content.match(/업체정보\(위치\)\s*\|\s*([^|]+)/);
+  if (locationMatch) basicInfo.push(`📍 위치: ${locationMatch[1].trim()}`);
+  
+  const hoursMatch = content.match(/운영시간\s*\|\s*([^|]+)/);
+  if (hoursMatch) basicInfo.push(`🕐 운영시간: ${hoursMatch[1].trim()}`);
+  
+  const parkingMatch = content.match(/주차.*?\|\s*([^|]+)/);
+  if (parkingMatch) basicInfo.push(`🚗 주차: ${parkingMatch[1].trim().substring(0, 50)}...`);
+  
+  previewBasic.innerHTML = basicInfo.length ? 
+    basicInfo.map(i => `<div style="margin-bottom:4px;">${i}</div>`).join('') : 
+    '<span class="text-muted">추출된 정보 없음</span>';
+  
+  // 의료진 추출
+  const doctorMatches = content.matchAll(/Dr\.([A-Z])\(([^)]+)\)/g);
+  let doctors = [];
+  for (const match of doctorMatches) {
+    doctors.push(`👨‍⚕️ ${match[2]} (Dr.${match[1]})`);
+  }
+  previewDoctors.innerHTML = doctors.length ? 
+    doctors.map(d => `<span class="tag tag-primary" style="margin:2px;">${d}</span>`).join('') :
+    '<span class="text-muted">추출된 정보 없음</span>';
+  
+  // 수가표 추출
+  const priceMatches = content.matchAll(/([가-힣]+)\(([A-Z])\)-?\s*([^\n]+)/g);
+  let prices = [];
+  for (const match of priceMatches) {
+    const procs = match[3].split('/').slice(0, 3);
+    prices.push(`${match[1]}: ${procs.join(', ')}`);
+  }
+  previewPrices.innerHTML = prices.length ?
+    prices.map(p => `<div style="margin-bottom:4px; font-size:0.85rem;">${p}</div>`).join('') :
+    '<span class="text-muted">추출된 정보 없음</span>';
+  
+  previewCard.style.display = 'block';
+});
+
+// 폼 제출
+document.getElementById('importForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const clinicName = document.getElementById('clinicName').value;
+  const mdContent = document.getElementById('mdContent').value;
+  
+  if (!clinicName.trim() || !mdContent.trim()) {
+    alert('병원명과 MD 내용을 모두 입력해주세요.');
+    return;
+  }
+  
+  document.getElementById('importBtn').disabled = true;
+  document.getElementById('importBtn').textContent = '등록 중...';
+  
+  try {
+    const formData = new FormData();
+    formData.append('clinic_name', clinicName);
+    formData.append('md_content', mdContent);
+    
+    const response = await fetch('/dashboard/api/import-clinic/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: formData
+    });
+    
+    const result = await response.json();
+    
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    
+    // 결과 표시
+    document.getElementById('previewCard').style.display = 'none';
+    document.getElementById('resultCard').style.display = 'block';
+    document.getElementById('resultContent').innerHTML = `
+      <div style="font-size: 0.95rem; line-height: 1.8;">
+        <p>✅ <strong>${result.clinic_name}</strong> ${result.created ? '등록' : '업데이트'} 완료!</p>
+        <p>👨‍⚕️ 의료진: ${result.doctors_count}명</p>
+        <p>💉 시술: ${result.procedures_count}개</p>
+      </div>
+    `;
+    
+  } catch (err) {
+    alert('등록 실패: ' + err.message);
+  } finally {
+    document.getElementById('importBtn').disabled = false;
+    document.getElementById('importBtn').textContent = '📥 가이드 등록';
+  }
+});
+</script>
+{% endblock %}

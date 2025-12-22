@@ -1,0 +1,878 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}프리셋 추출{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">프리셋 추출</h1>
+    <p class="page-subtitle">기존 후기를 분석하여 페르소나, 카페 셋팅, 컨텐츠 타입 프리셋을 자동 추출합니다</p>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- 왼쪽: 입력 -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">후기 입력</h3>
+    </div>
+
+    <!-- 추출 카테고리 선택 -->
+    <div class="form-group">
+      <label class="form-label">추출할 프리셋 카테고리 *</label>
+      <div class="category-buttons">
+        <button type="button" class="category-btn active" data-category="persona">
+          <span class="category-icon">👤</span>
+          <span class="category-name">페르소나</span>
+        </button>
+        <button type="button" class="category-btn" data-category="cafe">
+          <span class="category-icon">☕</span>
+          <span class="category-name">카페 셋팅</span>
+        </button>
+        <button type="button" class="category-btn" data-category="content_type">
+          <span class="category-icon">📄</span>
+          <span class="category-name">컨텐츠 타입</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 입력 방식 탭 -->
+    <div class="tab-buttons">
+      <button type="button" class="btn btn-primary tab-btn active" data-tab="text">
+        텍스트 입력
+      </button>
+      <button type="button" class="btn btn-secondary tab-btn" data-tab="image">
+        이미지 업로드
+      </button>
+    </div>
+
+    <!-- 텍스트 입력 탭 -->
+    <div id="textTab" class="tab-content">
+      <form id="analyzeForm">
+        {% csrf_token %}
+        <div class="form-group">
+          <label class="form-label">분석할 후기들 *</label>
+          <textarea name="texts" id="textsInput" class="form-textarea"
+                    style="min-height: 280px; font-size: 0.9rem;"
+                    placeholder="여러 후기를 붙여넣으세요.
+각 후기는 '---'로 구분해주세요." required></textarea>
+          <p class="form-hint">최소 2개 이상의 후기를 '---'로 구분하여 입력</p>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="btn btn-primary" id="analyzeBtn">
+            프리셋 추출하기
+          </button>
+          <button type="button" class="btn btn-secondary" id="sampleBtn">
+            예시 불러오기
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 이미지 업로드 탭 -->
+    <div id="imageTab" class="tab-content" style="display: none;">
+      <form id="imageAnalyzeForm">
+        {% csrf_token %}
+        <div class="form-group">
+          <div id="dropZone" class="drop-zone">
+            <div class="drop-zone-content">
+              <div style="font-size: 2rem; margin-bottom: 8px;">📷</div>
+              <p style="font-weight: 600;">이미지 드래그 또는 클릭</p>
+              <p class="text-muted text-sm">최대 10장, 각 10MB 이하</p>
+            </div>
+            <input type="file" id="imageInput" name="images" multiple accept="image/*" style="display: none;">
+          </div>
+          <div id="imagePreview" class="image-preview-grid" style="display: none;"></div>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="btn btn-primary" id="imageAnalyzeBtn">
+            이미지에서 추출
+          </button>
+          <button type="button" class="btn btn-secondary" id="clearImagesBtn">
+            초기화
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 정량 분석 (하단에 간략히) -->
+    <div id="quantCard" class="quant-summary" style="display: none;">
+      <div class="quant-summary-title">분석 결과</div>
+      <div class="quant-stats">
+        <span><strong id="sampleCount">0</strong>개 샘플</span>
+        <span>평균 <strong id="avgChars">0</strong>자</span>
+        <span>이모지 <strong id="emojiRate">0%</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 오른쪽: 추출 결과 (편집 가능) -->
+  <div>
+    <!-- 로딩 -->
+    <div class="card" id="loadingCard" style="display: none;">
+      <div class="loading">
+        <div class="spinner"></div>
+      </div>
+      <p class="text-center text-muted">프리셋을 추출하고 있습니다...</p>
+    </div>
+
+    <!-- 초기 안내 -->
+    <div class="card" id="guideCard">
+      <div class="empty-state">
+        <div style="font-size: 3rem; margin-bottom: 16px;">🔍</div>
+        <h3>프리셋 추출 대기 중</h3>
+        <p class="text-muted">왼쪽에 후기를 입력하고 추출 버튼을 눌러주세요</p>
+        <div class="guide-tips">
+          <p><strong>👤 페르소나:</strong> 같은 사람이 쓴 후기</p>
+          <p><strong>☕ 카페 셋팅:</strong> 같은 카페의 후기</p>
+          <p><strong>📄 컨텐츠 타입:</strong> 같은 시점의 후기 (예: 시술 당일)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 페르소나 편집 폼 -->
+    <div class="card result-card" id="personaCard" data-category="persona" style="display: none;">
+      <div class="card-header">
+        <h3 class="card-title">👤 추출된 페르소나</h3>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary btn-sm" id="reExtractPersonaBtn">다시 추출</button>
+        </div>
+      </div>
+
+      <form id="personaForm">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">페르소나 이름 *</label>
+            <input type="text" id="personaName" class="form-input" placeholder="예: 20대 후반 직장인">
+          </div>
+        </div>
+
+        <div class="form-row grid-2-cols">
+          <div class="form-group">
+            <label class="form-label">연령대</label>
+            <select id="personaAgeGroup" class="form-select">
+              <option value="">선택</option>
+              <option value="20_early">20대 초반</option>
+              <option value="20_mid">20대 중반</option>
+              <option value="20_late">20대 후반</option>
+              <option value="30_early">30대 초반</option>
+              <option value="30_mid">30대 중반</option>
+              <option value="30_late">30대 후반</option>
+              <option value="40_plus">40대 이상</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">성별</label>
+            <select id="personaGender" class="form-select">
+              <option value="">선택</option>
+              <option value="female">여성</option>
+              <option value="male">남성</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row grid-2-cols">
+          <div class="form-group">
+            <label class="form-label">직업/신분</label>
+            <select id="personaOccupation" class="form-select">
+              <option value="">선택</option>
+              <option value="office">직장인</option>
+              <option value="student">대학생</option>
+              <option value="housewife">주부</option>
+              <option value="self_employed">자영업</option>
+              <option value="freelancer">프리랜서</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">이모지 사용</label>
+            <select id="personaEmojiUsage" class="form-select">
+              <option value="many">많음</option>
+              <option value="moderate">적당히</option>
+              <option value="rarely">거의없음</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">말투 스타일</label>
+          <input type="text" id="personaSpeechStyle" class="form-input" placeholder="예: 친근하고 솔직한 말투">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">자주 쓰는 표현 (줄바꿈으로 구분)</label>
+          <textarea id="personaExpressions" class="form-textarea" style="min-height: 80px;" placeholder="진짜 대박
+솔직히 처음엔 걱정했는데
+고민하시는 분들 참고하세요"></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-primary" id="savePersonaBtn">
+            페르소나 저장
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 카페 셋팅 편집 폼 -->
+    <div class="card result-card" id="cafeCard" data-category="cafe" style="display: none;">
+      <div class="card-header">
+        <h3 class="card-title">☕ 추출된 카페 셋팅</h3>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary btn-sm" id="reExtractCafeBtn">다시 추출</button>
+        </div>
+      </div>
+
+      <form id="cafeForm">
+        <div class="form-group">
+          <label class="form-label">카페/플랫폼 이름 *</label>
+          <input type="text" id="cafeName" class="form-input" placeholder="예: 성형시술정보">
+        </div>
+
+        <div class="form-row grid-2-cols">
+          <div class="form-group">
+            <label class="form-label">플랫폼 타입</label>
+            <select id="cafePlatformType" class="form-select">
+              <option value="cafe">카페</option>
+              <option value="naver_blog">네이버블로그</option>
+              <option value="comment">댓글</option>
+              <option value="app_review">앱리뷰</option>
+              <option value="qna">지식인</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">글자수 범위</label>
+            <select id="cafeLengthRange" class="form-select">
+              <option value="100_300">100~300자</option>
+              <option value="300_800">300~800자</option>
+              <option value="800_1500" selected>800~1500자</option>
+              <option value="1500_3000">1500~3000자</option>
+              <option value="3000_plus">3000자+</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row grid-2-cols">
+          <div class="form-group">
+            <label class="form-label">카페 성격</label>
+            <select id="cafeCharacter" class="form-select">
+              <option value="info_share">정보공유형</option>
+              <option value="chat">수다형</option>
+              <option value="expert">전문가형</option>
+              <option value="qna">Q&A형</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">광고 규제</label>
+            <select id="cafeAdRestriction" class="form-select">
+              <option value="strict">엄격</option>
+              <option value="normal">보통</option>
+              <option value="loose">느슨</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">금지 키워드 (쉼표로 구분)</label>
+          <input type="text" id="cafeForbiddenKeywords" class="form-input" placeholder="협찬, 광고, 제공">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">작성 팁</label>
+          <textarea id="cafeTips" class="form-textarea" style="min-height: 60px;" placeholder="다른 병원과 비교한 내용 있으면 신뢰도 상승"></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-primary" id="saveCafeBtn">
+            카페 셋팅 저장
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 컨텐츠 타입 편집 폼 -->
+    <div class="card result-card" id="contentTypeCard" data-category="content_type" style="display: none;">
+      <div class="card-header">
+        <h3 class="card-title">📄 추출된 컨텐츠 타입</h3>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary btn-sm" id="reExtractContentTypeBtn">다시 추출</button>
+        </div>
+      </div>
+
+      <form id="contentTypeForm">
+        <div class="form-row grid-2-cols">
+          <div class="form-group">
+            <label class="form-label">컨텐츠 타입 이름 *</label>
+            <input type="text" id="contentTypeName" class="form-input" placeholder="예: 시술 후 2주차">
+          </div>
+          <div class="form-group">
+            <label class="form-label">코드 (영문)</label>
+            <input type="text" id="contentTypeValue" class="form-input" placeholder="예: recovery_2week">
+          </div>
+        </div>
+
+        <div class="form-row grid-2-cols">
+          <div class="form-group">
+            <label class="form-label">컨텐츠 목적</label>
+            <select id="contentTypePurpose" class="form-select">
+              <option value="review">후기공유</option>
+              <option value="info">정보제공</option>
+              <option value="recommend_request">추천요청</option>
+              <option value="question">질문</option>
+              <option value="experience">경험담</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">감정 톤</label>
+            <select id="contentTypeTone" class="form-select">
+              <option value="satisfied">만족</option>
+              <option value="expectation">기대</option>
+              <option value="worry">걱정</option>
+              <option value="nervous">긴장</option>
+              <option value="excited">설렘</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row grid-2-cols">
+          <div class="form-group">
+            <label class="form-label">최소 글자수</label>
+            <input type="number" id="contentTypeMinLength" class="form-input" value="400">
+          </div>
+          <div class="form-group">
+            <label class="form-label">최대 글자수</label>
+            <input type="number" id="contentTypeMaxLength" class="form-input" value="1200">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">글 구조</label>
+          <textarea id="contentTypeStructure" class="form-textarea" style="min-height: 60px;" placeholder="인트로 (20%) → 본문 (60%) → 마무리 (20%)"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">자주 쓰는 표현 (줄바꿈으로 구분)</label>
+          <textarea id="contentTypeExpressions" class="form-textarea" style="min-height: 60px;"></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-primary" id="saveContentTypeBtn">
+            컨텐츠 타입 저장
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+.category-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.category-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.category-btn:hover {
+  border-color: var(--brand-light);
+  background: var(--brand-bg);
+}
+.category-btn.active {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+}
+.category-icon { font-size: 1.5rem; margin-bottom: 4px; }
+.category-name { font-weight: 600; font-size: 0.85rem; }
+
+.tab-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.tab-btn { flex: 1; }
+
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  padding: 30px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg);
+}
+.drop-zone:hover { border-color: var(--brand); }
+
+.image-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.image-preview-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.image-preview-item img { width: 100%; height: 100%; object-fit: cover; }
+.image-preview-item .remove-btn {
+  position: absolute;
+  top: 2px; right: 2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.quant-summary {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.quant-summary-title {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.quant-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 0.9rem;
+}
+.quant-stats strong { color: var(--brand); }
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+}
+.empty-state h3 { margin-bottom: 8px; }
+.guide-tips {
+  margin-top: 20px;
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.guide-tips p { margin: 6px 0; }
+
+.form-row { margin-bottom: 16px; }
+.grid-2-cols {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.form-actions {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.result-card .card-header {
+  margin-bottom: 16px;
+}
+
+/* 성공/실패 메시지 */
+.save-success {
+  background: #d1fae5;
+  color: #059669;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+</style>
+
+<script>
+let analysisResult = null;
+let uploadedFiles = [];
+let selectedCategory = 'persona';
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// 카테고리 선택
+document.querySelectorAll('.category-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    selectedCategory = this.dataset.category;
+  });
+});
+
+// 탭 전환
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const tab = this.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active', 'btn-primary');
+      b.classList.add('btn-secondary');
+    });
+    this.classList.add('active', 'btn-primary');
+    this.classList.remove('btn-secondary');
+    document.getElementById('textTab').style.display = tab === 'text' ? 'block' : 'none';
+    document.getElementById('imageTab').style.display = tab === 'image' ? 'block' : 'none';
+  });
+});
+
+// 이미지 업로드
+const dropZone = document.getElementById('dropZone');
+const imageInput = document.getElementById('imageInput');
+const imagePreview = document.getElementById('imagePreview');
+
+dropZone.addEventListener('click', () => imageInput.click());
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--brand)'; });
+dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
+dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.style.borderColor = ''; handleFiles(e.dataTransfer.files); });
+imageInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+function handleFiles(files) {
+  const validFiles = Array.from(files).filter(f => f.type.startsWith('image/') && f.size <= 10*1024*1024);
+  if (uploadedFiles.length + validFiles.length > 10) { alert('최대 10개'); return; }
+  uploadedFiles = [...uploadedFiles, ...validFiles];
+  renderImagePreviews();
+}
+
+function renderImagePreviews() {
+  if (uploadedFiles.length === 0) { imagePreview.style.display = 'none'; return; }
+  imagePreview.style.display = 'grid';
+  imagePreview.innerHTML = uploadedFiles.map((file, idx) => `
+    <div class="image-preview-item">
+      <img src="${URL.createObjectURL(file)}">
+      <button type="button" class="remove-btn" onclick="removeImage(${idx})">×</button>
+    </div>
+  `).join('');
+}
+
+function removeImage(idx) { uploadedFiles.splice(idx, 1); renderImagePreviews(); }
+
+document.getElementById('clearImagesBtn').addEventListener('click', () => {
+  uploadedFiles = [];
+  renderImagePreviews();
+});
+
+// 예시 불러오기
+document.getElementById('sampleBtn').addEventListener('click', function() {
+  document.getElementById('textsInput').value = `저 여기서 코 했는데 진짜 만족해요ㅠㅠ
+처음엔 엄청 고민했는데 상담 받아보니까 원장님이 진짜 꼼꼼하게 설명해주시더라구요
+수술 당일에 좀 무서웠는데 실장님이 계속 얘기해주셔서 괜찮았어요!
+지금 2주차인데 붓기도 거의 빠지고 라인 너무 예뻐요
+고민하시는 분들 상담이라도 받아보세요~
+
+---
+
+안녕하세요! 저도 여기서 눈 수술 받고 왔어요
+친구 소개로 알게 됐는데 친구도 여기서 했거든요
+상담 예약하고 가니까 대기 시간도 별로 없었고
+원장님이 제 눈 상태 보시면서 어떻게 하면 좋을지 자세히 알려주셨어요
+가격도 다른 데 비해서 합리적이었어요!
+수술 받은지 한달 됐는데 자연스럽고 좋아요ㅎㅎ
+
+---
+
+후기 남겨요~ 얼굴 지방흡입 받았는데요
+상담 때 원장님이 무리하게 많이 빼지 않는게 좋다고 하셔서 신뢰가 갔어요
+다른 데는 막 많이 빼야 된다고 했거든요;;
+수술 후 관리도 잘 해주시고 경과도 좋아요
+고민되시는 분들 추천합니다!`;
+});
+
+// 텍스트 분석
+document.getElementById('analyzeForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const texts = document.getElementById('textsInput').value;
+  if (!texts.trim()) { alert('후기를 입력해주세요.'); return; }
+  await runAnalysis({ texts: texts, category: selectedCategory });
+});
+
+// 이미지 분석
+document.getElementById('imageAnalyzeForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  if (uploadedFiles.length < 2) { alert('최소 2개 이상의 이미지가 필요합니다.'); return; }
+
+  const formData = new FormData();
+  uploadedFiles.forEach(file => formData.append('images', file));
+  formData.append('category', selectedCategory);
+
+  showLoading();
+  try {
+    const response = await fetch('/dashboard/api/analyze-style-from-images/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCookie('csrftoken') },
+      body: formData
+    });
+    const result = await response.json();
+    if (result.error) throw new Error(result.error);
+    analysisResult = result;
+    displayResults(result);
+  } catch (err) {
+    alert('추출 실패: ' + err.message);
+  } finally {
+    hideLoading();
+  }
+});
+
+async function runAnalysis(data) {
+  showLoading();
+  try {
+    const response = await fetch('/dashboard/api/analyze-style/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (result.error) throw new Error(result.error);
+    analysisResult = result;
+    displayResults(result);
+  } catch (err) {
+    alert('추출 실패: ' + err.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+function showLoading() {
+  document.getElementById('loadingCard').style.display = 'block';
+  document.getElementById('guideCard').style.display = 'none';
+  document.querySelectorAll('.result-card').forEach(c => c.style.display = 'none');
+  document.getElementById('quantCard').style.display = 'none';
+}
+
+function hideLoading() {
+  document.getElementById('loadingCard').style.display = 'none';
+}
+
+function displayResults(result) {
+  const quant = result.quantitative;
+  const qual = result.qualitative;
+
+  // 정량 분석 표시
+  document.getElementById('sampleCount').textContent = quant.total_samples;
+  document.getElementById('avgChars').textContent = Math.round(quant.avg_char_count);
+  document.getElementById('emojiRate').textContent = Math.round(quant.emoji_usage_rate * 100) + '%';
+  document.getElementById('quantCard').style.display = 'block';
+
+  // 카테고리별 폼 채우기
+  if (selectedCategory === 'persona') {
+    fillPersonaForm(result);
+    document.getElementById('personaCard').style.display = 'block';
+  } else if (selectedCategory === 'cafe') {
+    fillCafeForm(result);
+    document.getElementById('cafeCard').style.display = 'block';
+  } else if (selectedCategory === 'content_type') {
+    fillContentTypeForm(result);
+    document.getElementById('contentTypeCard').style.display = 'block';
+  }
+}
+
+function fillPersonaForm(result) {
+  const p = result.suggested_persona || {};
+  const q = result.qualitative || {};
+
+  document.getElementById('personaName').value = p.name || '';
+  document.getElementById('personaAgeGroup').value = p.age_group || '';
+  document.getElementById('personaGender').value = p.gender || '';
+  document.getElementById('personaOccupation').value = p.occupation || '';
+  document.getElementById('personaEmojiUsage').value = p.emoji_usage ? 'many' : 'rarely';
+  document.getElementById('personaSpeechStyle').value = p.speech_style || q.speech_style || '';
+  document.getElementById('personaExpressions').value = (p.example_phrases || q.common_expressions || []).join('\n');
+}
+
+function fillCafeForm(result) {
+  const c = result.suggested_cafe_profile || {};
+  const quant = result.quantitative || {};
+
+  document.getElementById('cafeName').value = '';
+  document.getElementById('cafePlatformType').value = c.platform_type || 'cafe';
+
+  // 글자수 범위 추정
+  const avgChars = quant.avg_char_count || 800;
+  let lengthRange = '800_1500';
+  if (avgChars < 300) lengthRange = '100_300';
+  else if (avgChars < 800) lengthRange = '300_800';
+  else if (avgChars < 1500) lengthRange = '800_1500';
+  else if (avgChars < 3000) lengthRange = '1500_3000';
+  else lengthRange = '3000_plus';
+  document.getElementById('cafeLengthRange').value = lengthRange;
+
+  document.getElementById('cafeCharacter').value = c.cafe_character || 'info_share';
+  document.getElementById('cafeAdRestriction').value = c.ad_restriction || 'strict';
+  document.getElementById('cafeForbiddenKeywords').value = (c.forbidden_words || c.forbidden_keywords || []).join(', ');
+  document.getElementById('cafeTips').value = c.tips || '';
+}
+
+function fillContentTypeForm(result) {
+  const q = result.qualitative || {};
+  const quant = result.quantitative || {};
+
+  document.getElementById('contentTypeName').value = '';
+  document.getElementById('contentTypeValue').value = '';
+  document.getElementById('contentTypePurpose').value = 'review';
+  document.getElementById('contentTypeTone').value = 'satisfied';
+
+  const avgChars = quant.avg_char_count || 800;
+  document.getElementById('contentTypeMinLength').value = Math.round(avgChars * 0.7);
+  document.getElementById('contentTypeMaxLength').value = Math.round(avgChars * 1.3);
+
+  document.getElementById('contentTypeStructure').value = q.structure_pattern || '';
+  document.getElementById('contentTypeExpressions').value = (q.common_expressions || []).join('\n');
+}
+
+// 다시 추출 버튼
+document.getElementById('reExtractPersonaBtn').addEventListener('click', () => {
+  document.getElementById('analyzeForm').dispatchEvent(new Event('submit'));
+});
+document.getElementById('reExtractCafeBtn').addEventListener('click', () => {
+  document.getElementById('analyzeForm').dispatchEvent(new Event('submit'));
+});
+document.getElementById('reExtractContentTypeBtn').addEventListener('click', () => {
+  document.getElementById('analyzeForm').dispatchEvent(new Event('submit'));
+});
+
+// 저장: 페르소나
+document.getElementById('savePersonaBtn').addEventListener('click', async function() {
+  const name = document.getElementById('personaName').value.trim();
+  if (!name) { alert('페르소나 이름을 입력해주세요.'); return; }
+
+  const data = {
+    name: name,
+    persona: {
+      name: name,
+      age_group: document.getElementById('personaAgeGroup').value,
+      gender: document.getElementById('personaGender').value,
+      occupation: document.getElementById('personaOccupation').value,
+      emoji_usage: document.getElementById('personaEmojiUsage').value,
+      speech_style: document.getElementById('personaSpeechStyle').value,
+      example_phrases: document.getElementById('personaExpressions').value.split('\n').filter(x => x.trim()),
+    }
+  };
+
+  try {
+    const response = await fetch('/dashboard/api/create-persona-from-style/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (result.error) throw new Error(result.error);
+
+    showSaveSuccess('personaCard', `페르소나 "${result.persona_name}" 저장 완료!`);
+  } catch (err) {
+    alert('저장 실패: ' + err.message);
+  }
+});
+
+// 저장: 카페
+document.getElementById('saveCafeBtn').addEventListener('click', async function() {
+  const name = document.getElementById('cafeName').value.trim();
+  if (!name) { alert('카페 이름을 입력해주세요.'); return; }
+
+  const data = {
+    name: name,
+    cafe_profile: {
+      platform_type: document.getElementById('cafePlatformType').value,
+      length_range: document.getElementById('cafeLengthRange').value,
+      cafe_character: document.getElementById('cafeCharacter').value,
+      ad_restriction: document.getElementById('cafeAdRestriction').value,
+      forbidden_words: document.getElementById('cafeForbiddenKeywords').value.split(',').map(x => x.trim()).filter(x => x),
+      tips: document.getElementById('cafeTips').value,
+    }
+  };
+
+  try {
+    const response = await fetch('/dashboard/api/create-cafe-from-style/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (result.error) throw new Error(result.error);
+
+    showSaveSuccess('cafeCard', `카페 셋팅 "${result.cafe_name}" 저장 완료!`);
+  } catch (err) {
+    alert('저장 실패: ' + err.message);
+  }
+});
+
+// 저장: 컨텐츠 타입
+document.getElementById('saveContentTypeBtn').addEventListener('click', async function() {
+  const label = document.getElementById('contentTypeName').value.trim();
+  if (!label) { alert('컨텐츠 타입 이름을 입력해주세요.'); return; }
+
+  const data = {
+    label: label,
+    value: document.getElementById('contentTypeValue').value.trim() || label.toLowerCase().replace(/\s+/g, '_'),
+    analysis: {
+      quantitative: {
+        avg_char_count: (parseInt(document.getElementById('contentTypeMinLength').value) + parseInt(document.getElementById('contentTypeMaxLength').value)) / 2
+      },
+      qualitative: {
+        tone: document.getElementById('contentTypeTone').value,
+        structure_pattern: document.getElementById('contentTypeStructure').value,
+        common_expressions: document.getElementById('contentTypeExpressions').value.split('\n').filter(x => x.trim()),
+      }
+    },
+    content_purpose: document.getElementById('contentTypePurpose').value,
+    emotion_tone: document.getElementById('contentTypeTone').value,
+    min_length: parseInt(document.getElementById('contentTypeMinLength').value),
+    max_length: parseInt(document.getElementById('contentTypeMaxLength').value),
+  };
+
+  try {
+    const response = await fetch('/dashboard/api/create-content-type-from-style/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (result.error) throw new Error(result.error);
+
+    showSaveSuccess('contentTypeCard', `컨텐츠 타입 "${result.content_type_name}" 저장 완료!`);
+  } catch (err) {
+    alert('저장 실패: ' + err.message);
+  }
+});
+
+function showSaveSuccess(cardId, message) {
+  const card = document.getElementById(cardId);
+  const existing = card.querySelector('.save-success');
+  if (existing) existing.remove();
+
+  const msg = document.createElement('div');
+  msg.className = 'save-success';
+  msg.textContent = message;
+  card.querySelector('form').prepend(msg);
+
+  setTimeout(() => msg.remove(), 5000);
+}
+</script>
+{% endblock %}

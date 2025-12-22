@@ -1,0 +1,850 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}AI 리뷰 생성 PRO{% endblock %}
+
+{% block extra_css %}
+<style>
+.model-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.model-option {
+  position: relative;
+  cursor: pointer;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  transition: all 0.2s ease;
+  background: var(--bg);
+  min-width: 160px;
+  flex: 1 1 auto;
+  max-width: 220px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.model-option:hover {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+.model-option.selected,
+.model-option:has(input:checked) {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.1);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.2);
+}
+.model-option:has(input:checked)::after {
+  content: '✓';
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--primary);
+}
+.model-option input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.model-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.model-provider {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.model-provider.openai { color: #10a37f; }
+.model-provider.claude { color: #7c3aed; }
+.model-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.model-desc {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.3;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">✨ AI 리뷰 생성 PRO</h1>
+    <p class="page-subtitle">병원, 의료진, 시술을 선택하고 자연스러운 리뷰를 생성하세요</p>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- 왼쪽: 입력 폼 -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">📝 리뷰 설정</h3>
+    </div>
+    
+    <form id="reviewForm">
+      {% csrf_token %}
+      
+      <!-- Step 1: 병원 선택 -->
+      <div class="form-group">
+        <label class="form-label">1. 병원 선택</label>
+        <select name="clinic_id" id="clinicSelect" class="form-select">
+          <option value="">병원을 선택하세요</option>
+          <option value="__none__">없음</option>
+          <option value="__custom__">직접입력</option>
+          {% for clinic in clinics %}
+            <option value="{{ clinic.id }}">{{ clinic.name }}</option>
+          {% endfor %}
+        </select>
+        <div id="clinicCustomInput" class="custom-input-wrap" style="display:none; margin-top:8px;">
+          <input type="text" id="clinicCustomText" class="form-input" placeholder="병원명을 입력하세요">
+        </div>
+        <p class="form-hint">
+          병원이 없나요? <a href="{% url 'dashboard:clinic_import' %}">병원 가이드 추가하기</a>
+        </p>
+      </div>
+
+      <!-- Step 2: 의료진 선택 -->
+      <div class="form-group">
+        <label class="form-label">2. 담당 원장님</label>
+        <select name="doctor_code" id="doctorSelect" class="form-select">
+          <option value="">원장님을 선택하세요</option>
+          <option value="__none__">없음</option>
+          <option value="__custom__">직접입력</option>
+        </select>
+        <div id="doctorCustomInput" class="custom-input-wrap" style="display:none; margin-top:8px;">
+          <input type="text" id="doctorCustomText" class="form-input" placeholder="원장님 성함을 입력하세요">
+        </div>
+        <p class="form-hint" id="doctorInfo"></p>
+      </div>
+
+      <!-- Step 3: 시술 선택 -->
+      <div class="form-group">
+        <label class="form-label">3. 시술 선택</label>
+        <select name="procedure" id="procedureSelect" class="form-select">
+          <option value="">시술을 선택하세요</option>
+          <option value="__none__">없음</option>
+          <option value="__custom__">직접입력</option>
+        </select>
+        <div id="procedureCustomInput" class="custom-input-wrap" style="display:none; margin-top:8px;">
+          <input type="text" id="procedureCustomText" class="form-input" placeholder="시술명을 입력하세요">
+        </div>
+        <p class="form-hint" id="procedureInfo"></p>
+      </div>
+      
+      <!-- 구분선 -->
+      <hr style="margin: 28px 0; border: none; border-top: 1px solid var(--border);">
+      
+      <!-- Step 4: 컨텐츠 유형 선택 -->
+      <div class="form-group">
+        <label class="form-label">4. 컨텐츠 유형</label>
+        <select name="content_type" id="contentTypeSelect" class="form-select">
+          <option value="">유형을 선택하세요</option>
+          <option value="__none__">없음</option>
+          <option value="__custom__">직접입력</option>
+          {% for ct in content_types %}
+            <option value="{{ ct.value }}" data-desc="{{ ct.desc }}">
+              {{ ct.label }}
+            </option>
+          {% endfor %}
+        </select>
+        <div id="contentTypeCustomInput" class="custom-input-wrap" style="display:none; margin-top:8px;">
+          <input type="text" id="contentTypeCustomText" class="form-input" placeholder="컨텐츠 유형을 입력하세요 (예: 시술 후기, 추천글)">
+        </div>
+        <p class="form-hint" id="contentTypeInfo">컨텐츠 유형에 따라 글의 구조와 톤이 달라집니다</p>
+      </div>
+
+      <!-- Step 5: 페르소나 선택 -->
+      <div class="form-group">
+        <label class="form-label">5. 작성자 페르소나</label>
+        <select name="persona_id" id="personaSelect" class="form-select">
+          <option value="">기본 페르소나 사용</option>
+          <option value="__none__">없음</option>
+          <option value="__custom__">직접입력</option>
+          {% for persona in personas %}
+            <option value="{{ persona.id }}">
+              {{ persona.name }} - {{ persona.get_age_group_display }} {{ persona.get_gender_display }}
+            </option>
+          {% endfor %}
+        </select>
+        <div id="personaCustomInput" class="custom-input-wrap" style="display:none; margin-top:8px;">
+          <input type="text" id="personaCustomText" class="form-input" placeholder="페르소나 설명 (예: 30대 직장인 여성, 친근한 말투)">
+        </div>
+        <p class="form-hint" id="personaInfo"></p>
+      </div>
+
+      <!-- Step 6: 카페 설정 -->
+      <div class="form-group">
+        <label class="form-label">6. 타겟 카페</label>
+        <select name="cafe_id" id="cafeSelect" class="form-select">
+          <option value="">기본 설정 사용</option>
+          <option value="__none__">없음</option>
+          <option value="__custom__">직접입력</option>
+          {% for cafe in cafes %}
+            <option value="{{ cafe.id }}" data-min="{{ cafe.min_length }}" data-max="{{ cafe.max_length }}">
+              {{ cafe.name }} ({{ cafe.min_length }}~{{ cafe.max_length }}자)
+            </option>
+          {% endfor %}
+        </select>
+        <div id="cafeCustomInput" class="custom-input-wrap" style="display:none; margin-top:8px;">
+          <input type="text" id="cafeCustomText" class="form-input" placeholder="카페/플랫폼 설명 (예: 네이버카페, 500~1000자)">
+        </div>
+        <p class="form-hint" id="cafeInfo"></p>
+      </div>
+
+      <!-- Step 7: 상담실장 (선택) -->
+      <div class="form-group">
+        <label class="form-label">7. 상담실장</label>
+        <select name="consultant_name" id="consultantSelect" class="form-select">
+          <option value="">랜덤 또는 미지정</option>
+          <option value="__none__">없음</option>
+          <option value="__custom__">직접입력</option>
+        </select>
+        <div id="consultantCustomInput" class="custom-input-wrap" style="display:none; margin-top:8px;">
+          <input type="text" id="consultantCustomText" class="form-input" placeholder="상담실장 이름을 입력하세요">
+        </div>
+      </div>
+
+      <!-- Step 8: AI 모델 선택 -->
+      <div class="form-group">
+        <label class="form-label">8. AI 모델 선택 *</label>
+        <div class="model-selector">
+          {% for model in models %}
+            <label class="model-option">
+              <input type="radio" name="model" value="{{ model.id }}"
+                     {% if model.id == 'claude-sonnet-4-5-20250929' %}checked{% endif %}>
+              <div class="model-option-content">
+                <div class="model-provider {{ model.provider }}">
+                  {% if model.provider == 'openai' %}🤖 OpenAI{% else %}🟣 Claude{% endif %}
+                </div>
+                <div class="model-name">{{ model.name }}</div>
+                <div class="model-desc">{{ model.desc }}</div>
+              </div>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Step 9: 추가 지시사항 -->
+      <div class="form-group">
+        <label class="form-label">9. 추가 지시사항 (선택)</label>
+        <textarea name="custom_instructions" id="customInstructions" class="form-textarea"
+                  placeholder="예: 친구한테 추천하는 느낌으로, 가격 언급은 피해주세요"></textarea>
+      </div>
+      
+      <!-- 버튼 -->
+      <div class="flex gap-2" style="margin-top: 28px;">
+        <button type="button" class="btn btn-secondary" id="generatePromptBtn">
+          📝 프롬프트 생성
+        </button>
+        <button type="button" class="btn btn-primary btn-lg" id="generateReviewBtn">
+          ✨ 리뷰 생성하기
+        </button>
+        <button type="button" class="btn btn-secondary" id="resetBtn">
+          초기화
+        </button>
+      </div>
+    </form>
+  </div>
+  
+  <!-- 오른쪽: 결과 -->
+  <div>
+    <!-- 결과 카드 -->
+    <div class="card" id="resultCard">
+      <div class="card-header">
+        <h3 class="card-title">📄 생성된 리뷰</h3>
+        <div class="flex gap-2">
+          <span class="tag tag-muted" id="modelUsed" style="display: none;"></span>
+          <span class="tag tag-muted" id="tokenInfo" style="display: none;">0 토큰</span>
+          <span class="tag tag-muted" id="costInfo" style="display: none;">₩0</span>
+          <span class="tag tag-primary" id="charCount">0자</span>
+          <button class="btn btn-sm btn-ghost" id="copyBtn">📋 복사</button>
+        </div>
+      </div>
+
+      <div class="result-box" id="resultBox" style="min-height: 150px; color: var(--muted);">리뷰가 여기에 표시됩니다.</div>
+
+      <div class="flex gap-2" style="margin-top: 16px;">
+        <button class="btn btn-secondary btn-sm" id="regenerateBtn">🔄 다시 생성</button>
+        <button class="btn btn-ghost btn-sm" id="editBtn">✏️ 수정 요청</button>
+      </div>
+    </div>
+    
+    <!-- 로딩 -->
+    <div class="card" id="loadingCard" style="display: none;">
+      <div class="loading">
+        <div class="spinner"></div>
+      </div>
+      <p class="text-center text-muted">리뷰를 생성하고 있습니다...</p>
+    </div>
+    
+    <!-- 수정 요청 카드 -->
+    <div class="card" id="editCard" style="display: none; margin-top: 20px;">
+      <div class="card-header">
+        <h3 class="card-title">✏️ 수정 요청</h3>
+        <button class="btn btn-ghost btn-sm" id="cancelEditBtn">취소</button>
+      </div>
+      <div class="form-group">
+        <textarea id="feedbackInput" class="form-textarea" 
+                  placeholder="수정하고 싶은 부분을 설명해주세요. 예: 좀 더 짧게, 이모지 추가, 가격 부분 삭제"></textarea>
+      </div>
+      <button class="btn btn-primary" id="submitFeedbackBtn">수정 반영하여 재생성</button>
+    </div>
+    
+    <!-- 프롬프트 (접힌 상태) -->
+    <details class="card" style="margin-top: 20px;" id="promptCard">
+      <summary style="cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+        <span>🔧 프롬프트 확인/수정</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="copyPromptBtn" onclick="event.stopPropagation();">
+          📋 복사
+        </button>
+      </summary>
+      <div style="margin-top: 16px;">
+        <textarea id="promptEditor" class="form-textarea"
+                  style="min-height: 300px; font-size: 0.85rem; font-family: monospace; line-height: 1.6;"
+                  placeholder="'프롬프트 생성' 버튼을 클릭하면 프롬프트가 여기에 표시됩니다. 수정 후 '리뷰 생성하기'를 클릭하세요."></textarea>
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+// 데이터 저장용
+let currentClinicData = null;
+let currentReviewId = null;
+
+// DOM 요소
+const clinicSelect = document.getElementById('clinicSelect');
+const doctorSelect = document.getElementById('doctorSelect');
+const procedureSelect = document.getElementById('procedureSelect');
+const contentTypeSelect = document.getElementById('contentTypeSelect');
+const personaSelect = document.getElementById('personaSelect');
+const cafeSelect = document.getElementById('cafeSelect');
+const consultantSelect = document.getElementById('consultantSelect');
+const reviewForm = document.getElementById('reviewForm');
+const resultCard = document.getElementById('resultCard');
+const loadingCard = document.getElementById('loadingCard');
+const resultBox = document.getElementById('resultBox');
+const charCount = document.getElementById('charCount');
+const tokenInfo = document.getElementById('tokenInfo');
+const costInfo = document.getElementById('costInfo');
+const promptEditor = document.getElementById('promptEditor');
+const promptCard = document.getElementById('promptCard');
+const generatePromptBtn = document.getElementById('generatePromptBtn');
+const generateReviewBtn = document.getElementById('generateReviewBtn');
+const editCard = document.getElementById('editCard');
+
+// CSRF 토큰
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// 직접입력 토글 함수
+function setupCustomInput(selectId, customInputId) {
+  const select = document.getElementById(selectId);
+  const customInput = document.getElementById(customInputId);
+
+  select.addEventListener('change', function() {
+    if (this.value === '__custom__') {
+      customInput.style.display = 'block';
+      customInput.querySelector('input').focus();
+    } else {
+      customInput.style.display = 'none';
+    }
+  });
+}
+
+// 모든 직접입력 필드 설정
+setupCustomInput('clinicSelect', 'clinicCustomInput');
+setupCustomInput('doctorSelect', 'doctorCustomInput');
+setupCustomInput('procedureSelect', 'procedureCustomInput');
+setupCustomInput('contentTypeSelect', 'contentTypeCustomInput');
+setupCustomInput('personaSelect', 'personaCustomInput');
+setupCustomInput('cafeSelect', 'cafeCustomInput');
+setupCustomInput('consultantSelect', 'consultantCustomInput');
+
+// 병원 선택 시
+clinicSelect.addEventListener('change', async function() {
+  const clinicId = this.value;
+
+  // 없음 또는 직접입력 선택 시
+  if (!clinicId || clinicId === '__none__' || clinicId === '__custom__') {
+    // 직접입력일 경우 의료진/시술도 직접입력 모드로
+    if (clinicId === '__custom__') {
+      // 의료진 select에 기본 옵션 유지
+    }
+    return;
+  }
+
+  // API로 의료진 데이터 로드
+  try {
+    const response = await fetch(`/dashboard/api/clinic/${clinicId}/doctors/`);
+    const data = await response.json();
+    const doctors = data.doctors || [];
+    const consultants = data.consultants || [];
+
+    // 의료진 드롭다운 업데이트
+    doctorSelect.innerHTML = '<option value="">원장님을 선택하세요</option><option value="__none__">없음</option><option value="__custom__">직접입력</option>';
+    doctors.forEach(doc => {
+      const opt = document.createElement('option');
+      opt.value = doc.code;
+      opt.textContent = `${doc.name} 원장님 (${doc.code})`;
+      opt.dataset.style = doc.style || '';
+      opt.dataset.specialties = JSON.stringify(doc.specialties || []);
+      doctorSelect.appendChild(opt);
+    });
+
+    // 상담실장 드롭다운 업데이트
+    consultantSelect.innerHTML = '<option value="">랜덤 또는 미지정</option><option value="__none__">없음</option><option value="__custom__">직접입력</option>';
+    consultants.forEach(cons => {
+      const opt = document.createElement('option');
+      opt.value = cons.name;
+      opt.textContent = `${cons.name} 실장님 (${cons.age || ''}세, ${cons.style || ''})`;
+      consultantSelect.appendChild(opt);
+    });
+
+  } catch (e) {
+    console.error('의료진 데이터 로드 오류:', e);
+  }
+});
+
+// 원장 선택 시
+doctorSelect.addEventListener('change', function() {
+  const selected = this.options[this.selectedIndex];
+  const doctorCode = this.value;
+
+  // 직접입력 처리는 setupCustomInput에서 이미 처리됨
+  if (!doctorCode || doctorCode === '__none__' || doctorCode === '__custom__') {
+    document.getElementById('doctorInfo').textContent = '';
+    return;
+  }
+
+  // 원장 정보 표시
+  document.getElementById('doctorInfo').textContent = selected.dataset.style || '';
+
+  // 시술 목록 로드 (API 호출)
+  const clinicId = clinicSelect.value;
+  if (!clinicId || clinicId === '__none__' || clinicId === '__custom__') return;
+
+  fetch(`/dashboard/api/clinic/${clinicId}/procedures/${doctorCode}/`)
+    .then(res => res.json())
+    .then(data => {
+      procedureSelect.innerHTML = '<option value="">시술을 선택하세요</option><option value="__none__">없음</option><option value="__custom__">직접입력</option>';
+      data.procedures.forEach(proc => {
+        const opt = document.createElement('option');
+        opt.value = proc.procedure;
+        opt.textContent = `${proc.procedure} (${proc.price_display || proc.price})`;
+        procedureSelect.appendChild(opt);
+      });
+    })
+    .catch(err => {
+      console.error('시술 로드 오류:', err);
+    });
+});
+
+// 컨텐츠 유형 선택 시
+contentTypeSelect.addEventListener('change', function() {
+  const selected = this.options[this.selectedIndex];
+  if (this.value === '__none__' || this.value === '__custom__') {
+    document.getElementById('contentTypeInfo').textContent = '';
+    return;
+  }
+  if (selected.dataset.desc) {
+    document.getElementById('contentTypeInfo').textContent = selected.dataset.desc;
+  } else {
+    document.getElementById('contentTypeInfo').textContent = '컨텐츠 유형에 따라 글의 구조와 톤이 달라집니다';
+  }
+});
+
+// 페르소나 선택 시
+personaSelect.addEventListener('change', function() {
+  if (this.value === '__none__' || this.value === '__custom__') {
+    document.getElementById('personaInfo').textContent = '';
+    return;
+  }
+  document.getElementById('personaInfo').textContent = '';
+});
+
+// 카페 선택 시
+cafeSelect.addEventListener('change', function() {
+  const selected = this.options[this.selectedIndex];
+  if (this.value === '__none__' || this.value === '__custom__') {
+    document.getElementById('cafeInfo').textContent = '';
+    return;
+  }
+  if (selected.dataset.min && selected.dataset.max) {
+    document.getElementById('cafeInfo').textContent = `글자수: ${selected.dataset.min}~${selected.dataset.max}자`;
+  } else {
+    document.getElementById('cafeInfo').textContent = '';
+  }
+});
+
+// 폼 데이터 수집 함수
+function collectFormData() {
+  const formData = new FormData(reviewForm);
+  const data = Object.fromEntries(formData.entries());
+
+  // 직접입력 값 처리
+  if (data.clinic_id === '__custom__') {
+    data.clinic_custom = document.getElementById('clinicCustomText').value;
+  }
+  if (data.doctor_code === '__custom__') {
+    data.doctor_custom = document.getElementById('doctorCustomText').value;
+  }
+  if (data.procedure === '__custom__') {
+    data.procedure = document.getElementById('procedureCustomText').value;
+  }
+  if (data.content_type === '__custom__') {
+    data.content_type_custom = document.getElementById('contentTypeCustomText').value;
+  }
+  if (data.persona_id === '__custom__') {
+    data.persona_custom = document.getElementById('personaCustomText').value;
+  }
+  if (data.cafe_id === '__custom__') {
+    data.cafe_custom = document.getElementById('cafeCustomText').value;
+  }
+  if (data.consultant_name === '__custom__') {
+    data.consultant_name = document.getElementById('consultantCustomText').value;
+  }
+
+  // '__none__' 값은 빈 문자열로 변환
+  Object.keys(data).forEach(key => {
+    if (data[key] === '__none__') data[key] = '';
+  });
+
+  return data;
+}
+
+// 프롬프트 생성 버튼
+generatePromptBtn.addEventListener('click', async function() {
+  const data = collectFormData();
+
+  generatePromptBtn.disabled = true;
+  generatePromptBtn.textContent = '⏳ 생성 중...';
+
+  try {
+    const response = await fetch('/dashboard/api/generate-prompt/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    // 프롬프트 표시
+    promptEditor.value = result.prompt;
+    promptCard.open = true;  // details 열기
+    generateReviewBtn.disabled = false;
+
+  } catch (err) {
+    alert('프롬프트 생성 실패: ' + err.message);
+  } finally {
+    generatePromptBtn.disabled = false;
+    generatePromptBtn.textContent = '📝 프롬프트 생성';
+  }
+});
+
+// 리뷰 생성 버튼 (폼 데이터로 프롬프트 새로 생성 후 리뷰 생성)
+generateReviewBtn.addEventListener('click', async function() {
+  const data = collectFormData();
+  const selectedModel = document.querySelector('input[name="model"]:checked')?.value || 'claude-sonnet-4-5-20250929';
+
+  // UI 업데이트
+  loadingCard.style.display = 'block';
+  editCard.style.display = 'none';
+  resultBox.textContent = '생성 중...';
+  resultBox.style.color = 'var(--muted)';
+  generateReviewBtn.disabled = true;
+
+  try {
+    // 폼 데이터로 리뷰 생성 (프롬프트도 새로 생성됨)
+    const response = await fetch('/dashboard/api/generate/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    // 결과 표시
+    resultBox.textContent = result.review;
+    resultBox.style.color = '';  // 원래 색상으로 복원
+    charCount.textContent = `${result.char_count}자`;
+    currentReviewId = result.review_id;
+
+    // 토큰/비용 표시
+    if (result.total_tokens) {
+      let tokenText = `입력: ${result.input_tokens.toLocaleString()}`;
+      if (result.cached_input_tokens > 0) {
+        tokenText += ` (캐시: ${result.cached_input_tokens.toLocaleString()})`;
+      }
+      tokenText += ` | 출력: ${result.output_tokens.toLocaleString()}`;
+      tokenInfo.textContent = tokenText;
+      tokenInfo.style.display = '';
+    }
+    if (result.cost_krw !== undefined) {
+      costInfo.textContent = `₩${result.cost_krw.toLocaleString()}`;
+      costInfo.style.display = '';
+    }
+
+    // 생성된 프롬프트 표시
+    if (result.prompt_preview) {
+      promptEditor.value = result.prompt_preview;
+    }
+
+    // 사용한 모델 표시
+    const modelUsed = document.getElementById('modelUsed');
+    if (result.model_used) {
+      const isOpenAI = result.model_used.startsWith('gpt');
+      modelUsed.textContent = isOpenAI ? `🤖 ${result.model_used}` : `🟣 ${result.model_used}`;
+      modelUsed.style.display = 'inline-block';
+    }
+
+    loadingCard.style.display = 'none';
+
+  } catch (err) {
+    alert('생성 실패: ' + err.message);
+    loadingCard.style.display = 'none';
+    resultBox.textContent = '리뷰가 여기에 표시됩니다.';
+    resultBox.style.color = 'var(--muted)';
+  } finally {
+    generateReviewBtn.disabled = false;
+  }
+});
+
+// 폼 제출 방지 (엔터키 등)
+reviewForm.addEventListener('submit', function(e) {
+  e.preventDefault();
+});
+
+// 복사 버튼
+document.getElementById('copyBtn').addEventListener('click', function() {
+  navigator.clipboard.writeText(resultBox.textContent).then(() => {
+    this.textContent = '✅ 복사됨!';
+    setTimeout(() => { this.textContent = '📋 복사'; }, 2000);
+  });
+});
+
+// 다시 생성 (현재 프롬프트 창의 내용으로 리뷰 재생성)
+document.getElementById('regenerateBtn').addEventListener('click', async function() {
+  const prompt = promptEditor.value.trim();
+  const selectedModel = document.querySelector('input[name="model"]:checked')?.value || 'claude-sonnet-4-5-20250929';
+
+  if (!prompt) {
+    alert('프롬프트가 없습니다. 먼저 프롬프트를 생성하거나 입력해주세요.');
+    return;
+  }
+
+  // UI 업데이트
+  loadingCard.style.display = 'block';
+  editCard.style.display = 'none';
+  resultBox.textContent = '생성 중...';
+  resultBox.style.color = 'var(--muted)';
+
+  try {
+    // 현재 프롬프트로 리뷰 생성
+    const response = await fetch('/dashboard/api/generate-from-prompt/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({
+        prompt: prompt,
+        model: selectedModel
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    // 결과 표시
+    resultBox.textContent = result.review;
+    resultBox.style.color = '';  // 원래 색상으로 복원
+    charCount.textContent = `${result.char_count}자`;
+    currentReviewId = result.review_id;
+
+    // 토큰/비용 표시
+    if (result.total_tokens) {
+      let tokenText = `입력: ${result.input_tokens.toLocaleString()}`;
+      if (result.cached_input_tokens > 0) {
+        tokenText += ` (캐시: ${result.cached_input_tokens.toLocaleString()})`;
+      }
+      tokenText += ` | 출력: ${result.output_tokens.toLocaleString()}`;
+      tokenInfo.textContent = tokenText;
+      tokenInfo.style.display = '';
+    }
+    if (result.cost_krw !== undefined) {
+      costInfo.textContent = `₩${result.cost_krw.toLocaleString()}`;
+      costInfo.style.display = '';
+    }
+
+    // 사용한 모델 표시
+    const modelUsed = document.getElementById('modelUsed');
+    if (result.model_used) {
+      const isOpenAI = result.model_used.startsWith('gpt');
+      modelUsed.textContent = isOpenAI ? `🤖 ${result.model_used}` : `🟣 ${result.model_used}`;
+      modelUsed.style.display = 'inline-block';
+    }
+
+    loadingCard.style.display = 'none';
+
+  } catch (err) {
+    alert('재생성 실패: ' + err.message);
+    loadingCard.style.display = 'none';
+    resultBox.textContent = '리뷰가 여기에 표시됩니다.';
+    resultBox.style.color = 'var(--muted)';
+  }
+});
+
+// 프롬프트 복사
+document.getElementById('copyPromptBtn').addEventListener('click', function() {
+  navigator.clipboard.writeText(promptEditor.value).then(() => {
+    this.textContent = '✅ 복사됨!';
+    setTimeout(() => { this.textContent = '📋 프롬프트 복사'; }, 2000);
+  });
+});
+
+// 수정 요청 토글
+document.getElementById('editBtn').addEventListener('click', function() {
+  editCard.style.display = 'block';
+});
+document.getElementById('cancelEditBtn').addEventListener('click', function() {
+  editCard.style.display = 'none';
+});
+
+// 수정 반영 재생성
+document.getElementById('submitFeedbackBtn').addEventListener('click', async function() {
+  const feedback = document.getElementById('feedbackInput').value;
+  if (!feedback.trim()) {
+    alert('수정 요청 내용을 입력해주세요.');
+    return;
+  }
+
+  // 현재 선택된 모델 가져오기
+  const selectedModel = document.querySelector('input[name="model"]:checked')?.value || 'claude-sonnet-4-5-20250929';
+
+  loadingCard.style.display = 'block';
+  editCard.style.display = 'none';
+  resultBox.textContent = '수정 중...';
+  resultBox.style.color = 'var(--muted)';
+
+  try {
+    const response = await fetch('/dashboard/api/regenerate/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({
+        review_id: currentReviewId,
+        feedback: feedback,
+        model: selectedModel
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    resultBox.textContent = result.review;
+    resultBox.style.color = '';  // 원래 색상으로 복원
+    charCount.textContent = `${result.char_count}자`;
+    currentReviewId = result.review_id;
+    document.getElementById('feedbackInput').value = '';
+
+    // 토큰/비용 표시
+    if (result.total_tokens) {
+      let tokenText = `입력: ${result.input_tokens.toLocaleString()}`;
+      if (result.cached_input_tokens > 0) {
+        tokenText += ` (캐시: ${result.cached_input_tokens.toLocaleString()})`;
+      }
+      tokenText += ` | 출력: ${result.output_tokens.toLocaleString()}`;
+      tokenInfo.textContent = tokenText;
+      tokenInfo.style.display = '';
+    }
+    if (result.cost_krw !== undefined) {
+      costInfo.textContent = `₩${result.cost_krw.toLocaleString()}`;
+      costInfo.style.display = '';
+    }
+
+    loadingCard.style.display = 'none';
+
+  } catch (err) {
+    alert('재생성 실패: ' + err.message);
+    loadingCard.style.display = 'none';
+    resultBox.textContent = '리뷰가 여기에 표시됩니다.';
+    resultBox.style.color = 'var(--muted)';
+  }
+});
+
+// 초기화
+document.getElementById('resetBtn').addEventListener('click', function() {
+  reviewForm.reset();
+  doctorSelect.innerHTML = '<option value="">원장님을 선택하세요</option><option value="__none__">없음</option><option value="__custom__">직접입력</option>';
+  procedureSelect.innerHTML = '<option value="">시술을 선택하세요</option><option value="__none__">없음</option><option value="__custom__">직접입력</option>';
+  consultantSelect.innerHTML = '<option value="">랜덤 또는 미지정</option><option value="__none__">없음</option><option value="__custom__">직접입력</option>';
+  editCard.style.display = 'none';
+  document.getElementById('doctorInfo').textContent = '';
+  document.getElementById('personaInfo').textContent = '';
+  document.getElementById('cafeInfo').textContent = '';
+  document.getElementById('contentTypeInfo').textContent = '컨텐츠 유형에 따라 글의 구조와 톤이 달라집니다';
+
+  // 리뷰 결과 초기화
+  resultBox.textContent = '리뷰가 여기에 표시됩니다.';
+  resultBox.style.color = 'var(--muted)';
+  charCount.textContent = '0자';
+  tokenInfo.style.display = 'none';
+  costInfo.style.display = 'none';
+  document.getElementById('modelUsed').style.display = 'none';
+  currentReviewId = null;
+
+  // 프롬프트 영역 초기화
+  promptEditor.value = '';
+  promptCard.open = false;
+
+  // 모든 직접입력 필드 숨기기 및 초기화
+  document.querySelectorAll('.custom-input-wrap').forEach(el => {
+    el.style.display = 'none';
+    el.querySelector('input').value = '';
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+# Django
+Django>=4.2,<5.0
+djangorestframework>=3.14
+
+# OpenAI
+openai>=1.0
+
+# Anthropic (Claude)
+anthropic>=0.75
+
+# Utilities
+python-dotenv>=1.0
+
+# Production (optional)
+gunicorn>=21.0
+whitenoise>=6.0

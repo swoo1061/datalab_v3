@@ -1,0 +1,365 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}페르소나 관리{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">작성자 페르소나</h1>
+    <p class="page-subtitle">리뷰 작성자의 성격, 말투, 스타일을 설정합니다</p>
+  </div>
+  <a href="{% url 'dashboard:persona_new' %}" class="btn btn-primary">
+    + 페르소나 추가
+  </a>
+</div>
+
+<div class="card">
+  {% if personas %}
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>페르소나명</th>
+            <th>연령/성별</th>
+            <th>말투 스타일</th>
+            <th>상세도</th>
+            <th>상태</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for persona in personas %}
+          <tr data-id="{{ persona.pk }}" style="{% if not persona.is_active %}opacity: 0.5;{% endif %}">
+            <td>
+              <strong>{{ persona.name }}</strong>
+              {% if persona.description %}
+              <div class="text-sm text-muted" style="margin-top: 4px;">{{ persona.description|truncatechars:40 }}</div>
+              {% endif %}
+            </td>
+            <td>
+              <span class="tag tag-primary">{{ persona.age_group }}</span>
+              <span class="tag tag-muted">{{ persona.gender }}</span>
+            </td>
+            <td class="text-sm">
+              {{ persona.speech_style|truncatechars:30 }}
+            </td>
+            <td>
+              {% if persona.detail_level == 'detailed' %}
+                <span class="tag tag-success">상세</span>
+              {% elif persona.detail_level == 'brief' %}
+                <span class="tag tag-warning">간결</span>
+              {% else %}
+                <span class="tag tag-muted">보통</span>
+              {% endif %}
+              {% if persona.emoji_usage %}
+                <span style="margin-left: 4px;">😊</span>
+              {% endif %}
+            </td>
+            <td>
+              <button class="btn btn-ghost btn-sm toggle-btn" data-id="{{ persona.pk }}">
+                {% if persona.is_active %}
+                  <span class="tag tag-success">활성</span>
+                {% else %}
+                  <span class="tag tag-muted">비활성</span>
+                {% endif %}
+              </button>
+            </td>
+            <td>
+              <div class="flex gap-2">
+                <a href="{% url 'dashboard:persona_edit' persona.pk %}" class="btn btn-ghost btn-sm">
+                  수정
+                </a>
+                <button class="btn btn-ghost btn-sm delete-btn" data-id="{{ persona.pk }}" data-name="{{ persona.name }}" style="color: var(--danger);">
+                  삭제
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="text-center" style="padding: 60px;">
+      <p style="font-size: 3rem; margin-bottom: 16px;">👤</p>
+      <p class="text-muted" style="margin-bottom: 20px;">등록된 페르소나가 없습니다</p>
+      <a href="{% url 'dashboard:persona_new' %}" class="btn btn-primary">
+        첫 페르소나 등록하기
+      </a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card mt-4">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <span class="card-title">프리셋 미리보기</span>
+    <button id="load-all-presets-btn" class="btn btn-secondary btn-sm">
+      전체 불러오기
+    </button>
+  </div>
+  <p class="text-muted text-sm">원하는 프리셋을 선택하여 추가할 수 있습니다.</p>
+
+  <div id="presets-container" class="preset-grid mt-4">
+    <div class="text-center text-muted" style="padding: 40px;">
+      프리셋 로딩 중...
+    </div>
+  </div>
+  <div id="preset-result" class="text-sm mt-4" style="display: none;"></div>
+</div>
+
+<style>
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+.preset-card {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--card-bg, #fff);
+  transition: box-shadow 0.2s;
+}
+.preset-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.preset-card.already-exists {
+  opacity: 0.7;
+  border-color: var(--success, #10b981);
+  background: rgba(16, 185, 129, 0.05);
+}
+.preset-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.preset-card-title {
+  font-weight: 600;
+  font-size: 1rem;
+  margin: 0;
+}
+.preset-card-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted, #6b7280);
+  margin: 4px 0 0;
+}
+.preset-card-body {
+  font-size: 0.85rem;
+}
+.preset-card-body .row {
+  display: flex;
+  margin-bottom: 6px;
+}
+.preset-card-body .label {
+  width: 70px;
+  color: var(--text-muted, #6b7280);
+  flex-shrink: 0;
+}
+.preset-card-body .value {
+  flex: 1;
+}
+.preset-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.preset-keywords .tag {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+}
+.preset-card-footer {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+
+// 활성화 토글
+document.querySelectorAll('.toggle-btn').forEach(btn => {
+  btn.addEventListener('click', async (e) => {
+    const id = btn.dataset.id;
+    try {
+      const resp = await fetch(`/dashboard/api/personas/${id}/toggle/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrfToken}
+      });
+      const data = await resp.json();
+      if (data.success) {
+        location.reload();
+      }
+    } catch (err) {
+      alert('오류가 발생했습니다.');
+    }
+  });
+});
+
+// 삭제
+document.querySelectorAll('.delete-btn').forEach(btn => {
+  btn.addEventListener('click', async (e) => {
+    const id = btn.dataset.id;
+    const name = btn.dataset.name;
+    if (!confirm(`'${name}' 페르소나를 삭제하시겠습니까?`)) return;
+
+    try {
+      const resp = await fetch(`/dashboard/api/personas/${id}/delete/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrfToken}
+      });
+      const data = await resp.json();
+      if (data.success) {
+        location.reload();
+      }
+    } catch (err) {
+      alert('오류가 발생했습니다.');
+    }
+  });
+});
+
+// 프리셋 카드 렌더링
+function renderPresetCard(preset) {
+  const detailLevelText = {
+    'detailed': '상세',
+    'moderate': '보통',
+    'brief': '간결'
+  };
+
+  const keywords = preset.keywords.slice(0, 5).map(k =>
+    `<span class="tag tag-muted">${k}</span>`
+  ).join('');
+
+  return `
+    <div class="preset-card ${preset.already_exists ? 'already-exists' : ''}" data-index="${preset.index}">
+      <div class="preset-card-header">
+        <div>
+          <h4 class="preset-card-title">${preset.name}</h4>
+          ${preset.description ? `<p class="preset-card-desc">${preset.description}</p>` : ''}
+        </div>
+        ${preset.already_exists ? '<span class="tag tag-success">추가됨</span>' : ''}
+      </div>
+      <div class="preset-card-body">
+        <div class="row">
+          <span class="label">연령/성별</span>
+          <span class="value">
+            <span class="tag tag-primary">${preset.age_group}</span>
+            <span class="tag tag-muted">${preset.gender}</span>
+          </span>
+        </div>
+        <div class="row">
+          <span class="label">상세도</span>
+          <span class="value">
+            ${detailLevelText[preset.detail_level] || preset.detail_level}
+            ${preset.emoji_usage ? ' / 이모지 사용' : ''}
+          </span>
+        </div>
+        <div class="row">
+          <span class="label">말투</span>
+          <span class="value">${preset.speech_style.substring(0, 50)}${preset.speech_style.length > 50 ? '...' : ''}</span>
+        </div>
+        ${keywords ? `<div class="preset-keywords">${keywords}</div>` : ''}
+      </div>
+      <div class="preset-card-footer">
+        <button class="btn btn-primary btn-sm add-preset-btn" data-index="${preset.index}">
+          ${preset.already_exists ? '업데이트' : '추가'}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// 프리셋 목록 로드
+async function loadPresets() {
+  const container = document.getElementById('presets-container');
+
+  try {
+    const resp = await fetch('/dashboard/api/persona-presets/');
+    const data = await resp.json();
+
+    if (data.success && data.presets.length > 0) {
+      container.innerHTML = data.presets.map(renderPresetCard).join('');
+
+      // 개별 추가 버튼 이벤트
+      container.querySelectorAll('.add-preset-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const index = parseInt(btn.dataset.index);
+          btn.disabled = true;
+          btn.textContent = '처리 중...';
+
+          try {
+            const resp = await fetch('/dashboard/api/persona-presets/add/', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+              },
+              body: JSON.stringify({ index })
+            });
+            const data = await resp.json();
+
+            if (data.success) {
+              btn.textContent = '완료!';
+              btn.closest('.preset-card').classList.add('already-exists');
+              setTimeout(() => location.reload(), 500);
+            } else {
+              alert(data.error || '오류가 발생했습니다.');
+              btn.disabled = false;
+              btn.textContent = '추가';
+            }
+          } catch (err) {
+            alert('오류가 발생했습니다.');
+            btn.disabled = false;
+            btn.textContent = '추가';
+          }
+        });
+      });
+    } else {
+      container.innerHTML = '<div class="text-center text-muted" style="padding: 40px;">프리셋이 없습니다.</div>';
+    }
+  } catch (err) {
+    container.innerHTML = '<div class="text-center text-muted" style="padding: 40px; color: var(--danger);">프리셋 로드 실패</div>';
+  }
+}
+
+// 전체 불러오기
+document.getElementById('load-all-presets-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('load-all-presets-btn');
+  const resultDiv = document.getElementById('preset-result');
+
+  btn.disabled = true;
+  btn.textContent = '처리 중...';
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '전체 프리셋을 불러오는 중...';
+
+  try {
+    const resp = await fetch('/dashboard/api/load-persona-presets/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrfToken}
+    });
+    const data = await resp.json();
+    if (data.success) {
+      resultDiv.innerHTML = `<span style="color: var(--success);">${data.message}</span>`;
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      resultDiv.innerHTML = `<span style="color: var(--danger);">${data.error}</span>`;
+      btn.disabled = false;
+      btn.textContent = '전체 불러오기';
+    }
+  } catch (err) {
+    resultDiv.innerHTML = `<span style="color: var(--danger);">오류 발생</span>`;
+    btn.disabled = false;
+    btn.textContent = '전체 불러오기';
+  }
+});
+
+// 페이지 로드 시 프리셋 목록 로드
+loadPresets();
+</script>
+{% endblock %}

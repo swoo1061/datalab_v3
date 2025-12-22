@@ -1,0 +1,156 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}병원 가이드 목록{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">병원 가이드</h1>
+    <p class="page-subtitle">등록된 병원 정보를 관리합니다</p>
+  </div>
+  <a href="{% url 'dashboard:clinic_import' %}" class="btn btn-primary">
+    + 병원 추가
+  </a>
+</div>
+
+<div class="card">
+  {% if clinics %}
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>병원명</th>
+            <th>위치</th>
+            <th>의료진</th>
+            <th>시술</th>
+            <th>등록일</th>
+            <th>상태</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for clinic in clinics %}
+          <tr style="{% if not clinic.is_active %}opacity: 0.5;{% endif %}">
+            <td>
+              <strong>{{ clinic.name }}</strong>
+            </td>
+            <td class="text-sm text-muted">
+              {{ clinic.location|truncatechars:30 }}
+            </td>
+            <td>
+              {% for doc in clinic.doctors|slice:":3" %}
+                <span class="tag tag-primary" style="margin: 2px;">{{ doc.name }}</span>
+              {% empty %}
+                <span class="text-muted">-</span>
+              {% endfor %}
+              {% if clinic.doctors|length > 3 %}
+                <span class="text-muted text-sm">+{{ clinic.doctors|length|add:"-3" }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="tag tag-muted">{{ clinic.price_list|length }}개</span>
+            </td>
+            <td class="text-sm text-muted">
+              {{ clinic.created_at|date:"Y-m-d" }}
+            </td>
+            <td>
+              <button class="btn btn-ghost btn-sm toggle-btn" data-id="{{ clinic.pk }}">
+                {% if clinic.is_active %}
+                  <span class="tag tag-success">활성</span>
+                {% else %}
+                  <span class="tag tag-muted">비활성</span>
+                {% endif %}
+              </button>
+            </td>
+            <td>
+              <div class="flex gap-2">
+                <a href="{% url 'dashboard:clinic_detail' clinic.pk %}" class="btn btn-ghost btn-sm">
+                  상세
+                </a>
+                <button class="btn btn-ghost btn-sm delete-btn" data-id="{{ clinic.pk }}" data-name="{{ clinic.name }}" style="color: var(--danger);">
+                  삭제
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="text-center" style="padding: 60px;">
+      <p style="font-size: 3rem; margin-bottom: 16px;">+</p>
+      <p class="text-muted" style="margin-bottom: 20px;">등록된 병원이 없습니다</p>
+      <a href="{% url 'dashboard:clinic_import' %}" class="btn btn-primary">
+        첫 병원 등록하기
+      </a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card mt-4">
+  <div class="card-header">
+    <span class="card-title">병원 정보 가이드</span>
+  </div>
+  <p class="text-muted text-sm">
+    병원 정보는 Markdown 파일에서 임포트됩니다.
+    병원을 추가하려면 "병원 추가" 버튼을 클릭하고 MD 파일 내용을 붙여넣으세요.
+  </p>
+  <div class="mt-4" style="font-size: 0.85rem; color: var(--text-muted);">
+    <strong>MD 파일에 포함되어야 하는 정보:</strong>
+    <ul style="margin-top: 8px; padding-left: 20px;">
+      <li>기본 정보 (위치, 운영시간, 주차)</li>
+      <li>의료진 정보 (코드, 이름, 전문분야, 스타일)</li>
+      <li>상담실장 정보</li>
+      <li>수가표 (시술명, 가격)</li>
+      <li>사후관리 및 특징</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+
+// 활성화 토글
+document.querySelectorAll('.toggle-btn').forEach(btn => {
+  btn.addEventListener('click', async (e) => {
+    const id = btn.dataset.id;
+    try {
+      const resp = await fetch(`/dashboard/api/clinics/${id}/toggle/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrfToken}
+      });
+      const data = await resp.json();
+      if (data.success) {
+        location.reload();
+      }
+    } catch (err) {
+      alert('오류가 발생했습니다.');
+    }
+  });
+});
+
+// 삭제
+document.querySelectorAll('.delete-btn').forEach(btn => {
+  btn.addEventListener('click', async (e) => {
+    const id = btn.dataset.id;
+    const name = btn.dataset.name;
+    if (!confirm(`'${name}' 병원을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) return;
+
+    try {
+      const resp = await fetch(`/dashboard/api/clinics/${id}/delete/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrfToken}
+      });
+      const data = await resp.json();
+      if (data.success) {
+        location.reload();
+      }
+    } catch (err) {
+      alert('오류가 발생했습니다.');
+    }
+  });
+});
+</script>
+{% endblock %}

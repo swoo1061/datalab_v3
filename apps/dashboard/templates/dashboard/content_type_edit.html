@@ -1,0 +1,208 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{% if content_type %}컨텐츠 타입 수정{% else %}컨텐츠 타입 추가{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{% if content_type %}컨텐츠 타입 수정{% else %}새 컨텐츠 타입 추가{% endif %}</h1>
+    <p class="page-subtitle">리뷰 유형별 구조, 톤, 표현 방식을 설정합니다</p>
+  </div>
+  <a href="{% url 'dashboard:content_type_list' %}" class="btn btn-secondary">
+    목록으로
+  </a>
+</div>
+
+<form id="content-type-form" method="POST">
+  {% csrf_token %}
+
+  <div class="grid-2">
+    <!-- 기본 정보 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">기본 정보</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">유형 코드 *</label>
+        <input type="text" name="value" class="form-input"
+               value="{{ content_type.value|default:'' }}"
+               placeholder="예: consultation, procedure" required>
+        <p class="form-hint">영문 소문자, 언더스코어 사용</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">유형명 *</label>
+        <input type="text" name="label" class="form-input"
+               value="{{ content_type.label|default:'' }}"
+               placeholder="예: 상담후기, 시술후기" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">설명</label>
+        <textarea name="description" class="form-textarea" rows="2"
+                  placeholder="이 유형에 대한 간단한 설명">{{ content_type.description|default:'' }}</textarea>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">최소 글자수</label>
+          <input type="number" name="min_length" class="form-input"
+                 value="{{ content_type.min_length|default:400 }}" min="100">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">최대 글자수</label>
+          <input type="number" name="max_length" class="form-input"
+                 value="{{ content_type.max_length|default:1200 }}" min="100">
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">톤</label>
+          <input type="text" name="tone" class="form-input"
+                 value="{{ content_type.tone|default:'' }}"
+                 placeholder="예: 신중함, 분석적, 기대감">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">옵션</label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 12px;">
+            <input type="checkbox" name="image_required"
+                   {% if content_type.image_required %}checked{% endif %}>
+            <span class="text-sm">이미지 필수</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 8px;">
+            <input type="checkbox" name="is_active"
+                   {% if content_type.is_active or not content_type %}checked{% endif %}>
+            <span class="text-sm">활성화</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 글 구조 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">글 구조</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">글 구조 (섹션별 비율)</label>
+        <textarea name="structure" class="form-textarea" rows="6"
+                  placeholder="한 줄에 하나씩 입력&#10;예:&#10;고민/배경 (15%): 현재 상태와 고민 설명&#10;탐색과정 (20%): 여러 병원 알아본 과정&#10;상담경험 (30%): 이 병원에서의 상담 경험">{% for item in content_type.structure %}{{ item }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">필수 포함 섹션</label>
+        <textarea name="required_sections" class="form-textarea" rows="4"
+                  placeholder="한 줄에 하나씩 입력&#10;예:&#10;현재 고민/상태&#10;원장님 상담 스타일 묘사">{% for item in content_type.required_sections %}{{ item }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">감정 흐름</label>
+        <textarea name="emotion_flow" class="form-textarea" rows="2"
+                  placeholder="한 줄에 하나씩 입력 (예: 불안, 비교, 인상적, 결정)">{% for item in content_type.emotion_flow %}{{ item }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 표현 설정 -->
+  <div class="card mt-4">
+    <div class="card-header">
+      <span class="card-title">표현 설정</span>
+    </div>
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">자주 쓰는 표현</label>
+        <textarea name="common_expressions" class="form-textarea" rows="4"
+                  placeholder="한 줄에 하나씩 입력">{% for item in content_type.common_expressions %}{{ item }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">시작 패턴</label>
+        <textarea name="opening_patterns" class="form-textarea" rows="4"
+                  placeholder="한 줄에 하나씩 입력&#10;예: ~ 상담 받고 왔어요">{% for item in content_type.opening_patterns %}{{ item }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">마무리 패턴</label>
+        <textarea name="closing_patterns" class="form-textarea" rows="4"
+                  placeholder="한 줄에 하나씩 입력">{% for item in content_type.closing_patterns %}{{ item }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">작성 팁</label>
+        <textarea name="tips" class="form-textarea" rows="4"
+                  placeholder="이 유형의 리뷰를 작성할 때 참고할 팁">{{ content_type.tips|default:'' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 금지/권장 -->
+  <div class="card mt-4">
+    <div class="card-header">
+      <span class="card-title">금지/권장 요소</span>
+    </div>
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">금지 요소</label>
+        <textarea name="forbidden_elements" class="form-textarea" rows="4"
+                  placeholder="한 줄에 하나씩 입력&#10;이 유형에서 사용하면 안 되는 것들">{% for item in content_type.forbidden_elements %}{{ item }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+        <p class="form-hint">예: 수술 결과 언급 (아직 안 했으니까)</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">권장 요소</label>
+        <textarea name="recommended_elements" class="form-textarea" rows="4"
+                  placeholder="한 줄에 하나씩 입력&#10;이 유형에서 사용하면 좋은 것들">{% for item in content_type.recommended_elements %}{{ item }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+        <p class="form-hint">예: CT 촬영, 비교 분석</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex gap-4 mt-4" style="justify-content: flex-end;">
+    <a href="{% url 'dashboard:content_type_list' %}" class="btn btn-secondary">취소</a>
+    <button type="submit" class="btn btn-primary">
+      {% if content_type %}저장{% else %}추가{% endif %}
+    </button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('content-type-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const form = e.target;
+  const formData = new FormData(form);
+
+  try {
+    const resp = await fetch(window.location.href, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      window.location.href = data.redirect || '/dashboard/content-types/';
+    } else {
+      alert(data.error || '오류가 발생했습니다.');
+    }
+  } catch (err) {
+    alert('오류가 발생했습니다.');
+  }
+});
+</script>
+{% endblock %}
