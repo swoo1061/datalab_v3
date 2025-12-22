@@ -1,108 +1,152 @@
-# MedViral - 병의원 바이럴 마케팅 자동화 시스템
+# MedViral v3 - AI 리뷰 생성 시스템
 
-AI 기반 리뷰 생성 시스템으로, Notion에서 관리하는 병원 가이드를 기반으로 자연스러운 리뷰를 생성합니다.
+병의원 바이럴 마케팅을 위한 AI 기반 리뷰 생성 시스템입니다.
 
 ## 주요 기능
 
-- 🏥 **병원 가이드 관리**: Notion MD Export → 자동 파싱 → DB 저장
-- 👨‍⚕️ **의료진/시술 정보**: 원장별 스타일, 주력시술, 수가표 관리
-- 👤 **페르소나 시스템**: 20대 직장인, 30대 주부 등 다양한 작성자 설정
-- 📝 **카페별 설정**: 글자수 제한, 금지 단어, 필수 섹션 등
-- ✨ **AI 리뷰 생성**: GPT-4o-mini 기반 자연스러운 리뷰 생성
-- 🔄 **피드백 반영**: 수정 요청 후 재생성 기능
+- **AI 리뷰 생성**: OpenAI GPT, Claude Sonnet/Opus 지원
+- **Basic / PRO 모드**: 간편 입력 또는 상세 설정
+- **병원 가이드 관리**: Notion MD Export → 자동 파싱
+- **페르소나 시스템**: 다양한 작성자 스타일 설정
+- **카페 프로필**: 플랫폼별 글자수, 금지단어 설정
+- **스타일 분석**: 기존 글에서 스타일 추출
+- **토큰/비용 추적**: 실시간 사용량 및 비용 표시
 
-## 설치 및 실행
+## 요구사항
+
+- Python 3.10+
+- OpenAI API Key 또는 Anthropic API Key
+
+## 설치 방법
+
+### 1. 저장소 클론
 
 ```bash
-# 1. 의존성 설치
+git clone https://github.com/swoo1061/datalab_v3.git
+cd datalab_v3
+```
+
+### 2. 가상환경 생성 (권장)
+
+```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# Mac/Linux
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. 의존성 설치
+
+```bash
 pip install -r requirements.txt
+```
 
-# 2. 환경변수 설정
-export OPENAI_API_KEY="your-api-key"
-export DJANGO_SECRET_KEY="your-secret-key"
+### 4. 환경변수 설정
 
-# 3. DB 마이그레이션
+```bash
+# .env.example을 복사하여 .env 생성
+cp .env.example .env
+
+# .env 파일 편집하여 API 키 입력
+```
+
+**.env 파일 내용:**
+```
+DJANGO_SECRET_KEY=your-secret-key-here
+DEBUG=True
+OPENAI_API_KEY=sk-your-openai-api-key
+ANTHROPIC_API_KEY=sk-ant-your-anthropic-api-key
+```
+
+### 5. 데이터베이스 설정
+
+```bash
 python manage.py migrate
+```
 
-# 4. 초기 데이터 로드 (페르소나, 카페 프리셋)
-python manage.py shell < apps/data/initial_data.py
+### 6. 초기 데이터 로드 (선택)
 
-# 5. 서버 실행
+```bash
+python manage.py shell -c "from apps.data.initial_data import load_initial_data; load_initial_data()"
+```
+
+### 7. 서버 실행
+
+```bash
 python manage.py runserver
 ```
 
+브라우저에서 http://127.0.0.1:8000 접속
+
 ## 사용 방법
 
-### 1. 병원 가이드 추가
+### Basic 모드 (간편)
+1. 대시보드 → AI 생성 Basic
+2. 텍스트 영역에 자유롭게 입력 (병원명, 시술, 페르소나 등)
+3. AI 모델 선택 후 "생성하기" 클릭
 
-1. Notion에서 병원 가이드 페이지 열기
-2. ⋯ → Export → Markdown & CSV
-3. 다운받은 .md 파일 열기
-4. 대시보드 → 병원 가이드 추가 → MD 내용 붙여넣기
-
-### 2. 리뷰 생성
-
-1. 대시보드 → AI 리뷰 생성
-2. 병원 선택 → 원장님 선택 → 시술 선택
-3. (선택) 페르소나, 타겟 카페 설정
+### PRO 모드 (상세)
+1. 대시보드 → AI 생성 PRO
+2. 병원 가이드 선택 → 원장/시술 선택
+3. 페르소나, 카페 프로필, 컨텐츠 타입 설정
 4. "리뷰 생성하기" 클릭
-5. 결과 복사하여 사용
 
-### 3. 리뷰 수정
+## AI 모델 및 가격
 
-1. 생성된 리뷰에서 "수정 요청" 클릭
-2. 피드백 입력 (예: "좀 더 짧게", "이모지 추가")
-3. "수정 반영하여 재생성" 클릭
+| 모델 | Input ($/1M) | Output ($/1M) | 특징 |
+|------|-------------|---------------|------|
+| GPT-5 Mini | $0.25 | $2.00 | 저렴, 기본 품질 |
+| GPT-5.2 | $1.75 | $14.00 | 빠름, 고품질 |
+| Claude Sonnet 4.5 | $3.00 | $15.00 | 빠름, 고품질 (추천) |
+| Claude Opus 4.5 | $5.00 | $25.00 | 최고 품질 |
 
 ## 프로젝트 구조
 
 ```
-medviral/
-├── config/
-│   ├── settings.py      # Django 설정
-│   ├── urls.py          # URL 라우팅
-│   └── wsgi.py
+datalab_v3/
+├── config/              # Django 설정
 ├── apps/
-│   ├── data/
-│   │   ├── models.py    # 데이터 모델
-│   │   ├── admin.py     # Admin 설정
-│   │   └── initial_data.py  # 초기 데이터
-│   ├── ml/
-│   │   └── services/
-│   │       ├── clinic_parser.py     # MD 파서
-│   │       ├── prompt_generator.py  # 프롬프트 생성
-│   │       └── llm_service.py       # LLM 호출
-│   └── dashboard/
-│       ├── views.py     # 뷰
-│       ├── urls.py      # URL
-│       └── templates/   # 템플릿
-├── manage.py
-└── requirements.txt
+│   ├── dashboard/       # 웹 UI (뷰, 템플릿)
+│   ├── data/            # 데이터 모델
+│   └── ml/services/     # LLM 서비스, 파서
+├── docs/                # 문서
+├── .env.example         # 환경변수 예시
+├── requirements.txt     # 의존성
+└── manage.py
 ```
-
-## 데이터 모델
-
-- **ClinicGuide**: 병원 정보 (위치, 의료진, 수가표, 사후관리 등)
-- **Persona**: 작성자 페르소나 (말투, 연령대, 이모지 사용 등)
-- **CafeProfile**: 카페 설정 (글자수, 금지단어, 필수섹션 등)
-- **GeneratedReview**: 생성된 리뷰 기록
-
-## API 엔드포인트
-
-- `GET /dashboard/api/clinic/{id}/doctors/` - 병원 의료진 목록
-- `GET /dashboard/api/clinic/{id}/procedures/{doctor_code}/` - 시술 목록
-- `POST /dashboard/api/generate/` - 리뷰 생성
-- `POST /dashboard/api/regenerate/` - 피드백 반영 재생성
-- `POST /dashboard/api/import-clinic/` - 병원 가이드 임포트
 
 ## 환경변수
 
-| 변수명 | 설명 | 기본값 |
-|--------|------|--------|
-| `OPENAI_API_KEY` | OpenAI API 키 | (필수) |
-| `DJANGO_SECRET_KEY` | Django 시크릿 키 | dev용 키 |
-| `DEBUG` | 디버그 모드 | True |
-| `ALLOWED_HOSTS` | 허용 호스트 | localhost,127.0.0.1 |
+| 변수명 | 설명 | 필수 |
+|--------|------|------|
+| `DJANGO_SECRET_KEY` | Django 시크릿 키 | O |
+| `OPENAI_API_KEY` | OpenAI API 키 | △ |
+| `ANTHROPIC_API_KEY` | Claude API 키 | △ |
+| `DEBUG` | 디버그 모드 | X (기본: True) |
+
+※ OpenAI 또는 Anthropic API 키 중 하나 이상 필요
+
+## 문제 해결
+
+### API 키 오류
+```
+OPENAI_API_KEY가 설정되지 않았습니다
+```
+→ `.env` 파일에 API 키가 제대로 설정되었는지 확인
+
+### 마이그레이션 오류
+```bash
+python manage.py migrate --run-syncdb
+```
+
+### 포트 충돌
+```bash
+# 다른 포트로 실행
+python manage.py runserver 8080
+```
 
 ## 라이선스
 
