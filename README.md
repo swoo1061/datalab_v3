@@ -70,7 +70,7 @@ python manage.py migrate
 ### 6. 초기 데이터 로드 (선택)
 
 ```bash
-python manage.py shell -c "from apps.data.initial_data import load_initial_data; load_initial_data()"
+python manage.py shell -c "from apps.data.initial_data import create_all; create_all()"
 ```
 
 ### 7. 서버 실행
