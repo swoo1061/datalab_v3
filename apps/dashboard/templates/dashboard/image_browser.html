@@ -1,0 +1,38 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}이미지{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">🖼️ 이미지 브라우저</h1>
+    <p class="page-subtitle">업로드된 이미지 자산</p>
+  </div>
+</div>
+
+<div class="card">
+  {% if images %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
+      {% for img in images %}
+      <div style="border: 1px solid var(--border); border-radius: 10px; overflow: hidden;">
+        <div style="aspect-ratio: 1; background: var(--bg); display: flex; align-items: center; justify-content: center;">
+          {% if img.file %}
+            <img src="{{ img.file }}" alt="" style="max-width: 100%; max-height: 100%; object-fit: cover;">
+          {% else %}
+            <span class="text-muted">🖼️</span>
+          {% endif %}
+        </div>
+        <div style="padding: 12px;">
+          <div class="text-sm">{{ img.width|default:"?" }}×{{ img.height|default:"?" }}</div>
+          <div class="text-sm text-muted">{{ img.created_at|date:"m/d" }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-center" style="padding: 60px;">
+      <p style="font-size: 3rem; margin-bottom: 16px;">🖼️</p>
+      <p class="text-muted">업로드된 이미지가 없습니다</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

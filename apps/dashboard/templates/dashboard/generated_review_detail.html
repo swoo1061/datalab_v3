@@ -1,0 +1,117 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}생성 리뷰 상세{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">📄 생성 리뷰 상세</h1>
+    <p class="page-subtitle">
+      {{ review.clinic.name|default:"" }} · {{ review.procedure }} · {{ review.created_at|date:"Y-m-d H:i" }}
+    </p>
+  </div>
+  <div class="flex gap-2">
+    <button class="btn btn-primary" id="copyBtn">📋 복사</button>
+    <a href="{% url 'dashboard:generated_list' %}" class="btn btn-secondary">← 목록</a>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- 리뷰 내용 -->
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">📝 리뷰 내용</h3>
+      <span class="tag tag-primary">{{ review.generated_text|length }}자</span>
+    </div>
+    
+    <div class="result-box" id="reviewText">{{ review.generated_text }}</div>
+    
+    <div class="flex gap-2" style="margin-top: 16px;">
+      {% if review.status == 'generated' %}
+        <span class="tag tag-muted">생성됨</span>
+      {% elif review.status == 'edited' %}
+        <span class="tag tag-warning">수정됨</span>
+      {% elif review.status == 'uploaded' %}
+        <span class="tag tag-success">업로드완료</span>
+      {% elif review.status == 'rejected' %}
+        <span class="tag" style="background: #fee2e2; color: #dc2626;">반려</span>
+      {% endif %}
+      
+      {% if review.upload_url %}
+        <a href="{{ review.upload_url }}" target="_blank" class="btn btn-ghost btn-sm">
+          🔗 업로드된 글 보기
+        </a>
+      {% endif %}
+    </div>
+  </div>
+  
+  <!-- 생성 정보 -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">ℹ️ 생성 정보</h3>
+      </div>
+      
+      <div style="display: grid; gap: 16px;">
+        <div>
+          <div class="text-sm text-muted">병원</div>
+          <div>
+            {% if review.clinic %}
+              <a href="{% url 'dashboard:clinic_detail' review.clinic.pk %}">
+                {{ review.clinic.name }}
+              </a>
+            {% else %}
+              -
+            {% endif %}
+          </div>
+        </div>
+        
+        <div>
+          <div class="text-sm text-muted">담당 원장</div>
+          <div>
+            <span class="tag tag-primary">{{ review.doctor_code }}</span>
+            {{ review.doctor_name }}
+          </div>
+        </div>
+        
+        <div>
+          <div class="text-sm text-muted">시술</div>
+          <div>{{ review.procedure }}</div>
+        </div>
+        
+        <div>
+          <div class="text-sm text-muted">페르소나</div>
+          <div>{{ review.persona.name|default:"기본 페르소나" }}</div>
+        </div>
+        
+        <div>
+          <div class="text-sm text-muted">타겟 카페</div>
+          <div>{{ review.cafe.name|default:"기본 설정" }}</div>
+        </div>
+        
+        <div>
+          <div class="text-sm text-muted">생성일시</div>
+          <div>{{ review.created_at|date:"Y-m-d H:i:s" }}</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 프롬프트 -->
+    {% if review.prompt_used %}
+    <details class="card" style="margin-top: 20px;">
+      <summary style="cursor: pointer; font-weight: 600;">🔧 사용된 프롬프트</summary>
+      <pre style="margin-top: 16px; font-size: 0.75rem; white-space: pre-wrap; color: var(--muted); max-height: 400px; overflow-y: auto;">{{ review.prompt_used }}</pre>
+    </details>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+document.getElementById('copyBtn').addEventListener('click', function() {
+  const text = document.getElementById('reviewText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    this.textContent = '✅ 복사됨!';
+    setTimeout(() => { this.textContent = '📋 복사'; }, 2000);
+  });
+});
+</script>
+{% endblock %}

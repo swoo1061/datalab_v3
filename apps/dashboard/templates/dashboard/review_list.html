@@ -1,0 +1,55 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}수집 리뷰{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">📋 수집 리뷰</h1>
+    <p class="page-subtitle">외부에서 수집된 리뷰 데이터</p>
+  </div>
+</div>
+
+<div class="card">
+  {% if reviews %}
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>출처</th>
+            <th>내용</th>
+            <th>감정</th>
+            <th>언어</th>
+            <th>수집일</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reviews %}
+          <tr>
+            <td>{{ r.id }}</td>
+            <td><span class="tag tag-muted">{{ r.source|default:"-" }}</span></td>
+            <td>{{ r.original_text|truncatechars:80 }}</td>
+            <td>
+              {% if r.sentiment == 'positive' %}
+                <span class="tag tag-success">긍정</span>
+              {% elif r.sentiment == 'negative' %}
+                <span class="tag" style="background:#fee2e2;color:#dc2626;">부정</span>
+              {% else %}
+                <span class="tag tag-muted">{{ r.sentiment|default:"-" }}</span>
+              {% endif %}
+            </td>
+            <td>{{ r.language }}</td>
+            <td class="text-sm text-muted">{{ r.created_at|date:"m/d" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="text-center" style="padding: 60px;">
+      <p style="font-size: 3rem; margin-bottom: 16px;">📋</p>
+      <p class="text-muted">수집된 리뷰가 없습니다</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

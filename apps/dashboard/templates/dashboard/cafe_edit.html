@@ -1,0 +1,179 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{% if cafe %}카페 프로필 수정{% else %}카페 프로필 추가{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{% if cafe %}카페 프로필 수정{% else %}새 카페 프로필 추가{% endif %}</h1>
+    <p class="page-subtitle">업로드 대상 카페의 글쓰기 규칙을 설정합니다</p>
+  </div>
+  <a href="{% url 'dashboard:cafe_list' %}" class="btn btn-secondary">
+    목록으로
+  </a>
+</div>
+
+{% if error %}
+<div class="card" style="background: #fef2f2; border-color: var(--danger); margin-bottom: 20px;">
+  <p style="color: var(--danger);">{{ error }}</p>
+</div>
+{% endif %}
+
+{% if success %}
+<div class="card" style="background: #f0fdf4; border-color: var(--success); margin-bottom: 20px;">
+  <p style="color: var(--success);">{{ success }}</p>
+</div>
+{% endif %}
+
+<form method="POST">
+  {% csrf_token %}
+
+  <div class="grid-2">
+    <!-- 기본 정보 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">기본 정보</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">카페 이름 *</label>
+        <input type="text" name="name" class="form-input"
+               value="{{ cafe.name|default:'' }}"
+               placeholder="예: 성형 정보 카페" required>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">카테고리</label>
+          <input type="text" name="category" class="form-input"
+                 value="{{ cafe.category|default:'' }}"
+                 placeholder="예: 성형, 뷰티, 지역맘">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">URL (선택)</label>
+          <input type="url" name="url" class="form-input"
+                 value="{{ cafe.url|default:'' }}"
+                 placeholder="https://cafe.naver.com/...">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">카페 분위기</label>
+        <textarea name="vibe" class="form-textarea" rows="2"
+                  placeholder="예: 정보 공유 위주, 광고 티 나면 경고됨, 비교 후기 환영">{{ cafe.vibe|default:'' }}</textarea>
+        <p class="form-hint">이 카페의 전반적인 분위기와 특징</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">활성화</label>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" name="is_active"
+                 {% if cafe.is_active or not cafe %}checked{% endif %}>
+          <span class="text-sm">리뷰 생성 시 선택 가능</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- 글쓰기 규칙 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">글쓰기 규칙</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">최소 글자수</label>
+          <input type="number" name="min_length" class="form-input"
+                 value="{{ cafe.min_length|default:500 }}"
+                 min="100" max="5000">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">최대 글자수</label>
+          <input type="number" name="max_length" class="form-input"
+                 value="{{ cafe.max_length|default:1500 }}"
+                 min="100" max="5000">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">제목 스타일 팁</label>
+        <input type="text" name="title_style" class="form-input"
+               value="{{ cafe.title_style|default:'' }}"
+               placeholder="예: 질문형이나 후기 공유형 제목 선호">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">이미지 필수</label>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" name="image_required"
+                 {% if cafe.image_required %}checked{% endif %}>
+          <span class="text-sm">이 카페는 이미지가 필수입니다</span>
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">작성 팁</label>
+        <textarea name="tips" class="form-textarea" rows="2"
+                  placeholder="예: 다른 병원과 비교한 내용 있으면 신뢰도 상승">{{ cafe.tips|default:'' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 섹션 및 단어 설정 -->
+  <div class="card mt-4">
+    <div class="card-header">
+      <span class="card-title">섹션 및 단어 설정</span>
+    </div>
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">필수 포함 섹션</label>
+        <textarea name="required_sections" class="form-textarea" rows="5"
+                  placeholder="한 줄에 하나씩 입력&#10;예:&#10;병원 선택 이유&#10;상담 경험&#10;수술 과정&#10;회복기&#10;결과 만족도">{% for section in cafe.required_sections %}{{ section }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+        <p class="form-hint">글에 반드시 포함해야 할 섹션들 (한 줄에 하나씩)</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">금지 단어</label>
+        <textarea name="forbidden_words" class="form-textarea" rows="5"
+                  placeholder="쉼표 또는 줄바꿈으로 구분&#10;예: 최고, 완전 강추, 광고 아님, 무조건">{% for word in cafe.forbidden_words %}{{ word }}{% if not forloop.last %}, {% endif %}{% endfor %}</textarea>
+        <p class="form-hint">사용하면 안 되는 단어들 (광고처럼 보이는 표현)</p>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">권장 단어</label>
+      <textarea name="recommended_words" class="form-textarea" rows="2"
+                placeholder="쉼표 또는 줄바꿈으로 구분&#10;예: 솔직후기, 비교, 고민, 참고">{% for word in cafe.recommended_words %}{{ word }}{% if not forloop.last %}, {% endif %}{% endfor %}</textarea>
+      <p class="form-hint">자연스럽게 포함하면 좋은 단어들</p>
+    </div>
+  </div>
+
+  <!-- 미리보기 -->
+  {% if cafe %}
+  <div class="card mt-4">
+    <div class="card-header">
+      <span class="card-title">프롬프트 미리보기</span>
+    </div>
+    <div class="result-box">
+<strong>📝 타겟 카페: {{ cafe.name }}</strong>
+═══════════════════════════════════════
+- 분위기: {{ cafe.vibe }}
+- 글 길이: {{ cafe.min_length }}~{{ cafe.max_length }}자
+{% if cafe.required_sections %}- 필수 포함: {{ cafe.required_sections|join:", " }}{% endif %}
+{% if cafe.forbidden_words %}- 금지 단어: {{ cafe.forbidden_words|join:", " }}{% endif %}
+{% if cafe.tips %}- 팁: {{ cafe.tips }}{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="flex gap-4 mt-4" style="justify-content: flex-end;">
+    <a href="{% url 'dashboard:cafe_list' %}" class="btn btn-secondary">취소</a>
+    <button type="submit" class="btn btn-primary">
+      {% if cafe %}저장{% else %}추가{% endif %}
+    </button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,261 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}생성 리뷰 목록{% endblock %}
+
+{% block extra_css %}
+<style>
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+.bulk-actions.hidden {
+  display: none;
+}
+.select-count {
+  font-size: 0.9rem;
+  color: var(--text);
+  font-weight: 500;
+}
+.checkbox-cell {
+  width: 40px;
+  text-align: center;
+}
+.checkbox-cell input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+tr.selected {
+  background: rgba(79, 70, 229, 0.05);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">생성 리뷰 목록</h1>
+    <p class="page-subtitle">AI로 생성된 리뷰들을 관리합니다</p>
+  </div>
+  <a href="{% url 'dashboard:generate_review_basic' %}" class="btn btn-primary">
+    새 리뷰 생성
+  </a>
+</div>
+
+<div class="card">
+  {% if reviews %}
+    <!-- 일괄 작업 바 -->
+    <div class="bulk-actions hidden" id="bulkActions">
+      <span class="select-count"><strong id="selectedCount">0</strong>개 선택됨</span>
+      <button class="btn btn-sm" style="background: #fee2e2; color: #dc2626;" id="deleteSelectedBtn">
+        선택 삭제
+      </button>
+      <button class="btn btn-sm btn-ghost" id="cancelSelectBtn">
+        선택 취소
+      </button>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th class="checkbox-cell">
+              <input type="checkbox" id="selectAll" title="전체 선택">
+            </th>
+            <th>병원</th>
+            <th>원장</th>
+            <th>시술</th>
+            <th>페르소나</th>
+            <th>글자수</th>
+            <th>상태</th>
+            <th>생성일</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for review in reviews %}
+          <tr data-id="{{ review.pk }}">
+            <td class="checkbox-cell">
+              <input type="checkbox" class="row-checkbox" value="{{ review.pk }}">
+            </td>
+            <td>
+              <strong>{{ review.clinic.name|default:"-" }}</strong>
+            </td>
+            <td>
+              {% if review.doctor_code %}
+                <span class="tag tag-primary">{{ review.doctor_code }}</span>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>{{ review.procedure|default:"-" }}</td>
+            <td class="text-sm text-muted">
+              {{ review.persona.name|default:"기본" }}
+            </td>
+            <td class="text-sm">
+              {{ review.generated_text|length }}자
+            </td>
+            <td>
+              {% if review.status == 'uploaded' %}
+                <span class="tag tag-success">업로드완료</span>
+              {% elif review.status == 'edited' %}
+                <span class="tag tag-warning">수정됨</span>
+              {% elif review.status == 'rejected' %}
+                <span class="tag" style="background: #fee2e2; color: #dc2626;">반려</span>
+              {% else %}
+                <span class="tag tag-muted">생성됨</span>
+              {% endif %}
+            </td>
+            <td class="text-sm text-muted">
+              {{ review.created_at|date:"m/d H:i" }}
+            </td>
+            <td>
+              <a href="{% url 'dashboard:generated_detail' review.pk %}" class="btn btn-ghost btn-sm">
+                보기
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="text-center" style="padding: 60px;">
+      <p style="font-size: 3rem; margin-bottom: 16px;">📝</p>
+      <p class="text-muted" style="margin-bottom: 20px;">생성된 리뷰가 없습니다</p>
+      <a href="{% url 'dashboard:generate_review_basic' %}" class="btn btn-primary">
+        첫 리뷰 생성하기
+      </a>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+const selectAll = document.getElementById('selectAll');
+const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+const bulkActions = document.getElementById('bulkActions');
+const selectedCount = document.getElementById('selectedCount');
+const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+const cancelSelectBtn = document.getElementById('cancelSelectBtn');
+
+// CSRF 토큰
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// 선택 상태 업데이트
+function updateBulkActions() {
+  const checked = document.querySelectorAll('.row-checkbox:checked');
+  const count = checked.length;
+
+  selectedCount.textContent = count;
+
+  if (count > 0) {
+    bulkActions.classList.remove('hidden');
+  } else {
+    bulkActions.classList.add('hidden');
+  }
+
+  // 행 하이라이트
+  rowCheckboxes.forEach(cb => {
+    const row = cb.closest('tr');
+    if (cb.checked) {
+      row.classList.add('selected');
+    } else {
+      row.classList.remove('selected');
+    }
+  });
+
+  // 전체 선택 체크박스 상태
+  if (count === rowCheckboxes.length && count > 0) {
+    selectAll.checked = true;
+    selectAll.indeterminate = false;
+  } else if (count > 0) {
+    selectAll.checked = false;
+    selectAll.indeterminate = true;
+  } else {
+    selectAll.checked = false;
+    selectAll.indeterminate = false;
+  }
+}
+
+// 전체 선택
+selectAll?.addEventListener('change', function() {
+  rowCheckboxes.forEach(cb => {
+    cb.checked = this.checked;
+  });
+  updateBulkActions();
+});
+
+// 개별 선택
+rowCheckboxes.forEach(cb => {
+  cb.addEventListener('change', updateBulkActions);
+});
+
+// 선택 취소
+cancelSelectBtn?.addEventListener('click', function() {
+  rowCheckboxes.forEach(cb => {
+    cb.checked = false;
+  });
+  if (selectAll) selectAll.checked = false;
+  updateBulkActions();
+});
+
+// 선택 삭제
+deleteSelectedBtn?.addEventListener('click', async function() {
+  const checked = document.querySelectorAll('.row-checkbox:checked');
+  const ids = Array.from(checked).map(cb => cb.value);
+
+  if (ids.length === 0) return;
+
+  if (!confirm(`${ids.length}개의 리뷰를 삭제하시겠습니까?`)) return;
+
+  try {
+    const response = await fetch('/dashboard/api/generated/bulk-delete/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({ ids: ids })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      // 삭제된 행 제거
+      ids.forEach(id => {
+        const row = document.querySelector(`tr[data-id="${id}"]`);
+        if (row) row.remove();
+      });
+
+      updateBulkActions();
+
+      // 테이블이 비었으면 페이지 새로고침
+      if (document.querySelectorAll('.row-checkbox').length === 0) {
+        location.reload();
+      }
+    } else {
+      alert('삭제 실패: ' + (result.error || '알 수 없는 오류'));
+    }
+  } catch (err) {
+    alert('삭제 실패: ' + err.message);
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,162 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{% if persona %}페르소나 수정{% else %}페르소나 추가{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{% if persona %}페르소나 수정{% else %}새 페르소나 추가{% endif %}</h1>
+    <p class="page-subtitle">리뷰 작성자의 성격과 말투 스타일을 설정합니다</p>
+  </div>
+  <a href="{% url 'dashboard:persona_list' %}" class="btn btn-secondary">
+    목록으로
+  </a>
+</div>
+
+{% if error %}
+<div class="card" style="background: #fef2f2; border-color: var(--danger); margin-bottom: 20px;">
+  <p style="color: var(--danger);">{{ error }}</p>
+</div>
+{% endif %}
+
+{% if success %}
+<div class="card" style="background: #f0fdf4; border-color: var(--success); margin-bottom: 20px;">
+  <p style="color: var(--success);">{{ success }}</p>
+</div>
+{% endif %}
+
+<form method="POST">
+  {% csrf_token %}
+
+  <div class="grid-2">
+    <!-- 기본 정보 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">기본 정보</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">페르소나 이름 *</label>
+        <input type="text" name="name" class="form-input"
+               value="{{ persona.name|default:'' }}"
+               placeholder="예: 20대 후반 직장인 여성" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">설명</label>
+        <textarea name="description" class="form-textarea" rows="2"
+                  placeholder="이 페르소나에 대한 간단한 설명">{{ persona.description|default:'' }}</textarea>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">연령대</label>
+          <input type="text" name="age_group" class="form-input"
+                 value="{{ persona.age_group|default:'' }}"
+                 placeholder="예: 20대 후반">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">성별</label>
+          <select name="gender" class="form-select">
+            <option value="여성" {% if persona.gender == '여성' %}selected{% endif %}>여성</option>
+            <option value="남성" {% if persona.gender == '남성' %}selected{% endif %}>남성</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">활성화</label>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" name="is_active"
+                 {% if persona.is_active or not persona %}checked{% endif %}>
+          <span class="text-sm">리뷰 생성 시 선택 가능</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- 스타일 설정 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">스타일 설정</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">말투 스타일</label>
+        <textarea name="speech_style" class="form-textarea" rows="3"
+                  placeholder="예: ~했어요, ~좋았어요 (부드러운 존댓말), 중간중간 감탄사 사용">{{ persona.speech_style|default:'' }}</textarea>
+        <p class="form-hint">이 페르소나가 사용하는 특징적인 말투를 설명해주세요</p>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">상세도</label>
+          <select name="detail_level" class="form-select">
+            <option value="detailed" {% if persona.detail_level == 'detailed' %}selected{% endif %}>상세 (긴 글)</option>
+            <option value="moderate" {% if persona.detail_level == 'moderate' or not persona %}selected{% endif %}>보통</option>
+            <option value="brief" {% if persona.detail_level == 'brief' %}selected{% endif %}>간결 (짧은 글)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">이모지 사용</label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 12px;">
+            <input type="checkbox" name="emoji_usage"
+                   {% if persona.emoji_usage %}checked{% endif %}>
+            <span class="text-sm">이모지/이모티콘 사용</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 표현 설정 -->
+  <div class="card mt-4">
+    <div class="card-header">
+      <span class="card-title">표현 설정</span>
+    </div>
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">자주 쓰는 표현</label>
+        <textarea name="example_phrases" class="form-textarea" rows="5"
+                  placeholder="한 줄에 하나씩 입력&#10;예:&#10;솔직히 처음엔 걱정했는데&#10;결론부터 말하면 대만족이에요&#10;고민하시는 분들 참고하세요">{% for phrase in persona.example_phrases %}{{ phrase }}{% if not forloop.last %}
+{% endif %}{% endfor %}</textarea>
+        <p class="form-hint">이 페르소나가 자주 사용하는 표현들 (한 줄에 하나씩)</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">키워드</label>
+        <textarea name="keywords" class="form-textarea" rows="5"
+                  placeholder="쉼표 또는 줄바꿈으로 구분&#10;예: 솔직후기, 비교후기, 첫성형, 대만족">{% for kw in persona.keywords %}{{ kw }}{% if not forloop.last %}, {% endif %}{% endfor %}</textarea>
+        <p class="form-hint">이 페르소나와 관련된 키워드들</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 미리보기 -->
+  {% if persona %}
+  <div class="card mt-4">
+    <div class="card-header">
+      <span class="card-title">프롬프트 미리보기</span>
+    </div>
+    <div class="result-box">
+<strong>👤 작성자 페르소나</strong>
+═══════════════════════════════════════
+- 설정: {{ persona.name }} ({{ persona.age_group }} {{ persona.gender }})
+- 말투: {{ persona.speech_style }}
+- 상세도: {{ persona.get_detail_level_display }}
+- 이모지: {% if persona.emoji_usage %}적당히 사용{% else %}사용 안함{% endif %}
+{% if persona.example_phrases %}- 자주 쓰는 표현: {{ persona.example_phrases|join:", " }}{% endif %}
+{% if persona.keywords %}- 키워드: {{ persona.keywords|join:", " }}{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="flex gap-4 mt-4" style="justify-content: flex-end;">
+    <a href="{% url 'dashboard:persona_list' %}" class="btn btn-secondary">취소</a>
+    <button type="submit" class="btn btn-primary">
+      {% if persona %}저장{% else %}추가{% endif %}
+    </button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}리뷰 상세{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">📋 리뷰 #{{ r.id }}</h1>
+    <p class="page-subtitle">{{ r.source|default:"알 수 없음" }} · {{ r.created_at|date:"Y-m-d H:i" }}</p>
+  </div>
+  <a href="{% url 'dashboard:reviews_list' %}" class="btn btn-secondary">← 목록</a>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">원본 텍스트</h3>
+    </div>
+    <div class="result-box">{{ r.original_text }}</div>
+  </div>
+  
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">분석 정보</h3>
+    </div>
+    <div style="display: grid; gap: 16px;">
+      <div>
+        <div class="text-sm text-muted">감정 분석</div>
+        <div>{{ r.sentiment|default:"-" }}</div>
+      </div>
+      <div>
+        <div class="text-sm text-muted">요약</div>
+        <div>{{ r.summary|default:"-" }}</div>
+      </div>
+      <div>
+        <div class="text-sm text-muted">키워드</div>
+        <div>
+          {% for kw in r.keywords %}
+            <span class="tag tag-muted">{{ kw }}</span>
+          {% empty %}
+            -
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

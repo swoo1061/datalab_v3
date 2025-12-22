@@ -1,0 +1,27 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}업로드{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">📤 데이터 업로드</h1>
+    <p class="page-subtitle">리뷰 데이터나 이미지를 업로드합니다</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">파일 업로드</h3>
+  </div>
+  
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="form-group">
+      <label class="form-label">파일 선택</label>
+      <input type="file" name="file" class="form-input" accept=".csv,.xlsx,.json">
+      <p class="form-hint">지원 형식: CSV, XLSX, JSON</p>
+    </div>
+    <button type="submit" class="btn btn-primary">업로드</button>
+  </form>
+</div>
+{% endblock %}
