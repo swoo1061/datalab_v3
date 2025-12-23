@@ -1,0 +1,78 @@
+.model-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.model-option {
+  position: relative;
+  cursor: pointer;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  transition: all 0.2s ease;
+  background: var(--bg);
+  min-width: 160px;
+  flex: 1 1 auto;
+  max-width: 220px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.model-option:hover {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.model-option.selected,
+.model-option:has(input:checked) {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.1);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.2);
+}
+
+.model-option:has(input:checked)::after {
+  content: '✓';
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.model-option input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.model-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.model-provider {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.model-provider.openai { color: #10a37f; }
+.model-provider.claude { color: #7c3aed; }
+
+.model-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.model-desc {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.3;
+}

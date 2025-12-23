@@ -5,6 +5,7 @@ from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required, user_passes_test
 import json
 import re
 
@@ -21,6 +22,12 @@ from apps.ml.services.clinic_parser import parse_clinic_content
 # 기존 뷰 (호환성 유지)
 # =====================================================
 
+
+def is_staff(user):
+    return user.groups.filter(name='staff').exists() or user.is_superuser
+
+@login_required
+@user_passes_test(is_staff)
 def index(request):
     """대시보드 홈"""
     total_reviews = Review.objects.count()
@@ -1489,3 +1496,5 @@ def api_load_content_type_presets(request):
         "created": created_count,
         "updated": updated_count
     })
+
+

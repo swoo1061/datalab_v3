@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
+import sys
+sys.path.append(str(BASE_DIR))
 
 # .env 파일 로드 (명시적 경로 지정)
 env_path = BASE_DIR / '.env'
@@ -25,6 +27,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'accounts',
+    'apps.core',
     
     # Third party
     'rest_framework',
@@ -146,3 +150,7 @@ LOGGING = {
         },
     },
 }
+
+LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = '/dashboard/'
+LOGOUT_REDIRECT_URL = '/accounts/login/'

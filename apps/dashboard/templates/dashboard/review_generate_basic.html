@@ -1,114 +1,14 @@
 {% extends 'dashboard/base.html' %}
+{% load static %}
+
 {% block title %}AI 리뷰 생성 Basic{% endblock %}
 
 {% block extra_css %}
-<style>
-.input-guide {
-  margin-top: 20px;
-  padding: 20px;
-  background: var(--bg);
-  border-radius: 12px;
-  border: 1px solid var(--border);
-}
-.guide-title {
-  font-weight: 600;
-  margin-bottom: 16px;
-  color: var(--text);
-  font-size: 0.95rem;
-}
-.guide-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.guide-row {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-}
-.guide-label {
-  min-width: 80px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--brand);
-  padding-top: 2px;
-}
-.guide-desc {
-  font-size: 0.85rem;
-  color: var(--muted);
-  line-height: 1.5;
-}
-.model-selector {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.model-option {
-  position: relative;
-  cursor: pointer;
-  border: 2px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 20px;
-  transition: all 0.2s ease;
-  background: var(--bg);
-  min-width: 160px;
-  flex: 1 1 auto;
-  max-width: 220px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-.model-option:hover {
-  border-color: var(--brand);
-  background: rgba(79, 70, 229, 0.05);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-.model-option:has(input:checked) {
-  border-color: var(--brand);
-  background: rgba(79, 70, 229, 0.1);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
-}
-.model-option:has(input:checked)::after {
-  content: '\2713';
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  font-size: 14px;
-  font-weight: bold;
-  color: var(--brand);
-}
-.model-option input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.model-option-content {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.model-provider {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.model-provider.openai { color: #10a37f; }
-.model-provider.claude { color: #7c3aed; }
-.model-name {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text);
-}
-.model-desc {
-  font-size: 0.75rem;
-  color: var(--muted);
-  line-height: 1.3;
-}
-</style>
+<link rel="stylesheet" href="{% static 'dashboard/css/review_generate_basic.css' %}">
 {% endblock %}
 
 {% block content %}
+
 <div class="page-header">
   <div>
     <h1 class="page-title">AI 리뷰 생성 Basic</h1>
@@ -128,8 +28,7 @@
 
       <div class="form-group">
         <label class="form-label">리뷰 정보 입력</label>
-        <textarea name="user_input" id="userInput" class="form-textarea"
-                  style="min-height: 280px; font-size: 0.95rem; line-height: 1.7;"
+        <textarea name="user_input" id="userInput" class="form-textarea basic-user-input"
                   placeholder="예시:
 병원: 서울에이성형외과, 강남역 3번출구, 인테리어 깔끔
 원장: 김민수 원장님, 꼼꼼하게 설명해주심
@@ -189,7 +88,7 @@
       </div>
 
       <!-- AI 모델 선택 -->
-      <div class="form-group" style="margin-top: 20px;">
+      <div class="form-group mt-20">
         <label class="form-label">AI 모델 선택</label>
         <div class="model-selector">
           {% for model in models %}
@@ -208,7 +107,7 @@
         </div>
       </div>
 
-      <div class="flex gap-2" style="margin-top: 20px;">
+      <div class="flex gap-2 mt-20">
         <button type="button" class="btn btn-primary btn-lg" id="generateBtn">
           리뷰 생성
         </button>
@@ -228,14 +127,14 @@
           <span class="tag tag-muted" id="tokenInfo" style="display: none;">0 토큰</span>
           <span class="tag tag-muted" id="costInfo" style="display: none;">₩0</span>
           <span class="tag tag-primary" id="charCount">0자</span>
-          <button class="btn btn-sm btn-ghost" id="copyBtn">복사</button>
+          <button class="btn btn-sm btn-ghost" id="copyBtn" type="button">복사</button>
         </div>
       </div>
-      <div class="result-box" id="resultBox" style="min-height: 200px; color: var(--muted);">
+      <div class="result-box" id="resultBox">
         리뷰가 여기에 표시됩니다.
       </div>
-      <div class="flex gap-2" style="margin-top: 16px;">
-        <button class="btn btn-secondary btn-sm" id="regenerateBtn">다시 생성</button>
+      <div class="flex gap-2 mt-16">
+        <button class="btn btn-secondary btn-sm" id="regenerateBtn" type="button">다시 생성</button>
       </div>
     </div>
 
@@ -247,194 +146,23 @@
     </div>
 
     <!-- 프롬프트 확인/수정 -->
-    <details class="card" style="margin-top: 20px;" id="promptCard">
-      <summary style="cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+    <details class="card mt-20" id="promptCard">
+      <summary class="prompt-summary">
         <span>프롬프트 확인/수정</span>
-        <button type="button" class="btn btn-ghost btn-sm" id="copyPromptBtn" onclick="event.stopPropagation();">
+        <button type="button" class="btn btn-ghost btn-sm" id="copyPromptBtn">
           복사
         </button>
       </summary>
-      <div style="margin-top: 16px;">
-        <textarea id="promptEditor" class="form-textarea"
-                  style="min-height: 300px; font-size: 0.85rem; font-family: monospace; line-height: 1.6;"
+      <div class="prompt-body">
+        <textarea id="promptEditor" class="form-textarea prompt-editor"
                   placeholder="리뷰 생성 후 사용된 프롬프트가 여기에 표시됩니다. 수정 후 '다시 생성' 버튼을 클릭하세요."></textarea>
       </div>
     </details>
   </div>
 </div>
 
-<script>
-const userInput = document.getElementById('userInput');
-const resultBox = document.getElementById('resultBox');
-const charCount = document.getElementById('charCount');
-const tokenInfo = document.getElementById('tokenInfo');
-const costInfo = document.getElementById('costInfo');
-const loadingCard = document.getElementById('loadingCard');
-const generateBtn = document.getElementById('generateBtn');
-const promptEditor = document.getElementById('promptEditor');
-const promptCard = document.getElementById('promptCard');
+{% endblock %}
 
-// CSRF 토큰
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-}
-
-// 리뷰 생성
-generateBtn.addEventListener('click', async function() {
-  const input = userInput.value.trim();
-  const selectedModel = document.querySelector('input[name="model"]:checked')?.value || 'claude-sonnet-4-5-20250929';
-
-  if (!input) {
-    alert('리뷰 정보를 입력해주세요.');
-    return;
-  }
-
-  loadingCard.style.display = 'block';
-  resultBox.textContent = '생성 중...';
-  resultBox.style.color = 'var(--muted)';
-  generateBtn.disabled = true;
-
-  try {
-    const response = await fetch('/dashboard/api/generate-basic/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCookie('csrftoken')
-      },
-      body: JSON.stringify({
-        user_input: input,
-        model: selectedModel
-      })
-    });
-
-    const result = await response.json();
-
-    if (result.error) {
-      throw new Error(result.error);
-    }
-
-    resultBox.textContent = result.review;
-    resultBox.style.color = '';
-    charCount.textContent = `${result.char_count}자`;
-
-    // 토큰/비용 표시
-    if (result.total_tokens) {
-      let tokenText = `입력: ${result.input_tokens.toLocaleString()}`;
-      if (result.cached_input_tokens > 0) {
-        tokenText += ` (캐시: ${result.cached_input_tokens.toLocaleString()})`;
-      }
-      tokenText += ` | 출력: ${result.output_tokens.toLocaleString()}`;
-      tokenInfo.textContent = tokenText;
-      tokenInfo.style.display = '';
-    }
-    if (result.cost_krw !== undefined) {
-      costInfo.textContent = `₩${result.cost_krw.toLocaleString()}`;
-      costInfo.style.display = '';
-    }
-
-    // 프롬프트 표시
-    if (result.prompt_used) {
-      promptEditor.value = result.prompt_used;
-      promptCard.open = true;
-    }
-
-    loadingCard.style.display = 'none';
-
-  } catch (err) {
-    alert('생성 실패: ' + err.message);
-    loadingCard.style.display = 'none';
-    resultBox.textContent = '리뷰가 여기에 표시됩니다.';
-    resultBox.style.color = 'var(--muted)';
-  } finally {
-    generateBtn.disabled = false;
-  }
-});
-
-// 다시 생성 (프롬프트 수정 반영)
-document.getElementById('regenerateBtn').addEventListener('click', async function() {
-  const prompt = promptEditor.value.trim();
-  const selectedModel = document.querySelector('input[name="model"]:checked')?.value || 'claude-sonnet-4-5-20250929';
-
-  if (!prompt) {
-    // 프롬프트가 없으면 새로 생성
-    generateBtn.click();
-    return;
-  }
-
-  loadingCard.style.display = 'block';
-  resultBox.textContent = '생성 중...';
-  resultBox.style.color = 'var(--muted)';
-
-  try {
-    const response = await fetch('/dashboard/api/generate-from-prompt/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCookie('csrftoken')
-      },
-      body: JSON.stringify({
-        prompt: prompt,
-        model: selectedModel
-      })
-    });
-
-    const result = await response.json();
-
-    if (result.error) {
-      throw new Error(result.error);
-    }
-
-    resultBox.textContent = result.review;
-    resultBox.style.color = '';
-    charCount.textContent = `${result.char_count}자`;
-
-    loadingCard.style.display = 'none';
-
-  } catch (err) {
-    alert('재생성 실패: ' + err.message);
-    loadingCard.style.display = 'none';
-    resultBox.textContent = '리뷰가 여기에 표시됩니다.';
-    resultBox.style.color = 'var(--muted)';
-  }
-});
-
-// 복사
-document.getElementById('copyBtn').addEventListener('click', function() {
-  navigator.clipboard.writeText(resultBox.textContent).then(() => {
-    this.textContent = '복사됨!';
-    setTimeout(() => { this.textContent = '복사'; }, 2000);
-  });
-});
-
-// 초기화
-document.getElementById('resetBtn').addEventListener('click', function() {
-  userInput.value = '';
-  resultBox.textContent = '리뷰가 여기에 표시됩니다.';
-  resultBox.style.color = 'var(--muted)';
-  charCount.textContent = '0자';
-  tokenInfo.style.display = 'none';
-  costInfo.style.display = 'none';
-  promptEditor.value = '';
-  promptCard.open = false;
-});
-
-// 프롬프트 복사
-document.getElementById('copyPromptBtn').addEventListener('click', function() {
-  navigator.clipboard.writeText(promptEditor.value).then(() => {
-    this.textContent = '복사됨!';
-    setTimeout(() => { this.textContent = '복사'; }, 2000);
-  });
-});
-</script>
+{% block extra_js %}
+<script src="{% static 'dashboard/js/review_generate_basic.js' %}"></script>
 {% endblock %}
