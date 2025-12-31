@@ -17,10 +17,14 @@
 <body>
   <div class="layout">
     <aside class="sidebar">
-      <div class="logo">🏥 MedViral</div>
+      <div class="logo">🏥 Datalab90</div>
       <nav>
         <a href="{% url 'dashboard:index' %}" class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">
           📊 대시보드
+        </a>
+
+        <a href="{% url 'dashboard:llm_usage' %}">
+          📊 LLM 사용량 통계
         </a>
 
         <div class="nav-section">리뷰 생성</div>

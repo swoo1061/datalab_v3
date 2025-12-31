@@ -1,6 +1,7 @@
 """
 리뷰 생성 시스템 데이터 모델
 """
+from django.conf import settings
 from django.db import models
 from django.db.models import JSONField
 
@@ -789,3 +790,20 @@ class ImageAsset(models.Model):
 
     def __str__(self):
         return f"Image {self.pk}"
+    
+class LLMUsageLog(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="llm_usage_logs"
+    )
+    model = models.CharField(max_length=100)
+    input_tokens = models.IntegerField(default=0)
+    output_tokens = models.IntegerField(default=0)
+    total_tokens = models.IntegerField(default=0)
+    cost_usd = models.FloatField(default=0.0)
+    cost_krw = models.FloatField(default=0.0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]

@@ -1,17 +1,29 @@
 """
 대시보드 뷰 - 리뷰 생성 시스템 v2
 """
+
+
 from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required, user_passes_test
+from .decorators import dashboard_required
+from apps.ml.services.usage_logger import log_llm_usage
 import json
 import re
 
+import csv
+from openpyxl import Workbook
+
+from datetime import timedelta
+from django.utils import timezone
+from django.db.models import Sum, Count
+from django.db.models.functions import TruncDate
+
 from apps.data.models import (
     Review, Campaign, ImageAsset,
-    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile
+    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile, LLMUsageLog
 )
 from apps.ml.services.llm_service import generate_review, generate_review_advanced
 from apps.ml.services.prompt_generator import build_review_prompt, build_prompt_from_models
@@ -22,12 +34,11 @@ from apps.ml.services.clinic_parser import parse_clinic_content
 # 기존 뷰 (호환성 유지)
 # =====================================================
 
-
+@dashboard_required
 def is_staff(user):
     return user.groups.filter(name='staff').exists() or user.is_superuser
 
-@login_required
-@user_passes_test(is_staff)
+@dashboard_required
 def index(request):
     """대시보드 홈"""
     total_reviews = Review.objects.count()
@@ -47,21 +58,21 @@ def index(request):
     }
     return render(request, "dashboard/index.html", context)
 
-
+@dashboard_required
 def upload_view(request):
     return render(request, "dashboard/upload.html")
 
-
+@dashboard_required
 def review_list(request):
     reviews = Review.objects.all().order_by("-created_at")[:200]
     return render(request, "dashboard/review_list.html", {"reviews": reviews})
 
-
+@dashboard_required
 def review_detail(request, pk):
     review = get_object_or_404(Review, pk=pk)
     return render(request, "dashboard/review_detail.html", {"r": review})
 
-
+@dashboard_required
 def review_generate_legacy(request):
     """기존 리뷰 생성 (호환용)"""
     if request.method == 'GET':
@@ -86,7 +97,7 @@ def review_generate_legacy(request):
     )
     return JsonResponse({"review": generated, "review_id": rev.id})
 
-
+@dashboard_required
 def image_browser(request):
     images = ImageAsset.objects.all().order_by("-created_at")[:200]
     return render(request, "dashboard/image_browser.html", {"images": images})
@@ -95,7 +106,7 @@ def image_browser(request):
 # =====================================================
 # 새로운 리뷰 생성 시스템 v2
 # =====================================================
-
+@dashboard_required
 def review_generate_v2(request):
     """개선된 리뷰 생성 페이지 (PRO)"""
     from apps.data.models import ContentTypeProfile
@@ -136,7 +147,7 @@ def review_generate_v2(request):
     }
     return render(request, "dashboard/review_generate_v2.html", context)
 
-
+@dashboard_required
 def review_generate_basic(request):
     """간단한 리뷰 생성 페이지 (Basic)"""
     from apps.ml.services.llm_service import AVAILABLE_MODELS
@@ -157,7 +168,7 @@ def review_generate_basic(request):
     }
     return render(request, "dashboard/review_generate_basic.html", context)
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_generate_review_basic(request):
     """Basic 모드 리뷰 생성 API - 사용자 입력을 기본 프롬프트에 결합"""
@@ -172,7 +183,6 @@ def api_generate_review_basic(request):
     if not user_input:
         return JsonResponse({"error": "리뷰 정보를 입력해주세요."}, status=400)
 
-    # 기본 프롬프트 템플릿
     base_prompt = """당신은 실제로 시술을 받았거나 받을 환자로서 자연스러운 시술후기, 경험, 상담후기, 질문, 고민, 의견, 잡담들을 작성합니다.
 광고가 아닌 진짜 의견과 사실, 경험담처럼 작성해주세요.
 아래 정보를 바탕으로 자연스럽고 진정성 있는 후기를 작성해주세요.
@@ -187,20 +197,28 @@ def api_generate_review_basic(request):
 ## 사용자 제공 정보
 {user_input}
 
-## 주의사항
-- 위 정보에 없는 내용은 자연스럽게 생략
-- 병원명, 원장님, 시술명이 있으면 자연스럽게 포함
-- 지정된 페르소나가 있으면 해당 말투와 관점 반영
-- 추가 가이드가 있으면 반드시 준수
-
 자연스러운 후기를 작성해주세요:"""
 
     prompt = base_prompt.format(user_input=user_input)
 
     try:
         from apps.ml.services.llm_service import generate_review_with_prompt
-        result = generate_review_with_prompt(prompt, model=model, return_usage=True)
+        from apps.ml.services.usage_logger import log_llm_usage
+
+        # 🔥 LLM 호출
+        result = generate_review_with_prompt(
+            prompt,
+            model=model,
+            return_usage=True
+        )
         review_text = result["text"]
+
+        # ✅ STEP 3 핵심: 사용량 로그 기록
+        log_llm_usage(
+            user=request.user,
+            model=model,
+            usage=result
+        )
 
         # DB 저장
         generated_review = GeneratedReview.objects.create(
@@ -208,7 +226,6 @@ def api_generate_review_basic(request):
             prompt_used=prompt,
         )
 
-        # 원화 환산 (1 USD = 약 1,450 KRW)
         cost_krw = result["cost_usd"] * 1450
 
         return JsonResponse({
@@ -217,7 +234,6 @@ def api_generate_review_basic(request):
             "review": review_text,
             "char_count": len(review_text),
             "model_used": model,
-            "prompt_used": prompt,
             "input_tokens": result["input_tokens"],
             "output_tokens": result["output_tokens"],
             "cached_input_tokens": result.get("cached_input_tokens", 0),
@@ -231,8 +247,8 @@ def api_generate_review_basic(request):
             "error": f"생성 실패: {str(e)}"
         }, status=500)
 
-
-@require_http_methods(["GET"])
+@dashboard_required
+@require_http_methods(["POST"])
 def api_clinic_doctors(request, clinic_id):
     """특정 병원의 의료진 목록 API"""
     clinic = get_object_or_404(ClinicGuide, pk=clinic_id)
@@ -241,15 +257,15 @@ def api_clinic_doctors(request, clinic_id):
         "consultants": clinic.consultants,
     })
 
-
-@require_http_methods(["GET"])
+@dashboard_required
+@require_http_methods(["POST"])
 def api_clinic_procedures(request, clinic_id, doctor_code):
     """특정 의료진의 시술 목록 API"""
     clinic = get_object_or_404(ClinicGuide, pk=clinic_id)
     procedures = clinic.get_procedures_by_doctor(doctor_code)
     return JsonResponse({"procedures": procedures})
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_generate_review(request):
     """리뷰 생성 API"""
@@ -376,7 +392,7 @@ def api_generate_review(request):
             "error": f"생성 실패: {str(e)}"
         }, status=500)
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_regenerate_review(request):
     """피드백 반영 리뷰 재생성 API"""
@@ -427,7 +443,7 @@ def api_regenerate_review(request):
     except Exception as e:
         return JsonResponse({"error": f"재생성 실패: {str(e)}"}, status=500)
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_generate_prompt(request):
     """프롬프트만 생성하는 API"""
@@ -527,7 +543,7 @@ def api_generate_prompt(request):
             "error": f"프롬프트 생성 실패: {str(e)}"
         }, status=500)
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_generate_review_from_prompt(request):
     """프롬프트를 직접 받아서 리뷰 생성하는 API"""
@@ -580,19 +596,19 @@ def api_generate_review_from_prompt(request):
 # =====================================================
 # 생성된 리뷰 관리
 # =====================================================
-
+@dashboard_required
 def generated_review_list(request):
     """생성된 리뷰 목록"""
     reviews = GeneratedReview.objects.select_related('clinic', 'persona', 'cafe').all()[:100]
     return render(request, "dashboard/generated_review_list.html", {"reviews": reviews})
 
-
+@dashboard_required
 def generated_review_detail(request, pk):
     """생성된 리뷰 상세"""
     review = get_object_or_404(GeneratedReview, pk=pk)
     return render(request, "dashboard/generated_review_detail.html", {"review": review})
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_generated_bulk_delete(request):
     """생성된 리뷰 일괄 삭제 API"""
@@ -620,19 +636,19 @@ def api_generated_bulk_delete(request):
 # =====================================================
 # 병원 가이드 관리
 # =====================================================
-
+@dashboard_required
 def clinic_list(request):
     """병원 가이드 목록"""
     clinics = ClinicGuide.objects.all().order_by('-created_at')
     return render(request, "dashboard/clinic_list.html", {"clinics": clinics})
 
-
+@dashboard_required
 def clinic_detail(request, pk):
     """병원 가이드 상세"""
     clinic = get_object_or_404(ClinicGuide, pk=pk)
     return render(request, "dashboard/clinic_detail.html", {"clinic": clinic})
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_import_clinic_md(request):
     """MD 파일로 병원 가이드 임포트"""
@@ -678,7 +694,7 @@ def api_import_clinic_md(request):
     except Exception as e:
         return JsonResponse({"error": f"임포트 실패: {str(e)}"}, status=500)
 
-
+@dashboard_required
 def clinic_import(request):
     """병원 가이드 MD 임포트 페이지"""
     if request.method == 'GET':
@@ -687,7 +703,7 @@ def clinic_import(request):
     # POST 처리는 api_import_clinic_md에서
     return api_import_clinic_md(request)
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_clinic_delete(request, pk):
     """병원 가이드 삭제"""
@@ -695,7 +711,7 @@ def api_clinic_delete(request, pk):
     clinic.delete()
     return JsonResponse({"success": True})
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_clinic_toggle(request, pk):
     """병원 가이드 활성화/비활성화"""
@@ -708,7 +724,7 @@ def api_clinic_toggle(request, pk):
 # =====================================================
 # 스타일 분석 기능
 # =====================================================
-
+@dashboard_required
 def style_analyzer(request):
     """스타일 분석 페이지"""
     personas = Persona.objects.filter(is_active=True)
@@ -719,7 +735,7 @@ def style_analyzer(request):
         "cafes": cafes,
     })
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_analyze_style(request):
     """스타일 분석 API"""
@@ -756,7 +772,7 @@ def api_analyze_style(request):
     except Exception as e:
         return JsonResponse({"error": f"분석 실패: {str(e)}"}, status=500)
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_create_persona_from_style(request):
     """스타일 분석 결과로 페르소나 생성"""
@@ -795,7 +811,7 @@ def api_create_persona_from_style(request):
     except Exception as e:
         return JsonResponse({"error": f"생성 실패: {str(e)}"}, status=500)
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_create_cafe_from_style(request):
     """스타일 분석 결과로 카페 프로필 생성"""
@@ -831,7 +847,7 @@ def api_create_cafe_from_style(request):
     except Exception as e:
         return JsonResponse({"error": f"생성 실패: {str(e)}"}, status=500)
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_create_content_type_from_style(request):
     """스타일 분석 결과로 컨텐츠 타입 생성"""
@@ -884,7 +900,7 @@ def api_create_content_type_from_style(request):
 # =====================================================
 # 이미지 OCR 기능
 # =====================================================
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_extract_text_from_images(request):
     """이미지에서 텍스트 추출 API (GPT-4o Vision)"""
@@ -935,7 +951,7 @@ def api_extract_text_from_images(request):
     except Exception as e:
         return JsonResponse({"error": f"텍스트 추출 실패: {str(e)}"}, status=500)
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_analyze_style_from_images(request):
     """이미지에서 텍스트 추출 후 스타일 분석까지 한 번에"""
@@ -995,13 +1011,13 @@ def api_analyze_style_from_images(request):
 # =====================================================
 # 페르소나 관리
 # =====================================================
-
+@dashboard_required
 def persona_list(request):
     """페르소나 목록"""
     personas = Persona.objects.all().order_by('-is_active', '-created_at')
     return render(request, "dashboard/persona_list.html", {"personas": personas})
 
-
+@dashboard_required
 def persona_edit(request, pk=None):
     """페르소나 생성/수정"""
     if pk:
@@ -1051,7 +1067,7 @@ def persona_edit(request, pk=None):
 
     return render(request, "dashboard/persona_edit.html", {"persona": persona})
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_persona_delete(request, pk):
     """페르소나 삭제 API"""
@@ -1060,7 +1076,7 @@ def api_persona_delete(request, pk):
     persona.delete()
     return JsonResponse({"success": True, "message": f"'{name}' 페르소나가 삭제되었습니다."})
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_persona_toggle(request, pk):
     """페르소나 활성화 토글 API"""
@@ -1077,13 +1093,13 @@ def api_persona_toggle(request, pk):
 # =====================================================
 # 카페 프로필 관리
 # =====================================================
-
+@dashboard_required
 def cafe_list(request):
     """카페 프로필 목록"""
     cafes = CafeProfile.objects.all().order_by('-is_active', '-created_at')
     return render(request, "dashboard/cafe_list.html", {"cafes": cafes})
 
-
+@dashboard_required
 def cafe_edit(request, pk=None):
     """카페 프로필 생성/수정"""
     if pk:
@@ -1146,7 +1162,7 @@ def cafe_edit(request, pk=None):
 
     return render(request, "dashboard/cafe_edit.html", {"cafe": cafe})
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_cafe_delete(request, pk):
     """카페 프로필 삭제 API"""
@@ -1155,7 +1171,7 @@ def api_cafe_delete(request, pk):
     cafe.delete()
     return JsonResponse({"success": True, "message": f"'{name}' 카페 프로필이 삭제되었습니다."})
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_cafe_toggle(request, pk):
     """카페 프로필 활성화 토글 API"""
@@ -1172,7 +1188,7 @@ def api_cafe_toggle(request, pk):
 # =====================================================
 # 프리셋 불러오기 API
 # =====================================================
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_load_persona_presets(request):
     """페르소나 프리셋 불러오기"""
@@ -1198,7 +1214,7 @@ def api_load_persona_presets(request):
         "updated": updated_count
     })
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_load_cafe_presets(request):
     """카페 프로필 프리셋 불러오기"""
@@ -1228,7 +1244,7 @@ def api_load_cafe_presets(request):
 # =====================================================
 # 프리셋 미리보기 및 개별 추가 API
 # =====================================================
-
+@dashboard_required
 @require_http_methods(["GET"])
 def api_get_persona_presets(request):
     """페르소나 프리셋 목록 조회 (이미 추가된 것 표시)"""
@@ -1254,8 +1270,8 @@ def api_get_persona_presets(request):
 
     return JsonResponse({"success": True, "presets": presets})
 
-
-@require_http_methods(["GET"])
+@dashboard_required
+@require_http_methods(["get"])
 def api_get_cafe_presets(request):
     """카페 프리셋 목록 조회 (이미 추가된 것 표시)"""
     from apps.data.initial_data import CAFE_PRESETS
@@ -1282,7 +1298,7 @@ def api_get_cafe_presets(request):
 
     return JsonResponse({"success": True, "presets": presets})
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_add_persona_preset(request):
     """개별 페르소나 프리셋 추가"""
@@ -1310,7 +1326,7 @@ def api_add_persona_preset(request):
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=500)
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_add_cafe_preset(request):
     """개별 카페 프리셋 추가"""
@@ -1344,13 +1360,13 @@ def api_add_cafe_preset(request):
 # =====================================================
 
 from apps.data.models import ContentTypeProfile
-
+@dashboard_required
 def content_type_list(request):
     """컨텐츠 타입 목록"""
     content_types = ContentTypeProfile.objects.all()
     return render(request, "dashboard/content_type_list.html", {"content_types": content_types})
 
-
+@dashboard_required
 def content_type_edit(request, pk=None):
     """컨텐츠 타입 생성/수정"""
     if pk:
@@ -1399,7 +1415,7 @@ def content_type_edit(request, pk=None):
 
     return render(request, "dashboard/content_type_edit.html", {"content_type": content_type})
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_content_type_delete(request, pk):
     """컨텐츠 타입 삭제"""
@@ -1407,7 +1423,7 @@ def api_content_type_delete(request, pk):
     content_type.delete()
     return JsonResponse({"success": True})
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_content_type_toggle(request, pk):
     """컨텐츠 타입 활성화/비활성화"""
@@ -1416,7 +1432,7 @@ def api_content_type_toggle(request, pk):
     content_type.save()
     return JsonResponse({"success": True, "is_active": content_type.is_active})
 
-
+@dashboard_required
 @require_http_methods(["GET"])
 def api_get_content_type_presets(request):
     """컨텐츠 타입 프리셋 목록 조회"""
@@ -1443,7 +1459,7 @@ def api_get_content_type_presets(request):
 
     return JsonResponse({"success": True, "presets": presets})
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_add_content_type_preset(request):
     """개별 컨텐츠 타입 프리셋 추가"""
@@ -1471,7 +1487,7 @@ def api_add_content_type_preset(request):
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=500)
 
-
+@dashboard_required
 @require_http_methods(["POST"])
 def api_load_content_type_presets(request):
     """컨텐츠 타입 프리셋 전체 불러오기"""
@@ -1497,4 +1513,145 @@ def api_load_content_type_presets(request):
         "updated": updated_count
     })
 
+@dashboard_required
+def llm_usage_dashboard(request):
+    today = timezone.now().date()
+    month_start = today.replace(day=1)
+    start_date = today - timedelta(days=14)
 
+    qs = LLMUsageLog.objects.select_related("user")
+
+    # =========================
+    # 오늘 통계
+    # =========================
+    today_stats = qs.filter(created_at__date=today).aggregate(
+        total_cost=Sum("cost_krw"),
+        total_tokens=Sum("total_tokens"),
+        count=Count("id"),
+    )
+
+    # =========================
+    # 이번 달 통계
+    # =========================
+    month_stats = qs.filter(created_at__date__gte=month_start).aggregate(
+        total_cost=Sum("cost_krw"),
+        total_tokens=Sum("total_tokens"),
+        count=Count("id"),
+    )
+
+    # =========================
+    # 📈 날짜별 비용 (그래프)
+    # =========================
+    daily_stats = (
+        qs.filter(created_at__date__gte=start_date)
+        .annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(total_cost=Sum("cost_krw"))
+        .order_by("day")
+    )
+
+    daily_labels = [d["day"].strftime("%m/%d") for d in daily_stats]
+    daily_costs = [float(d["total_cost"] or 0) for d in daily_stats]
+
+    # =========================
+    # 📊 모델별 비용
+    # =========================
+    by_model = (
+        qs.values("model")
+        .annotate(
+            total_cost=Sum("cost_krw"),
+            total_tokens=Sum("total_tokens"),
+            count=Count("id"),
+        )
+        .order_by("-total_cost")
+    )
+
+    model_labels = [m["model"] for m in by_model]
+    model_costs = [float(m["total_cost"] or 0) for m in by_model]
+
+    # =========================
+    # 유저별 비용 (표용)
+    # =========================
+    by_user = (
+        qs.values("user__username")
+        .annotate(
+            total_cost=Sum("cost_krw"),
+            total_tokens=Sum("total_tokens"),
+            count=Count("id"),
+        )
+        .order_by("-total_cost")
+    )
+
+    context = {
+        # 요약
+        "today": today_stats,
+        "month": month_stats,
+
+        # 표
+        "by_model": by_model,
+        "by_user": by_user,
+
+        # 그래프
+        "daily_labels": daily_labels,
+        "daily_costs": daily_costs,
+        "model_labels": model_labels,
+        "model_costs": model_costs,
+    }
+    return render(request, "dashboard/llm_usage_dashboard.html", context)
+
+@dashboard_required
+def export_llm_usage_csv(request):
+    response = HttpResponse(
+        content_type="text/csv; charset=utf-8-sig"
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="llm_usage_{timezone.now().date()}.csv"'
+    )
+
+    # ⭐ 핵심: utf-8-sig (BOM 포함)
+    writer = csv.writer(response)
+    writer.writerow(["날짜", "유저", "모델", "토큰", "비용(원)"])
+
+    logs = LLMUsageLog.objects.select_related("user").order_by("-created_at")
+
+    for log in logs:
+        writer.writerow([
+            log.created_at.strftime("%Y-%m-%d %H:%M"),
+            log.user.username if log.user else "-",
+            log.model,
+            log.total_tokens,
+            int(log.cost_krw),
+        ])
+
+    return response
+
+@dashboard_required
+def export_llm_usage_excel(request):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "LLM Usage"
+
+    # 헤더
+    headers = ["날짜", "유저", "모델", "토큰", "비용(원)"]
+    ws.append(headers)
+
+    logs = LLMUsageLog.objects.select_related("user").order_by("-created_at")
+
+    for log in logs:
+        ws.append([
+            log.created_at.strftime("%Y-%m-%d %H:%M"),
+            log.user.username if log.user else "-",
+            log.model,
+            log.total_tokens,
+            int(log.cost_krw),
+        ])
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="llm_usage_{timezone.now().date()}.xlsx"'
+    )
+
+    wb.save(response)
+    return response

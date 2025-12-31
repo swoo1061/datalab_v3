@@ -9,6 +9,13 @@ app_name = "dashboard"
 urlpatterns = [
     # 홈
     path("", views.index, name="index"),
+
+    # LLM 사용량 통계
+    path("usage/", views.llm_usage_dashboard, name="llm_usage"),
+
+    # LLM 사용량 Export
+    path("usage/export/csv/", views.export_llm_usage_csv, name="export_llm_usage_csv"),
+    path("usage/export/excel/", views.export_llm_usage_excel, name="export_llm_usage_excel"),
     
     # 기존 리뷰 관리
     path("upload/", views.upload_view, name="upload"),
