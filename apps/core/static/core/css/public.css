@@ -34,8 +34,16 @@ body {
   align-items: center;
 }
 .logo {
-  font-size: 1.25rem;
+  text-decoration: none;
+  color: #4f46e5;
   font-weight: 700;
+  font-size: 1.4rem;
+}
+
+/* 호버 시에도 밑줄 방지 */
+.logo:hover {
+  text-decoration: none;
+  opacity: 0.85;         /* 살짝 인터랙션 */
 }
 .nav {
   display: flex;
@@ -123,4 +131,42 @@ body {
   .hero h1 {
     font-size: 2.1rem;
   }
+}
+
+.forbidden-public {
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.forbidden-box {
+  text-align: center;
+  background: #fff;
+  padding: 48px;
+  border-radius: 16px;
+  max-width: 420px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+.forbidden-box .icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+}
+
+.forbidden-box h1 {
+  font-size: 1.6rem;
+  margin-bottom: 12px;
+}
+
+.forbidden-box p {
+  color: #666;
+  line-height: 1.6;
+}
+
+.forbidden-box .actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
 }

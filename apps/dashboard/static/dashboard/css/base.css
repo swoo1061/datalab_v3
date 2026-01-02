@@ -36,10 +36,12 @@
       flex-direction: column;
     }
     .sidebar .logo {
-      font-size: 1.25rem;
+      font-size: 1.5rem;
       font-weight: 700;
       padding: 0 12px;
       margin-bottom: 32px;
+      color:#ffffff;
+      text-decoration: none;
     }
     .sidebar nav { flex: 1; }
     .sidebar nav a {
@@ -159,11 +161,13 @@
       box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
     }
     .btn-secondary {
-      background: var(--surface);
-      color: var(--text);
-      border: 1px solid var(--border);
+      background: linear-gradient(135deg, var(--brand) 0%, #7c3aed 100%);
+      color: white;
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
     }
-    .btn-secondary:hover { background: var(--bg); }
+    .btn-secondary:hover { 
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5); }
     .btn-ghost {
       background: transparent;
       color: var(--brand);

@@ -17,7 +17,7 @@
 <body>
   <div class="layout">
     <aside class="sidebar">
-      <div class="logo">🏥 Datalab90</div>
+      <a href="{% url 'core:home' %}" class="logo">🏥 Datalab90</a>
       <nav>
         <a href="{% url 'dashboard:index' %}" class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">
           📊 대시보드

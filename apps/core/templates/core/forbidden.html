@@ -1,0 +1,30 @@
+{% extends "core/base_public.html" %}
+{% block title %}접근 제한{% endblock %}
+
+{% block content %}
+<div style="max-width:420px;margin:120px auto;text-align:center;">
+  <div style="font-size:3rem;margin-bottom:16px;">🚫</div>
+
+  <h1 style="font-size:1.6rem;font-weight:700;margin-bottom:12px;">
+    접근 권한이 없습니다
+  </h1>
+
+  <p style="color:#666;line-height:1.6;margin-bottom:24px;">
+    이 페이지는 <strong>관리자 전용</strong> 기능입니다.<br>
+    권한이 필요하다면 관리자에게 문의해주세요.
+  </p>
+
+  <div style="font-size:0.9rem;color:#999;margin-bottom:32px;">
+    현재 계정: <strong>{{ request.user.username }}</strong>
+  </div>
+
+  <div style="display:flex;gap:12px;justify-content:center;">
+    <a href="{% url 'core:home' %}" class="btn btn-primary">
+      홈으로
+    </a>
+    <a href="{% url 'accounts:logout' %}" class="btn btn-primary">
+      로그아웃
+    </a>
+  </div>
+</div>
+{% endblock %}

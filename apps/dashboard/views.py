@@ -25,6 +25,8 @@ from apps.data.models import (
     Review, Campaign, ImageAsset,
     Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile, LLMUsageLog
 )
+from apps.ml.services.clinic_normalizer import normalize_clinic_payload
+from apps.ml.services.clinic_md_llm import parse_clinic_md_with_llm
 from apps.ml.services.llm_service import generate_review, generate_review_advanced
 from apps.ml.services.prompt_generator import build_review_prompt, build_prompt_from_models
 from apps.ml.services.clinic_parser import parse_clinic_content
@@ -644,9 +646,36 @@ def clinic_list(request):
 
 @dashboard_required
 def clinic_detail(request, pk):
-    """병원 가이드 상세"""
     clinic = get_object_or_404(ClinicGuide, pk=pk)
-    return render(request, "dashboard/clinic_detail.html", {"clinic": clinic})
+
+    price_list = clinic.price_list or []
+
+    normalized_prices = []
+    for p in price_list:
+        # 기본 복사
+        item = dict(p)
+
+        # price 없으면 price_만원으로 생성
+        if "price" not in item:
+            if "price_만원" in item:
+                item["price"] = f"{item['price_만원']}만원"
+            elif "price_a" in item or "price_b" in item:
+                a = item.get("price_a", "")
+                b = item.get("price_b", "")
+                item["price"] = f"{a} ~ {b}만원".strip()
+            else:
+                item["price"] = "-"
+
+        # 템플릿 호환용
+        item["price_display"] = item["price"]
+
+        normalized_prices.append(item)
+
+    clinic.price_list = normalized_prices
+
+    return render(request, "dashboard/clinic_detail.html", {
+        "clinic": clinic
+    })
 
 @dashboard_required
 @require_http_methods(["POST"])
@@ -660,7 +689,8 @@ def api_import_clinic_md(request):
     
     try:
         # 파싱
-        data = parse_clinic_content(md_content)
+        data = parse_clinic_md_with_llm(md_content)
+        data = normalize_clinic_payload(data)
         
         # 저장
         clinic, created = ClinicGuide.objects.update_or_create(
