@@ -5,6 +5,7 @@ from django.contrib import admin
 from .models import (
     Campaign, Review, ImageAsset,
     Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile
+, ClinicDoctor, ClinicPrice
 )
 
 
@@ -89,12 +90,72 @@ class CafeProfileAdmin(admin.ModelAdmin):
     )
 
 
+class ClinicDoctorInline(admin.TabularInline):
+    model = ClinicDoctor
+    extra = 0
+    fields = (
+        "order",
+        "name",
+        "code",
+        "style",
+        "specialties",
+        "is_active",
+    )
+    ordering = ("order",)
+
+
+class ClinicPriceInline(admin.TabularInline):
+    model = ClinicPrice
+    extra = 0
+    fields = (
+        "order",
+        "doctor",
+        "procedure",
+        "price_display",
+        "note",
+        "is_active",
+    )
+    ordering = ("order",)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """
+        수가 입력 시:
+        현재 편집 중인 ClinicGuide에 속한 원장만 보이게
+        """
+        if db_field.name == "doctor":
+            try:
+                # URL: /admin/data/clinicguide/{id}/change/
+                clinic_id = request.resolver_match.kwargs.get("object_id")
+                if clinic_id:
+                    kwargs["queryset"] = ClinicDoctor.objects.filter(
+                        clinic_id=clinic_id,
+                        is_active=True
+                    )
+            except Exception:
+                pass
+
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
 @admin.register(ClinicGuide)
 class ClinicGuideAdmin(admin.ModelAdmin):
-    list_display = ['name', 'location_short', 'doctors_count', 'procedures_count', 'is_active', 'updated_at']
+    list_display = [
+        'name',
+        'location_short',
+        'doctors_count',
+        'procedures_count',
+        'is_active',
+        'updated_at'
+    ]
+
     list_filter = ['is_active', 'created_at']
     search_fields = ['name', 'location']
     readonly_fields = ['created_at', 'updated_at']
+
+    inlines = [
+        ClinicDoctorInline,
+        ClinicPriceInline,
+    ]
+
     fieldsets = (
         ('기본 정보', {
             'fields': ('name', 'file_path', 'location', 'hours', 'parking')
@@ -103,7 +164,14 @@ class ClinicGuideAdmin(admin.ModelAdmin):
             'fields': ('process',)
         }),
         ('데이터 (JSON)', {
-            'fields': ('doctors', 'consultants', 'price_list', 'aftercare', 'post_care', 'features'),
+            'fields': (
+                'doctors',
+                'consultants',
+                'price_list',
+                'aftercare',
+                'post_care',
+                'features',
+            ),
             'classes': ('collapse',)
         }),
         ('언급 제한', {
@@ -115,18 +183,20 @@ class ClinicGuideAdmin(admin.ModelAdmin):
         }),
     )
 
+    # ===== Custom Columns =====
     def location_short(self, obj):
-        return obj.location[:30] + '...' if len(obj.location) > 30 else obj.location
-    location_short.short_description = '위치'
+        if not obj.location:
+            return "-"
+        return obj.location[:30] + "..." if len(obj.location) > 30 else obj.location
+    location_short.short_description = "위치"
 
     def doctors_count(self, obj):
-        return len(obj.doctors) if obj.doctors else 0
-    doctors_count.short_description = '의료진'
+        return obj.doctor_objects.count()
+    doctors_count.short_description = "의료진"
 
     def procedures_count(self, obj):
-        return len(obj.price_list) if obj.price_list else 0
-    procedures_count.short_description = '시술'
-
+        return obj.price_objects.count()
+    procedures_count.short_description = "시술"
 
 @admin.register(ContentTypeProfile)
 class ContentTypeProfileAdmin(admin.ModelAdmin):

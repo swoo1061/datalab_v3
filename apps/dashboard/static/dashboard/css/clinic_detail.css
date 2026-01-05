@@ -1,0 +1,163 @@
+/* ===== Info ===== */
+.info-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.divider {
+  margin: 16px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+/* ===== Doctor Buttons ===== */
+.doctor-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.doctor-list form {
+  margin: 0;
+}
+
+.doctor-item {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  color: var(--text);
+
+  padding: 10px 14px;
+  border-radius: 12px;
+
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.doctor-item:hover {
+  background: var(--brand-bg);
+  border-color: var(--brand-light);
+}
+
+.doctor-item.active {
+  background: linear-gradient(135deg, var(--brand) 0%, #7c3aed 100%);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(79,70,229,.25);
+}
+
+/* ===== Doctor Detail ===== */
+.doctor-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* ===== Price Table ===== */
+.price-table-wrap {
+  overflow-x: auto;
+}
+
+.price-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.price-table thead {
+  background: var(--bg);
+}
+
+.price-table th,
+.price-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.price-table th {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.price-table tbody tr:hover {
+  background: var(--bg);
+}
+
+.price-table .procedure {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.price-table .price {
+  text-align: right;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--brand);
+  white-space: nowrap;
+}
+
+/* ===== Price Grid (4~6개 한눈에) ===== */
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 한 줄에 3개 */
+  gap: 10px;
+}
+
+.price-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.price-procedure {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.price-value {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--brand);
+  white-space: nowrap;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .price-grid {
+    grid-template-columns: 1fr; /* 모바일 1열 */
+  }
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 768px) {
+  .doctor-list {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .doctor-item {
+    flex-shrink: 0;
+  }
+}

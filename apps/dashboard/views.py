@@ -15,7 +15,7 @@ import re
 
 import csv
 from openpyxl import Workbook
-
+from django.db import models
 from datetime import timedelta
 from django.utils import timezone
 from django.db.models import Sum, Count
@@ -23,7 +23,7 @@ from django.db.models.functions import TruncDate
 
 from apps.data.models import (
     Review, Campaign, ImageAsset,
-    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile, LLMUsageLog
+    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile, LLMUsageLog, ClinicDoctor, ClinicPrice
 )
 from apps.ml.services.clinic_normalizer import normalize_clinic_payload
 from apps.ml.services.clinic_md_llm import parse_clinic_md_with_llm
@@ -648,33 +648,37 @@ def clinic_list(request):
 def clinic_detail(request, pk):
     clinic = get_object_or_404(ClinicGuide, pk=pk)
 
-    price_list = clinic.price_list or []
+    # 1️⃣ 이 병원의 원장 목록
+    doctors = clinic.doctor_objects.filter(is_active=True).order_by("order")
 
-    normalized_prices = []
-    for p in price_list:
-        # 기본 복사
-        item = dict(p)
+    # 2️⃣ URL 파라미터
+    selected_code = request.GET.get("doctor")
 
-        # price 없으면 price_만원으로 생성
-        if "price" not in item:
-            if "price_만원" in item:
-                item["price"] = f"{item['price_만원']}만원"
-            elif "price_a" in item or "price_b" in item:
-                a = item.get("price_a", "")
-                b = item.get("price_b", "")
-                item["price"] = f"{a} ~ {b}만원".strip()
-            else:
-                item["price"] = "-"
+    # 3️⃣ 선택된 원장 결정 (🔥 핵심)
+    if selected_code:
+        selected_doctor = doctors.filter(
+            models.Q(code=selected_code) |
+            models.Q(name=selected_code)
+        ).first()
+    else:
+        # 👉 자동 선택
+        selected_doctor = doctors.first()
 
-        # 템플릿 호환용
-        item["price_display"] = item["price"]
-
-        normalized_prices.append(item)
-
-    clinic.price_list = normalized_prices
+    # 4️⃣ 수가 조회
+    if selected_doctor:
+        price_list = selected_doctor.prices.filter(
+            is_active=True
+        ).order_by("order")
+        selected_code = selected_doctor.code or selected_doctor.name
+    else:
+        price_list = []
 
     return render(request, "dashboard/clinic_detail.html", {
-        "clinic": clinic
+        "clinic": clinic,
+        "doctors": doctors,
+        "selected_doctor": selected_doctor,
+        "selected_code": selected_code,
+        "price_list": price_list,
     })
 
 @dashboard_required

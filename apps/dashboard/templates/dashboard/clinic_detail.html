@@ -1,5 +1,10 @@
 {% extends 'dashboard/base.html' %}
+{% load static %}
 {% block title %}{{ clinic.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'dashboard/css/clinic_detail.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -18,152 +23,113 @@
 </div>
 
 <div class="grid-2">
-  <!-- 기본 정보 -->
   <div class="card">
     <div class="card-header">
       <h3 class="card-title">📋 기본 정보</h3>
     </div>
-    
-    <div style="display: grid; gap: 16px;">
-      <div>
-        <div class="text-sm text-muted">위치</div>
-        <div>{{ clinic.location|default:"-" }}</div>
-      </div>
-      <div>
-        <div class="text-sm text-muted">운영시간</div>
-        <div>{{ clinic.hours|default:"-" }}</div>
-      </div>
-      <div>
-        <div class="text-sm text-muted">주차</div>
-        <div>{{ clinic.parking|default:"-" }}</div>
-      </div>
-      <div>
-        <div class="text-sm text-muted">상담 프로세스</div>
-        <div>{{ clinic.process|default:"-" }}</div>
-      </div>
+
+    <div class="info-grid">
+      <div><div class="label">위치</div><div>{{ clinic.location|default:"-" }}</div></div>
+      <div><div class="label">운영시간</div><div>{{ clinic.hours|default:"-" }}</div></div>
+      <div><div class="label">주차</div><div>{{ clinic.parking|default:"-" }}</div></div>
+      <div><div class="label">상담 프로세스</div><div>{{ clinic.process|default:"-" }}</div></div>
     </div>
-    
+
     {% if clinic.features %}
-    <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border);">
+    <hr class="divider">
     <div>
-      <div class="text-sm text-muted mb-4">특징</div>
-      <div class="flex gap-2" style="flex-wrap: wrap;">
-        {% if clinic.features.cctv %}
-          <span class="tag tag-success">📹 {{ clinic.features.cctv }}</span>
-        {% endif %}
-        {% if clinic.features.anesthesia %}
-          <span class="tag tag-success">💉 {{ clinic.features.anesthesia }}</span>
-        {% endif %}
-        {% if clinic.features.real_name %}
-          <span class="tag tag-success">✅ 수술 실명제</span>
-        {% endif %}
+      <div class="label mb-2">특징</div>
+      <div class="flex gap-2 wrap">
+        {% if clinic.features.cctv %}<span class="tag tag-success">📹 {{ clinic.features.cctv }}</span>{% endif %}
+        {% if clinic.features.anesthesia %}<span class="tag tag-success">💉 {{ clinic.features.anesthesia }}</span>{% endif %}
+        {% if clinic.features.real_name %}<span class="tag tag-success">✅ 수술 실명제</span>{% endif %}
       </div>
     </div>
     {% endif %}
   </div>
-  
-  <!-- 의료진 -->
+
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title">👨‍⚕️ 의료진</h3>
+      <h3 class="card-title">👨‍⚕️ 의료진 & 수가</h3>
     </div>
-    
-    {% if clinic.doctors %}
-      <div style="display: grid; gap: 16px;">
-        {% for doc in clinic.doctors %}
-        <div style="padding: 16px; background: var(--bg); border-radius: 10px;">
-          <div class="flex items-center gap-2" style="margin-bottom: 8px;">
-            <strong>{{ doc.name }} 원장님</strong>
-            <span class="tag tag-primary">{{ doc.code }}</span>
-          </div>
-          <div class="text-sm text-muted">{{ doc.style|default:"" }}</div>
-          {% if doc.specialties %}
-          <div class="flex gap-2" style="margin-top: 8px; flex-wrap: wrap;">
-            {% for spec in doc.specialties %}
-              <span class="tag tag-muted">{{ spec }}</span>
-            {% endfor %}
-          </div>
-          {% endif %}
-        </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="text-muted">등록된 의료진 정보가 없습니다</p>
-    {% endif %}
-  </div>
-</div>
 
-<!-- 수가표 -->
-<div class="card" style="margin-top: 20px;">
-  <div class="card-header">
-    <h3 class="card-title">💰 수가표</h3>
-  </div>
-  
-  {% if clinic.price_list %}
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>원장님</th>
-            <th>시술</th>
-            <th>가격</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for price in clinic.price_list %}
-          <tr>
-            <td>
-              <span class="tag tag-primary">{{ price.doctor_code }}</span>
-              {{ price.doctor_name }}
-            </td>
-            <td>{{ price.procedure }}</td>
-            <td><strong>{{ price.price_display|default:price.price }}</strong></td>
-          </tr>
+    <div class="doctor-list doctor-list--wrap">
+      {% for doc in doctors %}
+        {% with doc_key=doc.code|default:doc.name %}
+          <a href="?doctor={{ doc_key }}"
+             class="doctor-item {% if doc_key == selected_code %}active{% endif %}">
+            {{ doc.name }} 원장
+          </a>
+        {% endwith %}
+      {% endfor %}
+    </div>
+
+    {% if selected_doctor %}
+    <div class="doctor-detail">
+      <h4 class="doctor-title">{{ selected_doctor.name }} 원장님</h4>
+
+      {% if selected_doctor.style %}
+        <div class="text-muted mb-2">{{ selected_doctor.style }}</div>
+      {% endif %}
+
+      {% if selected_doctor.specialties %}
+        <div class="flex gap-2 wrap mb-3">
+          {% for spec in selected_doctor.specialties %}
+            <span class="tag tag-muted">{{ spec }}</span>
           {% endfor %}
-        </tbody>
-      </table>
+        </div>
+      {% endif %}
+
+      <hr class="divider">
+
+      {% if price_list %}
+        <div class="price-grid">
+          {% for p in price_list %}
+            <div class="price-card">
+              <div class="price-procedure">
+                {{ p.procedure }}
+              </div>
+              <div class="price-value">
+                {{ p.price_display|default:"상담 필요" }}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">등록된 수가 정보가 없습니다</p>
+        {% endif %}
     </div>
-  {% else %}
-    <p class="text-muted">등록된 수가 정보가 없습니다</p>
-  {% endif %}
+    {% endif %}
+  </div>
 </div>
 
-<!-- 상담실장 & 사후관리 -->
-<div class="grid-2" style="margin-top: 20px;">
-  <!-- 상담실장 -->
+<div class="grid-2 mt-4">
   <div class="card">
-    <div class="card-header">
-      <h3 class="card-title">💁‍♀️ 상담실장</h3>
-    </div>
-    
+    <div class="card-header"><h3 class="card-title">💁‍♀️ 상담실장</h3></div>
     {% if clinic.consultants %}
-      <div style="display: grid; gap: 12px;">
+      <div class="stack">
         {% for cons in clinic.consultants %}
-        <div class="flex items-center gap-2">
-          <strong>{{ cons.name }}</strong>
-          <span class="text-sm text-muted">({{ cons.age }}세)</span>
-          <span class="text-sm">{{ cons.style }}</span>
-        </div>
+          <div class="flex gap-2">
+            <strong>{{ cons.name }}</strong>
+            <span class="text-muted">({{ cons.age }})</span>
+            <span>{{ cons.style }}</span>
+          </div>
         {% endfor %}
       </div>
     {% else %}
       <p class="text-muted">등록된 상담실장 정보가 없습니다</p>
     {% endif %}
   </div>
-  
-  <!-- 사후관리 -->
+
   <div class="card">
-    <div class="card-header">
-      <h3 class="card-title">🩹 사후관리</h3>
-    </div>
-    
+    <div class="card-header"><h3 class="card-title">🩹 사후관리</h3></div>
     {% if clinic.aftercare %}
-      <div style="display: grid; gap: 12px;">
+      <div class="stack">
         {% for surgery, care in clinic.aftercare.items %}
-        <div>
-          <div class="text-sm text-muted">{{ surgery }}</div>
-          <div>{{ care|truncatechars:100 }}</div>
-        </div>
+          <div>
+            <div class="label">{{ surgery }}</div>
+            <div>{{ care|truncatechars:100 }}</div>
+          </div>
         {% endfor %}
       </div>
     {% else %}
@@ -171,44 +137,4 @@
     {% endif %}
   </div>
 </div>
-
-<!-- 언급 제한 병원 -->
-{% if clinic.blocked_hospitals or clinic.allowed_hospitals %}
-<div class="card" style="margin-top: 20px;">
-  <div class="card-header">
-    <h3 class="card-title">⚠️ 언급 제한</h3>
-  </div>
-  
-  <div class="grid-2">
-    <div>
-      <div class="text-sm text-muted mb-4">❌ 언급 불가 병원</div>
-      {% if clinic.blocked_hospitals %}
-        <div class="flex gap-2" style="flex-wrap: wrap;">
-          {% for hospital in clinic.blocked_hospitals %}
-            <span class="tag" style="background: #fee2e2; color: #dc2626;">{{ hospital }}</span>
-          {% endfor %}
-        </div>
-      {% else %}
-        <span class="text-muted">없음</span>
-      {% endif %}
-    </div>
-    
-    <div>
-      <div class="text-sm text-muted mb-4">✅ 언급 가능 병원</div>
-      {% if clinic.allowed_hospitals %}
-        {% for category, hospitals in clinic.allowed_hospitals.items %}
-          <div style="margin-bottom: 8px;">
-            <span class="text-sm">{{ category }}:</span>
-            {% for hospital in hospitals %}
-              <span class="tag tag-muted" style="margin: 2px;">{{ hospital }}</span>
-            {% endfor %}
-          </div>
-        {% endfor %}
-      {% else %}
-        <span class="text-muted">없음</span>
-      {% endif %}
-    </div>
-  </div>
-</div>
-{% endif %}
 {% endblock %}

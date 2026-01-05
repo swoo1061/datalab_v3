@@ -714,7 +714,117 @@ class ClinicGuide(models.Model):
         """특정 의료진의 시술 목록"""
         return [p for p in self.price_list if p.get('doctor_code') == doctor_code]
 
+class ClinicDoctor(models.Model):
+    """
+    병원 의료진 (어드민에서 직접 관리)
+    """
+    clinic = models.ForeignKey(
+        "ClinicGuide",
+        on_delete=models.CASCADE,
+        related_name="doctor_objects",
+        verbose_name="병원"
+    )
 
+    code = models.CharField(
+        max_length=20,
+        blank=True,
+        verbose_name="원장 코드",
+        help_text="예: A, B, 원장1 (없으면 비워도 됨)"
+    )
+
+    name = models.CharField(
+        max_length=50,
+        verbose_name="원장명"
+    )
+
+    style = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="스타일/설명"
+    )
+
+    specialties = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="전문 분야",
+        help_text='예: ["눈성형", "코성형"]'
+    )
+
+    order = models.IntegerField(
+        default=0,
+        verbose_name="정렬 순서"
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="노출 여부"
+    )
+
+    class Meta:
+        ordering = ["order", "id"]
+        verbose_name = "의료진"
+        verbose_name_plural = "의료진 목록"
+
+    def __str__(self):
+        return f"{self.name} 원장"
+
+class ClinicPrice(models.Model):
+    """
+    병원 수가 (원장 + 시술 단위)
+    """
+    clinic = models.ForeignKey(
+        "ClinicGuide",
+        on_delete=models.CASCADE,
+        related_name="price_objects",
+        verbose_name="병원"
+    )
+
+    doctor = models.ForeignKey(
+        ClinicDoctor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prices",
+        verbose_name="담당 원장"
+    )
+
+    procedure = models.CharField(
+        max_length=100,
+        verbose_name="시술명"
+    )
+
+    price_display = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="가격 표시",
+        help_text="예: 50만원 / 30~50만원 / 상담 필요"
+    )
+
+    note = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="비고"
+    )
+
+    order = models.IntegerField(
+        default=0,
+        verbose_name="정렬 순서"
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="노출 여부"
+    )
+
+    class Meta:
+        ordering = ["order", "id"]
+        verbose_name = "수가"
+        verbose_name_plural = "수가 목록"
+
+    def __str__(self):
+        doctor = self.doctor.name if self.doctor else "공통"
+        return f"{doctor} - {self.procedure}"
+    
 class GeneratedReview(models.Model):
     """AI 생성 리뷰 기록"""
     clinic = models.ForeignKey(ClinicGuide, on_delete=models.SET_NULL, null=True, verbose_name="병원")
