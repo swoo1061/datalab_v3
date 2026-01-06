@@ -1,3 +1,7 @@
+/* ==================================================
+   Clinic Detail Page Only (FINAL)
+   ================================================== */
+
 /* ===== Info ===== */
 .info-grid {
   display: grid;
@@ -16,7 +20,9 @@
   border-top: 1px solid var(--border);
 }
 
-/* ===== Doctor Buttons ===== */
+/* ==================================================
+   Doctor Buttons
+   ================================================== */
 .doctor-list {
   display: flex;
   flex-wrap: wrap;
@@ -24,26 +30,24 @@
   margin-bottom: 16px;
 }
 
-.doctor-list form {
-  margin: 0;
-}
-
 .doctor-item {
-  appearance: none;
-  border: 1px solid var(--border);
-  background: #f8fafc;
-  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 
   padding: 10px 14px;
   border-radius: 12px;
+  border: 1px solid var(--border);
+
+  background: #f8fafc;
+  color: var(--text);
 
   font-size: 0.85rem;
   font-weight: 600;
-  white-space: nowrap;
+  text-decoration: none;
 
   cursor: pointer;
   transition: all 0.15s ease;
-  text-decoration: none;
 }
 
 .doctor-item:hover {
@@ -53,111 +57,88 @@
 
 .doctor-item.active {
   background: linear-gradient(135deg, var(--brand) 0%, #7c3aed 100%);
-  color: #ffffff;
+  color: #fff;
   border-color: transparent;
   box-shadow: 0 4px 12px rgba(79,70,229,.25);
 }
 
-/* ===== Doctor Detail ===== */
+/* ==================================================
+   Doctor Detail
+   ================================================== */
 .doctor-title {
   font-size: 1rem;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
-/* ===== Price Table ===== */
-.price-table-wrap {
-  overflow-x: auto;
-}
-
-.price-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--surface);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.price-table thead {
-  background: var(--bg);
-}
-
-.price-table th,
-.price-table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-}
-
-.price-table th {
-  font-size: 0.75rem;
-  color: var(--muted);
-  text-transform: uppercase;
-}
-
-.price-table tbody tr:hover {
-  background: var(--bg);
-}
-
-.price-table .procedure {
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.price-table .price {
-  text-align: right;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--brand);
-  white-space: nowrap;
-}
-
-/* ===== Price Grid (4~6개 한눈에) ===== */
+/* ==================================================
+   Price Grid (카드형 – 핵심 수정 구간)
+   ================================================== */
 .price-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* 한 줄에 3개 */
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
+/* 카드 자체 */
 .price-card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 6px;
 
-  padding: 10px 12px;
-  background: var(--bg);
-  border-radius: 10px;
+  padding: 12px;
   border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+
+  min-width: 0;       /* ⭐ 핵심 */
+  overflow: hidden;   /* ⭐ 핵심 */
 }
 
+/* 시술명 영역 */
 .price-procedure {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--text);
+  display: block;          /* ⭐ 핵심 */
+  width: 100%;             /* ⭐ 핵심 */
+
+  font-size: 0.85rem;
+  font-weight: 600;
   line-height: 1.4;
+
+  white-space: normal;     /* 줄바꿈 허용 */
+  word-break: keep-all;    /* 한글 단어 단위 */
+  overflow-wrap: break-word;
+
+  max-width: 100%;         /* ⭐ 핵심 */
 }
 
+/* 설명 텍스트 */
+.price-desc {
+  display: block;          /* ⭐⭐⭐ 제일 중요 */
+  margin-top: 2px;
+
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--brand);
+
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 가격 */
 .price-value {
-  font-size: 0.82rem;
+  align-self: flex-end;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--brand);
   white-space: nowrap;
 }
 
-/* ===== Responsive ===== */
+/* ==================================================
+   Responsive
+   ================================================== */
 @media (max-width: 768px) {
   .price-grid {
-    grid-template-columns: 1fr; /* 모바일 1열 */
-  }
-}
-
-/* ===== Mobile ===== */
-@media (max-width: 768px) {
-  .doctor-list {
-    overflow-x: auto;
-    white-space: nowrap;
-  }
-
-  .doctor-item {
-    flex-shrink: 0;
+    grid-template-columns: 1fr;
   }
 }

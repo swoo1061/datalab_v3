@@ -4,21 +4,27 @@ from django.db import transaction
 
 
 class Command(BaseCommand):
-    help = "ClinicGuide JSON(doctors, price_list)을 ClinicDoctor / ClinicPrice 모델로 이전"
+    help = "ClinicGuide JSON(doctors, price_list)을 ClinicDoctor / ClinicPrice 모델로 이전 (단일 병원)"
 
     @transaction.atomic
     def handle(self, *args, **options):
-        self.stdout.write(self.style.WARNING("▶ 병원 JSON → 모델 마이그레이션 시작"))
+        self.stdout.write(self.style.WARNING("▶ 병원 JSON → 모델 마이그레이션 시작 (단일 병원)"))
 
-        clinics = ClinicGuide.objects.all()
+        # 🔥 여기서 병원 하나만 지정
+        clinic_id = 25
+        clinics = ClinicGuide.objects.filter(id=clinic_id)
+
+        if not clinics.exists():
+            self.stdout.write(self.style.ERROR(f"❌ 병원 ID={clinic_id} 없음"))
+            return
 
         for clinic in clinics:
-            self.stdout.write(f"\n🏥 병원: {clinic.name}")
+            self.stdout.write(f"\n🏥 병원: {clinic.name} (ID={clinic.id})")
 
             # -------------------------
             # 1️⃣ 의료진 이전
             # -------------------------
-            doctor_map = {}  # code/name → ClinicDoctor
+            doctor_map = {}
 
             doctors_json = clinic.doctors or []
             for idx, d in enumerate(doctors_json):
@@ -41,7 +47,6 @@ class Command(BaseCommand):
                 )
 
                 if not created:
-                    # 기존 데이터 업데이트 (선택)
                     doctor.code = doctor.code or code
                     doctor.style = doctor.style or d.get("style", "")
                     doctor.specialties = doctor.specialties or d.get("specialties", [])
@@ -96,4 +101,4 @@ class Command(BaseCommand):
                     )
                 )
 
-        self.stdout.write(self.style.SUCCESS("\n✅ JSON → 모델 이전 완료"))
+        self.stdout.write(self.style.SUCCESS("\n✅ 단일 병원 JSON → 모델 이전 완료"))
