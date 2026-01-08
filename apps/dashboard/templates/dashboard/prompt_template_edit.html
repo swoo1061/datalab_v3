@@ -1,0 +1,392 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{% if template %}프롬프트 수정{% else %}프롬프트 추가{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{% if template %}프롬프트 템플릿 수정{% else %}새 프롬프트 템플릿{% endif %}</h1>
+    <p class="page-subtitle">
+      {% if template %}
+        {{ template.get_mode_display }} - {{ template.name }} (v{{ template.version }})
+      {% else %}
+        리뷰 생성에 사용할 새 프롬프트 템플릿을 작성합니다
+      {% endif %}
+    </p>
+  </div>
+  <a href="{% url 'dashboard:prompt_template_list' %}" class="btn btn-ghost">
+    목록으로
+  </a>
+</div>
+
+{% if error %}
+<div class="alert alert-danger mb-4">{{ error }}</div>
+{% endif %}
+
+{% if success %}
+<div class="alert alert-success mb-4">{{ success }}</div>
+{% endif %}
+
+<form method="POST" class="prompt-form">
+  {% csrf_token %}
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">기본 정보</span>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="mode">모드 <span class="required">*</span></label>
+        <select name="mode" id="mode" required>
+          <option value="">선택하세요</option>
+          <option value="basic" {% if template.mode == 'basic' %}selected{% endif %}>Basic</option>
+          <option value="basic_plus" {% if template.mode == 'basic_plus' %}selected{% endif %}>Basic Plus</option>
+          <option value="pro_header" {% if template.mode == 'pro_header' %}selected{% endif %}>Pro - 헤더</option>
+          <option value="pro_guidelines" {% if template.mode == 'pro_guidelines' %}selected{% endif %}>Pro - 가이드라인</option>
+        </select>
+        <p class="form-help">이 템플릿이 사용될 생성 모드를 선택하세요</p>
+      </div>
+
+      <div class="form-group">
+        <label for="name">템플릿 이름 <span class="required">*</span></label>
+        <input type="text" name="name" id="name" value="{{ template.name }}" required placeholder="예: 기본 후기 생성">
+      </div>
+
+      <div class="form-group full-width">
+        <label for="description">설명</label>
+        <input type="text" name="description" id="description" value="{{ template.description }}" placeholder="이 템플릿에 대한 간단한 설명">
+      </div>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" name="is_default" {% if template.is_default %}checked{% endif %}>
+          <span>기본 템플릿으로 설정</span>
+        </label>
+        <p class="form-help">해당 모드에서 기본으로 사용됩니다</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-4">
+    <div class="card-header">
+      <span class="card-title">프롬프트 내용 <span class="required">*</span></span>
+      <span class="text-muted text-sm" id="char-count">0자</span>
+    </div>
+
+    <div class="form-group">
+      <textarea name="content" id="content" rows="25" required placeholder="프롬프트 내용을 입력하세요...">{{ template.content }}</textarea>
+      <p class="form-help">
+        <strong>변수 사용 가능:</strong><br>
+        - Basic: <code>{user_input}</code><br>
+        - Basic Plus: <code>{user_input}</code>, <code>{persona_desc}</code>, <code>{situation_desc}</code>, <code>{content_list}</code><br>
+        - Pro: 변수 없음 (동적으로 조합됨)
+      </p>
+    </div>
+  </div>
+
+  {% if template %}
+  <div class="card mt-4">
+    <div class="card-header">
+      <span class="card-title">변경 사유 (선택)</span>
+    </div>
+    <div class="form-group">
+      <input type="text" name="change_note" id="change_note" placeholder="이번 수정 내용에 대한 메모 (버전 이력에 기록됩니다)">
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="form-actions mt-4">
+    <a href="{% url 'dashboard:prompt_template_list' %}" class="btn btn-ghost">취소</a>
+    <button type="submit" class="btn btn-primary">
+      {% if template %}저장{% else %}생성{% endif %}
+    </button>
+  </div>
+</form>
+
+{% if template and versions %}
+<div class="card mt-6" id="versions">
+  <div class="card-header">
+    <span class="card-title">버전 이력</span>
+    <span class="text-muted text-sm">최근 {{ versions|length }}개</span>
+  </div>
+
+  <div class="version-list">
+    {% for v in versions %}
+    <div class="version-item">
+      <div class="version-header">
+        <div class="version-info">
+          <span class="version-number">v{{ v.version }}</span>
+          <span class="version-date">{{ v.created_at|date:"Y-m-d H:i" }}</span>
+        </div>
+        <div class="version-actions">
+          <button class="btn btn-ghost btn-sm preview-version-btn" data-version="{{ v.version }}" data-content="{{ v.content|escapejs }}">
+            미리보기
+          </button>
+          <button class="btn btn-secondary btn-sm restore-btn" data-pk="{{ template.pk }}" data-version="{{ v.version }}">
+            복원
+          </button>
+        </div>
+      </div>
+      {% if v.change_note %}
+      <p class="version-note">{{ v.change_note }}</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- 버전 미리보기 모달 -->
+<div id="version-modal" class="modal hidden">
+  <div class="modal-backdrop" onclick="closeVersionModal()"></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="modal-title">버전 미리보기</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeVersionModal()">X</button>
+    </div>
+    <div class="modal-body">
+      <pre id="modal-content"></pre>
+    </div>
+  </div>
+</div>
+
+<style>
+.prompt-form textarea {
+  font-family: 'Pretendard Variable', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 400px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  padding: 20px;
+}
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+.form-group label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary, #3b82f6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+.form-help {
+  font-size: 0.85rem;
+  color: var(--text-muted, #6b7280);
+  margin-top: 6px;
+}
+.form-help code {
+  background: var(--bg-secondary, #f3f4f6);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.checkbox-label input {
+  width: auto;
+}
+.required {
+  color: var(--danger, #ef4444);
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.version-list {
+  padding: 16px;
+}
+.version-item {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+.version-item:last-child {
+  margin-bottom: 0;
+}
+.version-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.version-number {
+  font-weight: 600;
+  color: var(--primary, #3b82f6);
+}
+.version-date {
+  color: var(--text-muted, #6b7280);
+  font-size: 0.9rem;
+  margin-left: 12px;
+}
+.version-note {
+  font-size: 0.9rem;
+  color: var(--text-muted, #6b7280);
+  margin: 8px 0 0;
+}
+.version-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 모달 */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal.hidden {
+  display: none;
+}
+.modal-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+.modal-content {
+  position: relative;
+  background: var(--card-bg, #fff);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+}
+.modal-body pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 6px;
+}
+.alert-danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger, #ef4444);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+.alert-success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success, #10b981);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+
+// 글자 수 카운트
+const textarea = document.getElementById('content');
+const charCount = document.getElementById('char-count');
+
+function updateCharCount() {
+  charCount.textContent = textarea.value.length.toLocaleString() + '자';
+}
+
+textarea.addEventListener('input', updateCharCount);
+updateCharCount();
+
+// 버전 미리보기
+document.querySelectorAll('.preview-version-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const version = btn.dataset.version;
+    const content = btn.dataset.content;
+
+    document.getElementById('modal-title').textContent = `v${version} 미리보기`;
+    document.getElementById('modal-content').textContent = content;
+    document.getElementById('version-modal').classList.remove('hidden');
+  });
+});
+
+function closeVersionModal() {
+  document.getElementById('version-modal').classList.add('hidden');
+}
+
+// ESC로 모달 닫기
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeVersionModal();
+  }
+});
+
+// 버전 복원
+document.querySelectorAll('.restore-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const pk = btn.dataset.pk;
+    const version = btn.dataset.version;
+
+    if (!confirm(`v${version}으로 복원하시겠습니까?\n현재 내용은 자동으로 백업됩니다.`)) return;
+
+    try {
+      const resp = await fetch(`/dashboard/api/prompt-templates/${pk}/restore/${version}/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrfToken}
+      });
+      const data = await resp.json();
+      if (data.success) {
+        alert(data.message);
+        location.reload();
+      } else {
+        alert(data.error || '오류가 발생했습니다.');
+      }
+    } catch (err) {
+      alert('오류가 발생했습니다.');
+    }
+  });
+});
+</script>
+{% endblock %}

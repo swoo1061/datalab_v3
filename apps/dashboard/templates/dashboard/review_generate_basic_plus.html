@@ -1,0 +1,1357 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}AI 생성 Basic+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid var(--border);
+  }
+  .tab-btn {
+    padding: 12px 24px;
+    background: none;
+    border: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover {
+    color: var(--brand);
+  }
+  .tab-btn.active {
+    color: var(--brand);
+    border-bottom-color: var(--brand);
+  }
+  .tab-content {
+    display: none;
+  }
+  .tab-content.active {
+    display: block;
+  }
+  .series-output {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    white-space: pre-wrap;
+    line-height: 1.8;
+    font-size: 0.95rem;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  .series-item {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 3px double var(--border);
+  }
+  .series-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+  .series-title {
+    font-weight: 700;
+    color: var(--brand);
+    margin-bottom: 12px;
+    font-size: 1rem;
+  }
+  .checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .checkbox-item:hover {
+    background: var(--brand-bg);
+  }
+  .checkbox-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--brand);
+  }
+  .checkbox-item label {
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .content-type-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .content-type-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-radius: 8px;
+  }
+  .content-type-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--brand);
+  }
+  .content-type-row label {
+    flex: 1;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .len-input {
+    width: 70px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    text-align: center;
+  }
+  .len-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .prompt-preview {
+    background: #1e293b;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .prompt-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    color: #94a3b8;
+  }
+  .prompt-preview pre {
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    line-height: 1.6;
+    margin: 0;
+  }
+  .collapse-btn {
+    width: 100%;
+    text-align: left;
+    padding: 12px 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .collapse-btn:hover {
+    background: var(--brand-bg);
+    border-color: var(--brand);
+  }
+  .diversity-settings {
+    margin-top: 12px;
+    padding: 16px;
+    background: var(--bg);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .setting-row {
+    margin-bottom: 16px;
+  }
+  .setting-row label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .slider-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .slider-container input[type="range"] {
+    flex: 1;
+    height: 6px;
+    accent-color: var(--brand);
+  }
+  .slider-container span {
+    min-width: 40px;
+    font-weight: 600;
+    color: var(--brand);
+  }
+  .setting-hint {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .setting-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .setting-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .setting-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .setting-grid > div label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .setting-grid .form-select {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+  .extract-area {
+    min-height: 150px;
+    font-size: 0.9rem;
+  }
+  .style-preview {
+    background: var(--brand-bg);
+    border-radius: 10px;
+    padding: 16px;
+    margin-top: 12px;
+  }
+  .style-preview h4 {
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    color: var(--brand);
+  }
+  .style-preview p {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 4px 0;
+  }
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--brand);
+    background: var(--brand-bg);
+  }
+  .drop-zone input[type="file"] {
+    display: none;
+  }
+  .image-preview {
+    max-width: 100%;
+    max-height: 200px;
+    margin-top: 12px;
+    border-radius: 8px;
+  }
+  .reply-output {
+    background: #fffbeb;
+    border: 1px solid #fbbf24;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 16px;
+  }
+  .usage-info {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .usage-info span {
+    background: var(--bg);
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">AI 생성 Basic+</h1>
+    <p class="page-subtitle">컨텐츠 시리즈 생성 & 스타일 기반 댓글/글 생성</p>
+  </div>
+</div>
+
+<!-- 탭 메뉴 -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="series">시리즈 생성</button>
+  <button class="tab-btn" data-tab="reply">스타일 추출 & 댓글 반응</button>
+  <button class="tab-btn" data-tab="custom">스타일 기반 글 생성</button>
+</div>
+
+<!-- 탭 1: 시리즈 생성 -->
+<div id="tab-series" class="tab-content active">
+  <div class="grid-2">
+    <div class="card">
+      <h3 class="card-title mb-4">시리즈 설정</h3>
+
+      <div class="form-group">
+        <label class="form-label">기본 정보 입력</label>
+        <textarea id="series-input" class="form-textarea" rows="6" placeholder="병원명, 시술명, 페르소나 정보 등을 자유롭게 입력하세요.
+
+예시:
+- 병원: 강남역 ○○피부과
+- 시술: 피코토닝 5회
+- 페르소나: 30대 초반 직장인 여성, 기미/잡티 고민
+- 특이사항: 처음 레이저 시술, 겁이 많음"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">생성할 컨텐츠 선택 (체크 & 글자수 설정)</label>
+        <div class="content-type-list">
+          <div class="content-type-row">
+            <input type="checkbox" id="ct-question" value="question" checked>
+            <label for="ct-question">고민 & 질문</label>
+            <input type="number" id="len-question" class="len-input" value="500" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct-research" value="research" checked>
+            <label for="ct-research">발품/손품</label>
+            <input type="number" id="len-research" class="len-input" value="600" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct-consultation" value="consultation" checked>
+            <label for="ct-consultation">방문상담 후기</label>
+            <input type="number" id="len-consultation" class="len-input" value="600" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct-day0" value="day0" checked>
+            <label for="ct-day0">시술 당일</label>
+            <input type="number" id="len-day0" class="len-input" value="600" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct-month1" value="month1" checked>
+            <label for="ct-month1">1개월 후기</label>
+            <input type="number" id="len-month1" class="len-input" value="500" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct-month2" value="month2" checked>
+            <label for="ct-month2">2개월 후기</label>
+            <input type="number" id="len-month2" class="len-input" value="500" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct-month3" value="month3">
+            <label for="ct-month3">3개월 후기</label>
+            <input type="number" id="len-month3" class="len-input" value="500" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
+        </div>
+        <p class="form-hint">각 컨텐츠별 목표 글자수를 설정하세요 (권장: 400~600자)</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">AI 모델</label>
+        <select id="series-model" class="form-select">
+          {% for model in models %}
+          <option value="{{ model.id }}" {% if 'sonnet' in model.id|lower %}selected{% endif %}>
+            {{ model.name }} ({{ model.provider }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- 프롬프트 템플릿 선택 -->
+      <div class="form-group">
+        <label class="form-label">프롬프트 템플릿</label>
+        <div class="flex gap-2 items-center">
+          <select id="series-template" class="form-select" style="max-width: 300px;">
+            <option value="">기본 템플릿</option>
+          </select>
+          <button type="button" class="btn btn-ghost btn-sm" id="previewSeriesTemplateBtn">미리보기</button>
+          <a href="{% url 'dashboard:prompt_template_list' %}" class="btn btn-ghost btn-sm" target="_blank">관리</a>
+        </div>
+      </div>
+
+      <!-- 다양성 설정 (접기/펼치기) -->
+      <div class="form-group">
+        <button type="button" class="collapse-btn" onclick="toggleDiversity()">
+          <span id="diversity-icon">▶</span> 다양성 설정 (랜덤 페르소나/상황)
+        </button>
+        <div id="diversity-settings" class="diversity-settings" style="display: none;">
+
+          <!-- Temperature -->
+          <div class="setting-row">
+            <label>창의성 (Temperature)</label>
+            <div class="slider-container">
+              <input type="range" id="temperature" min="0.5" max="1.0" step="0.05" value="0.85">
+              <span id="temp-value">0.85</span>
+            </div>
+            <p class="setting-hint">높을수록 다양한 표현 (권장: 0.8~0.95)</p>
+          </div>
+
+          <!-- 랜덤 페르소나 -->
+          <div class="setting-section">
+            <div class="setting-header">
+              <span>페르소나 설정</span>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="randomizePersona()">🎲 랜덤</button>
+            </div>
+            <div class="setting-grid">
+              <div>
+                <label>연령대</label>
+                <select id="persona-age" class="form-select">
+                  <option value="">랜덤</option>
+                  <option value="20대 초반">20대 초반</option>
+                  <option value="20대 중후반">20대 중후반</option>
+                  <option value="30대 초반">30대 초반</option>
+                  <option value="30대 중후반">30대 중후반</option>
+                  <option value="40대">40대</option>
+                  <option value="50대 이상">50대 이상</option>
+                </select>
+              </div>
+              <div>
+                <label>성별</label>
+                <select id="persona-gender" class="form-select">
+                  <option value="">랜덤</option>
+                  <option value="여성">여성</option>
+                  <option value="남성">남성</option>
+                </select>
+              </div>
+              <div>
+                <label>직업</label>
+                <select id="persona-job" class="form-select">
+                  <option value="">랜덤</option>
+                  <option value="직장인">직장인</option>
+                  <option value="대학생">대학생</option>
+                  <option value="주부">주부</option>
+                  <option value="자영업">자영업</option>
+                  <option value="프리랜서">프리랜서</option>
+                  <option value="취준생">취준생</option>
+                </select>
+              </div>
+              <div>
+                <label>성격</label>
+                <select id="persona-personality" class="form-select">
+                  <option value="">랜덤</option>
+                  <option value="꼼꼼하고 신중한">꼼꼼/신중</option>
+                  <option value="활발하고 수다스러운">활발/수다</option>
+                  <option value="차분하고 담백한">차분/담백</option>
+                  <option value="걱정 많고 예민한">걱정多/예민</option>
+                  <option value="쿨하고 대충대충인">쿨/대충</option>
+                </select>
+              </div>
+              <div>
+                <label>말투</label>
+                <select id="persona-tone" class="form-select">
+                  <option value="">랜덤</option>
+                  <option value="친근한 반말">친근 반말</option>
+                  <option value="정중한 존댓말">정중 존댓말</option>
+                  <option value="~요체 위주">~요체</option>
+                  <option value="이모지 많이 사용">이모지 多</option>
+                  <option value="이모지 거의 안 씀">이모지 少</option>
+                </select>
+              </div>
+              <div>
+                <label>시술 경험</label>
+                <select id="persona-exp" class="form-select">
+                  <option value="">랜덤</option>
+                  <option value="완전 처음">완전 처음</option>
+                  <option value="1~2번 해봄">1~2번</option>
+                  <option value="여러 번 경험">여러 번</option>
+                  <option value="피부과 단골">단골</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 랜덤 상황 변수 -->
+          <div class="setting-section">
+            <div class="setting-header">
+              <span>상황 변수</span>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="randomizeSituation()">🎲 랜덤</button>
+            </div>
+            <div class="setting-grid">
+              <div>
+                <label>상담 분위기</label>
+                <select id="sit-consult" class="form-select">
+                  <option value="">랜덤</option>
+                  <option value="친절하고 자세했음">친절/자세</option>
+                  <option value="빠르고 간단했음">빠름/간단</option>
+                  <option value="살짝 푸시 있었음">푸시 있음</option>
+                  <option value="원장님 직접 상담">원장 직접</option>
+                </select>
+              </div>
+              <div>
+                <label>시술 통증</label>
+                <select id="sit-pain" class="form-select">
+                  <option value="">랜덤</option>
+                  <option value="거의 안 아팠음">거의 무통</option>
+                  <option value="따끔따끔 정도">따끔</option>
+                  <option value="좀 아팠지만 참을만">참을만</option>
+                  <option value="많이 아팠음">많이 아픔</option>
+                </select>
+              </div>
+              <div>
+                <label>다운타임</label>
+                <select id="sit-downtime" class="form-select">
+                  <option value="">랜덤</option>
+                  <option value="거의 없었음">거의 없음</option>
+                  <option value="2~3일 붓기">2~3일</option>
+                  <option value="일주일 정도">일주일</option>
+                  <option value="2주 이상">2주+</option>
+                </select>
+              </div>
+              <div>
+                <label>만족도</label>
+                <select id="sit-satisfaction" class="form-select">
+                  <option value="">랜덤</option>
+                  <option value="대만족">대만족</option>
+                  <option value="만족">만족</option>
+                  <option value="보통">보통</option>
+                  <option value="약간 아쉬움">약간 아쉬움</option>
+                </select>
+              </div>
+              <div>
+                <label>가격 느낌</label>
+                <select id="sit-price" class="form-select">
+                  <option value="">랜덤</option>
+                  <option value="저렴했음">저렴</option>
+                  <option value="적당했음">적당</option>
+                  <option value="좀 비쌌지만 만족">비싸지만OK</option>
+                  <option value="비싼 편">비쌈</option>
+                </select>
+              </div>
+              <div>
+                <label>재방문 의향</label>
+                <select id="sit-revisit" class="form-select">
+                  <option value="">랜덤</option>
+                  <option value="무조건 또 갈 예정">무조건 재방문</option>
+                  <option value="아마 또 갈 듯">아마 재방문</option>
+                  <option value="고민 중">고민 중</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-secondary" style="width:100%; margin-top:12px;" onclick="randomizeAll()">
+            🎲 전체 랜덤 설정
+          </button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-lg" style="width: 100%;" onclick="generateSeries()">
+        시리즈 생성하기
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">생성 결과</h3>
+        <div class="flex gap-2">
+          <button class="btn btn-ghost btn-sm" onclick="togglePromptPreview()">프롬프트 보기</button>
+          <button class="btn btn-secondary btn-sm" onclick="copySeriesResult()">복사</button>
+        </div>
+      </div>
+
+      <!-- 프롬프트 미리보기 -->
+      <div id="prompt-preview" class="prompt-preview" style="display: none;">
+        <div class="prompt-preview-header">
+          <strong>전송된 프롬프트</strong>
+          <button class="btn btn-ghost btn-sm" onclick="copyPrompt()">복사</button>
+        </div>
+        <pre id="prompt-content"></pre>
+      </div>
+
+      <div id="series-loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+      </div>
+      <div id="series-output" class="series-output" style="display: none;"></div>
+      <div id="series-placeholder" class="text-center text-muted" style="padding: 60px 20px;">
+        시리즈를 생성하면 여기에 결과가 표시됩니다.
+      </div>
+      <div id="series-usage" class="usage-info" style="display: none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 탭 2: 스타일 추출 & 댓글 반응 -->
+<div id="tab-reply" class="tab-content">
+  <div class="grid-2">
+    <div class="card">
+      <h3 class="card-title mb-4">1. 스타일 추출</h3>
+
+      <div class="form-group">
+        <label class="form-label">원본 글 입력 (복사 붙여넣기 또는 이미지)</label>
+        <textarea id="style-source" class="form-textarea extract-area" rows="6" placeholder="스타일을 추출할 원본 글을 붙여넣으세요.
+시리즈 전체 또는 일부 컨텐츠를 입력하면 됩니다."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">또는 이미지 업로드</label>
+        <div class="drop-zone" id="style-drop-zone" onclick="document.getElementById('style-images').click()">
+          <input type="file" id="style-images" accept="image/*" multiple>
+          <p>이미지를 드래그하거나 클릭하여 업로드</p>
+          <p class="text-sm text-muted">캡처 이미지에서 텍스트를 추출합니다</p>
+        </div>
+        <div id="style-image-preview"></div>
+      </div>
+
+      <button class="btn btn-secondary" style="width: 100%;" onclick="extractStyle()">
+        스타일 추출하기
+      </button>
+
+      <div id="style-preview" class="style-preview" style="display: none;">
+        <h4>추출된 스타일</h4>
+        <p id="style-summary">-</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title mb-4">2. 댓글에 답변 생성</h3>
+
+      <div class="form-group">
+        <label class="form-label">댓글 입력 (복사 붙여넣기 또는 이미지)</label>
+        <textarea id="comment-input" class="form-textarea" rows="4" placeholder="답변할 댓글 내용을 붙여넣으세요.
+
+예시: '저도 피코 고민중인데 통증 어땠어요? 다운타임은요?'"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">또는 댓글 이미지</label>
+        <div class="drop-zone" id="comment-drop-zone" onclick="document.getElementById('comment-images').click()">
+          <input type="file" id="comment-images" accept="image/*" multiple>
+          <p>댓글 캡처 이미지 업로드</p>
+        </div>
+        <div id="comment-image-preview"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">AI 모델</label>
+        <select id="reply-model" class="form-select">
+          {% for model in models %}
+          <option value="{{ model.id }}" {% if 'sonnet' in model.id|lower %}selected{% endif %}>
+            {{ model.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="btn btn-primary" style="width: 100%;" onclick="generateReply()">
+        답변 생성하기
+      </button>
+
+      <div id="reply-loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+      </div>
+      <div id="reply-output" class="reply-output" style="display: none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 탭 3: 스타일 기반 글 생성 -->
+<div id="tab-custom" class="tab-content">
+  <div class="grid-2">
+    <div class="card">
+      <h3 class="card-title mb-4">1. 스타일 소스</h3>
+
+      <div class="form-group">
+        <label class="form-label">참고할 글 입력</label>
+        <textarea id="custom-style-source" class="form-textarea extract-area" rows="6" placeholder="스타일을 참고할 원본 글을 붙여넣으세요."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">또는 이미지 업로드</label>
+        <div class="drop-zone" id="custom-drop-zone" onclick="document.getElementById('custom-images').click()">
+          <input type="file" id="custom-images" accept="image/*" multiple>
+          <p>이미지를 드래그하거나 클릭하여 업로드</p>
+        </div>
+        <div id="custom-image-preview"></div>
+      </div>
+
+      <button class="btn btn-secondary" style="width: 100%;" onclick="extractCustomStyle()">
+        스타일 추출하기
+      </button>
+
+      <div id="custom-style-preview" class="style-preview" style="display: none;">
+        <h4>추출된 스타일</h4>
+        <p id="custom-style-summary">-</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title mb-4">2. 새 글 생성</h3>
+
+      <div class="form-group">
+        <label class="form-label">생성할 글의 조건/주제</label>
+        <textarea id="custom-prompt" class="form-textarea" rows="4" placeholder="어떤 글을 생성할지 조건을 입력하세요.
+
+예시:
+- 같은 병원에서 추가로 울쎄라 시술 받은 후기
+- 다른 사람이 질문한 내용에 대한 추가 설명
+- 시술 6개월 후 유지 후기"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">AI 모델</label>
+        <select id="custom-model" class="form-select">
+          {% for model in models %}
+          <option value="{{ model.id }}" {% if 'sonnet' in model.id|lower %}selected{% endif %}>
+            {{ model.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="btn btn-primary" style="width: 100%;" onclick="generateCustom()">
+        글 생성하기
+      </button>
+
+      <div id="custom-loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+      </div>
+      <div id="custom-output" class="result-box" style="display: none;"></div>
+      <div id="custom-usage" class="usage-info" style="display: none;"></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 탭 전환
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+  });
+});
+
+// 이미지 드래그앤드롭 설정
+function setupDropZone(zoneId, inputId, previewId) {
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  const preview = document.getElementById(previewId);
+
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    zone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); });
+  });
+
+  ['dragenter', 'dragover'].forEach(eventName => {
+    zone.addEventListener(eventName, () => zone.classList.add('drag-over'));
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    zone.addEventListener(eventName, () => zone.classList.remove('drag-over'));
+  });
+
+  zone.addEventListener('drop', e => {
+    input.files = e.dataTransfer.files;
+    showImagePreviews(input.files, preview);
+  });
+
+  input.addEventListener('change', () => {
+    showImagePreviews(input.files, preview);
+  });
+}
+
+function showImagePreviews(files, container) {
+  container.innerHTML = '';
+  Array.from(files).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.className = 'image-preview';
+      container.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+setupDropZone('style-drop-zone', 'style-images', 'style-image-preview');
+setupDropZone('comment-drop-zone', 'comment-images', 'comment-image-preview');
+setupDropZone('custom-drop-zone', 'custom-images', 'custom-image-preview');
+
+// 저장된 스타일 데이터
+let extractedStyle = null;
+let customExtractedStyle = null;
+let lastPrompt = null;
+
+// 다양성 설정 관련
+function toggleDiversity() {
+  const settings = document.getElementById('diversity-settings');
+  const icon = document.getElementById('diversity-icon');
+  if (settings.style.display === 'none') {
+    settings.style.display = 'block';
+    icon.textContent = '▼';
+  } else {
+    settings.style.display = 'none';
+    icon.textContent = '▶';
+  }
+}
+
+// Temperature 슬라이더 이벤트
+document.addEventListener('DOMContentLoaded', function() {
+  const tempSlider = document.getElementById('temperature');
+  const tempValue = document.getElementById('temp-value');
+  if (tempSlider && tempValue) {
+    tempSlider.addEventListener('input', function() {
+      tempValue.textContent = this.value;
+    });
+  }
+});
+
+// 페르소나 옵션들
+const personaOptions = {
+  age: ['20대 초반', '20대 중후반', '30대 초반', '30대 중후반', '40대', '50대 이상'],
+  gender: ['여성', '남성'],
+  job: ['직장인', '대학생', '주부', '자영업', '프리랜서', '취준생'],
+  personality: ['꼼꼼하고 신중한', '활발하고 수다스러운', '차분하고 담백한', '걱정 많고 예민한', '쿨하고 대충대충인'],
+  tone: ['친근한 반말', '정중한 존댓말', '~요체 위주', '이모지 많이 사용', '이모지 거의 안 씀'],
+  exp: ['완전 처음', '1~2번 해봄', '여러 번 경험', '피부과 단골']
+};
+
+// 상황 변수 옵션들
+const situationOptions = {
+  consult: ['친절하고 자세했음', '빠르고 간단했음', '살짝 푸시 있었음', '원장님 직접 상담'],
+  pain: ['거의 안 아팠음', '따끔따끔 정도', '좀 아팠지만 참을만', '많이 아팠음'],
+  downtime: ['거의 없었음', '2~3일 붓기', '일주일 정도', '2주 이상'],
+  satisfaction: ['대만족', '만족', '보통', '약간 아쉬움'],
+  price: ['저렴했음', '적당했음', '좀 비쌌지만 만족', '비싼 편'],
+  revisit: ['무조건 또 갈 예정', '아마 또 갈 듯', '고민 중']
+};
+
+function getRandomItem(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function randomizePersona() {
+  document.getElementById('persona-age').value = getRandomItem(personaOptions.age);
+  document.getElementById('persona-gender').value = getRandomItem(personaOptions.gender);
+  document.getElementById('persona-job').value = getRandomItem(personaOptions.job);
+  document.getElementById('persona-personality').value = getRandomItem(personaOptions.personality);
+  document.getElementById('persona-tone').value = getRandomItem(personaOptions.tone);
+  document.getElementById('persona-exp').value = getRandomItem(personaOptions.exp);
+}
+
+function randomizeSituation() {
+  document.getElementById('sit-consult').value = getRandomItem(situationOptions.consult);
+  document.getElementById('sit-pain').value = getRandomItem(situationOptions.pain);
+  document.getElementById('sit-downtime').value = getRandomItem(situationOptions.downtime);
+  document.getElementById('sit-satisfaction').value = getRandomItem(situationOptions.satisfaction);
+  document.getElementById('sit-price').value = getRandomItem(situationOptions.price);
+  document.getElementById('sit-revisit').value = getRandomItem(situationOptions.revisit);
+}
+
+function randomizeAll() {
+  // Temperature 랜덤 (0.7 ~ 0.95)
+  const tempSlider = document.getElementById('temperature');
+  const tempValue = document.getElementById('temp-value');
+  const randomTemp = (0.7 + Math.random() * 0.25).toFixed(2);
+  tempSlider.value = randomTemp;
+  tempValue.textContent = randomTemp;
+
+  randomizePersona();
+  randomizeSituation();
+}
+
+// 다양성 설정 수집 함수
+function collectDiversitySettings() {
+  const settings = {
+    temperature: parseFloat(document.getElementById('temperature').value),
+    persona: {
+      age: document.getElementById('persona-age').value,
+      gender: document.getElementById('persona-gender').value,
+      job: document.getElementById('persona-job').value,
+      personality: document.getElementById('persona-personality').value,
+      tone: document.getElementById('persona-tone').value,
+      experience: document.getElementById('persona-exp').value
+    },
+    situation: {
+      consult: document.getElementById('sit-consult').value,
+      pain: document.getElementById('sit-pain').value,
+      downtime: document.getElementById('sit-downtime').value,
+      satisfaction: document.getElementById('sit-satisfaction').value,
+      price: document.getElementById('sit-price').value,
+      revisit: document.getElementById('sit-revisit').value
+    }
+  };
+
+  // 빈 값("랜덤")이면 실제 랜덤 값 할당
+  for (const [key, value] of Object.entries(settings.persona)) {
+    if (!value) {
+      const optKey = key === 'experience' ? 'exp' : key;
+      settings.persona[key] = getRandomItem(personaOptions[optKey] || []);
+    }
+  }
+  for (const [key, value] of Object.entries(settings.situation)) {
+    if (!value) {
+      settings.situation[key] = getRandomItem(situationOptions[key] || []);
+    }
+  }
+
+  return settings;
+}
+
+// CSRF 토큰
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// 시리즈 생성
+async function generateSeries() {
+  const input = document.getElementById('series-input').value.trim();
+  if (!input) {
+    alert('기본 정보를 입력해주세요.');
+    return;
+  }
+
+  // 선택된 컨텐츠 타입 및 길이 수집
+  const contentTypes = [];
+  const contentLengths = {};
+  document.querySelectorAll('#tab-series .content-type-row').forEach(row => {
+    const checkbox = row.querySelector('input[type="checkbox"]');
+    const lenInput = row.querySelector('.len-input');
+    if (checkbox.checked) {
+      contentTypes.push(checkbox.value);
+      contentLengths[checkbox.value] = parseInt(lenInput.value) || 500;
+    }
+  });
+
+  if (contentTypes.length === 0) {
+    alert('최소 하나의 컨텐츠를 선택해주세요.');
+    return;
+  }
+
+  const model = document.getElementById('series-model').value;
+
+  // 다양성 설정 수집
+  const diversitySettings = collectDiversitySettings();
+
+  document.getElementById('series-placeholder').style.display = 'none';
+  document.getElementById('series-output').style.display = 'none';
+  document.getElementById('series-loading').style.display = 'flex';
+  document.getElementById('series-usage').style.display = 'none';
+  document.getElementById('prompt-preview').style.display = 'none';
+
+  try {
+    const response = await fetch('/dashboard/api/generate-series/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      body: JSON.stringify({
+        user_input: input,
+        content_types: contentTypes,
+        content_lengths: contentLengths,
+        model: model,
+        temperature: diversitySettings.temperature,
+        persona: diversitySettings.persona,
+        situation: diversitySettings.situation,
+        template_id: seriesTemplateSelect.value || null,
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      const outputEl = document.getElementById('series-output');
+      outputEl.innerHTML = formatSeriesOutput(data.series);
+      outputEl.style.display = 'block';
+
+      // 프롬프트 저장
+      if (data.prompt) {
+        lastPrompt = data.prompt;
+        document.getElementById('prompt-content').textContent = data.prompt;
+      }
+
+      // 사용량 표시
+      if (data.usage) {
+        document.getElementById('series-usage').innerHTML = `
+          <span>입력: ${data.usage.input_tokens.toLocaleString()} 토큰</span>
+          <span>출력: ${data.usage.output_tokens.toLocaleString()} 토큰</span>
+          <span>비용: $${data.usage.cost_usd.toFixed(4)} (₩${data.usage.cost_krw.toFixed(0)})</span>
+        `;
+        document.getElementById('series-usage').style.display = 'flex';
+      }
+    } else {
+      alert('생성 실패: ' + data.error);
+      document.getElementById('series-placeholder').style.display = 'block';
+    }
+  } catch (error) {
+    alert('오류 발생: ' + error.message);
+    document.getElementById('series-placeholder').style.display = 'block';
+  } finally {
+    document.getElementById('series-loading').style.display = 'none';
+  }
+}
+
+function togglePromptPreview() {
+  const preview = document.getElementById('prompt-preview');
+  if (!lastPrompt) {
+    alert('먼저 시리즈를 생성해주세요.');
+    return;
+  }
+  preview.style.display = preview.style.display === 'none' ? 'block' : 'none';
+}
+
+function copyPrompt() {
+  if (lastPrompt) {
+    navigator.clipboard.writeText(lastPrompt).then(() => {
+      alert('프롬프트가 복사되었습니다.');
+    });
+  }
+}
+
+function formatSeriesOutput(series) {
+  const typeNames = {
+    'question': '고민 & 질문',
+    'research': '발품/손품',
+    'consultation': '방문상담 후기',
+    'day0': '시술 당일',
+    'month1': '1개월 후기',
+    'month2': '2개월 후기',
+    'month3': '3개월 후기',
+  };
+
+  return series.map(item => `
+    <div class="series-item">
+      <div class="series-title">${typeNames[item.type] || item.type} <span style="font-weight:400;color:var(--muted);font-size:0.85rem;">(${item.char_count || item.content.length}자)</span></div>
+      <div>${item.content.replace(/\n/g, '<br>')}</div>
+    </div>
+  `).join('');
+}
+
+function copySeriesResult() {
+  const output = document.getElementById('series-output');
+  const text = output.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    alert('복사되었습니다.');
+  });
+}
+
+// 스타일 추출 (탭2)
+async function extractStyle() {
+  const textSource = document.getElementById('style-source').value.trim();
+  const imageFiles = document.getElementById('style-images').files;
+
+  if (!textSource && imageFiles.length === 0) {
+    alert('원본 글을 입력하거나 이미지를 업로드해주세요.');
+    return;
+  }
+
+  let sourceText = textSource;
+
+  // 이미지가 있으면 OCR 먼저
+  if (imageFiles.length > 0) {
+    try {
+      const formData = new FormData();
+      for (const file of imageFiles) {
+        formData.append('images', file);
+      }
+
+      const ocrResponse = await fetch('/dashboard/api/extract-text-from-images/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: formData,
+      });
+
+      const ocrData = await ocrResponse.json();
+      if (ocrData.success) {
+        sourceText = (sourceText ? sourceText + '\n\n' : '') + ocrData.combined;
+      }
+    } catch (e) {
+      console.error('OCR 실패:', e);
+    }
+  }
+
+  // 스타일 저장
+  extractedStyle = {
+    source_text: sourceText,
+    extracted: true,
+  };
+
+  // 미리보기 표시
+  const preview = document.getElementById('style-preview');
+  const summary = document.getElementById('style-summary');
+  summary.textContent = `${sourceText.length}자 분량의 글에서 스타일이 추출되었습니다. 이제 댓글에 답변을 생성할 수 있습니다.`;
+  preview.style.display = 'block';
+
+  alert('스타일이 추출되었습니다. 이제 댓글을 입력하고 답변을 생성하세요.');
+}
+
+// 댓글 답변 생성
+async function generateReply() {
+  if (!extractedStyle) {
+    alert('먼저 스타일을 추출해주세요.');
+    return;
+  }
+
+  let commentText = document.getElementById('comment-input').value.trim();
+  const commentImages = document.getElementById('comment-images').files;
+
+  // 이미지가 있으면 OCR
+  if (commentImages.length > 0) {
+    try {
+      const formData = new FormData();
+      for (const file of commentImages) {
+        formData.append('images', file);
+      }
+
+      const ocrResponse = await fetch('/dashboard/api/extract-text-from-images/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: formData,
+      });
+
+      const ocrData = await ocrResponse.json();
+      if (ocrData.success) {
+        commentText = (commentText ? commentText + '\n\n' : '') + ocrData.combined;
+      }
+    } catch (e) {
+      console.error('OCR 실패:', e);
+    }
+  }
+
+  if (!commentText) {
+    alert('답변할 댓글을 입력해주세요.');
+    return;
+  }
+
+  const model = document.getElementById('reply-model').value;
+
+  document.getElementById('reply-loading').style.display = 'flex';
+  document.getElementById('reply-output').style.display = 'none';
+
+  try {
+    const response = await fetch('/dashboard/api/generate-reply/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      body: JSON.stringify({
+        source_text: extractedStyle.source_text,
+        comment: commentText,
+        model: model,
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      const output = document.getElementById('reply-output');
+      output.innerHTML = `<strong>생성된 답변:</strong><br><br>${data.reply.replace(/\n/g, '<br>')}`;
+      output.style.display = 'block';
+    } else {
+      alert('생성 실패: ' + data.error);
+    }
+  } catch (error) {
+    alert('오류 발생: ' + error.message);
+  } finally {
+    document.getElementById('reply-loading').style.display = 'none';
+  }
+}
+
+// 커스텀 스타일 추출 (탭3)
+async function extractCustomStyle() {
+  const textSource = document.getElementById('custom-style-source').value.trim();
+  const imageFiles = document.getElementById('custom-images').files;
+
+  if (!textSource && imageFiles.length === 0) {
+    alert('원본 글을 입력하거나 이미지를 업로드해주세요.');
+    return;
+  }
+
+  let sourceText = textSource;
+
+  // 이미지가 있으면 OCR
+  if (imageFiles.length > 0) {
+    try {
+      const formData = new FormData();
+      for (const file of imageFiles) {
+        formData.append('images', file);
+      }
+
+      const ocrResponse = await fetch('/dashboard/api/extract-text-from-images/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: formData,
+      });
+
+      const ocrData = await ocrResponse.json();
+      if (ocrData.success) {
+        sourceText = (sourceText ? sourceText + '\n\n' : '') + ocrData.combined;
+      }
+    } catch (e) {
+      console.error('OCR 실패:', e);
+    }
+  }
+
+  customExtractedStyle = {
+    source_text: sourceText,
+    extracted: true,
+  };
+
+  const preview = document.getElementById('custom-style-preview');
+  const summary = document.getElementById('custom-style-summary');
+  summary.textContent = `${sourceText.length}자 분량의 글에서 스타일이 추출되었습니다.`;
+  preview.style.display = 'block';
+
+  alert('스타일이 추출되었습니다. 이제 생성할 글의 조건을 입력하세요.');
+}
+
+// 커스텀 글 생성
+async function generateCustom() {
+  if (!customExtractedStyle) {
+    alert('먼저 스타일을 추출해주세요.');
+    return;
+  }
+
+  const prompt = document.getElementById('custom-prompt').value.trim();
+  if (!prompt) {
+    alert('생성할 글의 조건을 입력해주세요.');
+    return;
+  }
+
+  const model = document.getElementById('custom-model').value;
+
+  document.getElementById('custom-loading').style.display = 'flex';
+  document.getElementById('custom-output').style.display = 'none';
+  document.getElementById('custom-usage').style.display = 'none';
+
+  try {
+    const response = await fetch('/dashboard/api/generate-with-style/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      body: JSON.stringify({
+        source_text: customExtractedStyle.source_text,
+        prompt: prompt,
+        model: model,
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      const output = document.getElementById('custom-output');
+      output.textContent = data.content;
+      output.style.display = 'block';
+
+      if (data.usage) {
+        document.getElementById('custom-usage').innerHTML = `
+          <span>입력: ${data.usage.input_tokens.toLocaleString()} 토큰</span>
+          <span>출력: ${data.usage.output_tokens.toLocaleString()} 토큰</span>
+          <span>비용: $${data.usage.cost_usd.toFixed(4)} (₩${data.usage.cost_krw.toFixed(0)})</span>
+        `;
+        document.getElementById('custom-usage').style.display = 'flex';
+      }
+    } else {
+      alert('생성 실패: ' + data.error);
+    }
+  } catch (error) {
+    alert('오류 발생: ' + error.message);
+  } finally {
+    document.getElementById('custom-loading').style.display = 'none';
+  }
+}
+
+// 템플릿 목록 로드
+const seriesTemplateSelect = document.getElementById('series-template');
+let basicPlusTemplates = [];
+
+async function loadBasicPlusTemplates() {
+  try {
+    const response = await fetch('/dashboard/api/prompt-templates/?mode=basic_plus');
+    const data = await response.json();
+    basicPlusTemplates = data.templates || [];
+
+    seriesTemplateSelect.innerHTML = '<option value="">기본 템플릿</option>';
+
+    basicPlusTemplates.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.name + (t.is_default ? ' (기본)' : '');
+      if (t.is_default) {
+        opt.selected = true;
+      }
+      seriesTemplateSelect.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('템플릿 로드 실패:', err);
+  }
+}
+
+// 템플릿 미리보기
+document.getElementById('previewSeriesTemplateBtn').addEventListener('click', function() {
+  const templateId = seriesTemplateSelect.value;
+
+  if (!templateId) {
+    alert('기본 템플릿이 선택되어 있습니다. 다른 템플릿을 선택해주세요.');
+    return;
+  }
+
+  const template = basicPlusTemplates.find(t => t.id == templateId);
+  if (template) {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;';
+    modal.innerHTML = `
+      <div style="background:white;border-radius:12px;max-width:800px;width:90%;max-height:80vh;display:flex;flex-direction:column;">
+        <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="margin:0;font-size:1.1rem;">${template.name} (v${template.version})</h3>
+          <button style="background:none;border:none;font-size:1.5rem;cursor:pointer;" onclick="this.closest('div[style*=fixed]').remove()">&times;</button>
+        </div>
+        <div style="padding:20px;overflow-y:auto;">
+          <pre style="white-space:pre-wrap;word-break:break-word;font-size:0.85rem;line-height:1.6;margin:0;">${template.content}</pre>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+  }
+});
+
+// 페이지 로드 시 템플릿 로드
+loadBasicPlusTemplates();
+</script>
+{% endblock %}

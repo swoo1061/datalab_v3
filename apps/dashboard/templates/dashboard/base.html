@@ -310,8 +310,11 @@
         </a>
         
         <div class="nav-section">리뷰 생성</div>
-        <a href="{% url 'dashboard:generate_review_basic' %}" class="{% if 'basic' in request.resolver_match.url_name or request.resolver_match.url_name == 'generate_review' %}active{% endif %}">
+        <a href="{% url 'dashboard:generate_review_basic' %}" class="{% if request.resolver_match.url_name == 'generate_review_basic' or request.resolver_match.url_name == 'generate_review' %}active{% endif %}">
           ✨ Basic
+        </a>
+        <a href="{% url 'dashboard:generate_review_basic_plus' %}" class="{% if 'basic_plus' in request.resolver_match.url_name %}active{% endif %}">
+          ⚡ Basic+
         </a>
         <a href="{% url 'dashboard:generate_review_pro' %}" class="{% if 'pro' in request.resolver_match.url_name or 'v2' in request.resolver_match.url_name %}active{% endif %}">
           🚀 PRO
@@ -343,6 +346,14 @@
         </a>
         <a href="{% url 'dashboard:image_browser' %}" class="{% if request.resolver_match.url_name == 'image_browser' %}active{% endif %}">
           🖼️ 이미지
+        </a>
+
+        <div class="nav-section">시스템</div>
+        <a href="{% url 'dashboard:prompt_template_list' %}" class="{% if 'prompt_template' in request.resolver_match.url_name %}active{% endif %}">
+          📝 프롬프트 관리
+        </a>
+        <a href="{% url 'dashboard:server_settings' %}" class="{% if 'server' in request.resolver_match.url_name %}active{% endif %}">
+          ⚙️ 서버 설정
         </a>
       </nav>
       <div class="version">v2.0 · 내부용</div>

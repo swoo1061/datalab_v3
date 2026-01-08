@@ -1,0 +1,157 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}서버 설정{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">서버 설정</h1>
+    <p class="page-subtitle">방화벽 상태 및 접속 로그 확인</p>
+  </div>
+</div>
+
+<!-- 서버 정보 & 방화벽 상태 -->
+<div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+  <div class="stat-card">
+    <div class="stat-label">서버 IP</div>
+    <div class="stat-value" style="font-size: 1.2rem;">{{ local_ip }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">방화벽 (dtlab90)</div>
+    <div class="stat-value" id="firewall-status" style="font-size: 1.2rem;">
+      <span class="tag tag-muted">확인 중...</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">오늘 접속자 (고유 IP)</div>
+    <div class="stat-value">{{ unique_ips_today }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">총 로그 수</div>
+    <div class="stat-value">{{ total_logs }}</div>
+  </div>
+</div>
+
+<!-- 방화벽 명령어 안내 -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h3 class="card-title">방화벽 명령어 (관리자 권한 필요)</h3>
+  </div>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+    <div>
+      <label class="form-label">열기 (포트 8000 허용)</label>
+      <div class="result-box" style="font-family: monospace; font-size: 0.85rem; padding: 12px; background: #1e293b; color: #e2e8f0;">netsh advfirewall firewall add rule name="dtlab90" dir=in action=allow protocol=tcp localport=8000</div>
+    </div>
+    <div>
+      <label class="form-label">닫기 (규칙 삭제)</label>
+      <div class="result-box" style="font-family: monospace; font-size: 0.85rem; padding: 12px; background: #1e293b; color: #e2e8f0;">netsh advfirewall firewall delete rule name="dtlab90"</div>
+    </div>
+  </div>
+</div>
+
+<!-- 접속 로그 -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">접속 로그 (최근 100건)</h3>
+    <div class="flex gap-2">
+      <button class="btn btn-secondary btn-sm" onclick="refreshLogs()">새로고침</button>
+      <button class="btn btn-secondary btn-sm" style="color: var(--danger);" onclick="clearLogs()">전체 삭제</button>
+    </div>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>시간</th>
+          <th>IP 주소</th>
+          <th>메소드</th>
+          <th>경로</th>
+          <th>User Agent</th>
+        </tr>
+      </thead>
+      <tbody id="logs-table">
+        {% for log in recent_logs %}
+        <tr>
+          <td style="white-space: nowrap;">{{ log.created_at|date:"m/d H:i:s" }}</td>
+          <td><code>{{ log.ip_address }}</code></td>
+          <td><span class="tag {% if log.method == 'POST' %}tag-warning{% else %}tag-muted{% endif %}">{{ log.method }}</span></td>
+          <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">{{ log.path }}</td>
+          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; font-size: 0.8rem; color: var(--muted);">{{ log.user_agent|truncatechars:50 }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-center text-muted">접속 로그가 없습니다.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 페이지 로드 시 방화벽 상태 확인
+document.addEventListener('DOMContentLoaded', function() {
+  checkFirewallStatus();
+});
+
+function checkFirewallStatus() {
+  const statusEl = document.getElementById('firewall-status');
+
+  fetch('/dashboard/api/firewall-status/')
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        if (data.status === 'open') {
+          statusEl.innerHTML = '<span class="tag tag-success">ON (열림)</span>';
+        } else {
+          statusEl.innerHTML = '<span class="tag tag-muted">OFF (닫힘)</span>';
+        }
+      } else {
+        statusEl.innerHTML = '<span class="tag tag-warning">확인 불가</span>';
+      }
+    })
+    .catch(error => {
+      statusEl.innerHTML = '<span class="tag tag-warning">오류</span>';
+    });
+}
+
+function refreshLogs() {
+  location.reload();
+}
+
+function clearLogs() {
+  if (!confirm('모든 접속 로그를 삭제하시겠습니까?')) return;
+
+  fetch('/dashboard/api/access-logs/clear/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert(`${data.deleted_count}개 로그가 삭제되었습니다.`);
+      location.reload();
+    }
+  });
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+</script>
+{% endblock %}

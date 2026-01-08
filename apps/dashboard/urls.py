@@ -22,6 +22,7 @@ urlpatterns = [
 
     # 리뷰 생성 Basic & PRO
     path("generate/basic/", views.review_generate_basic, name="generate_review_basic"),
+    path("generate/basic-plus/", views.review_generate_basic_plus, name="generate_review_basic_plus"),
     path("generate/pro/", views.review_generate_v2, name="generate_review_pro"),
     path("generate/v2/", views.review_generate_v2, name="generate_review_v2"),  # 호환용
     
@@ -42,6 +43,9 @@ urlpatterns = [
     path("api/clinic/<int:clinic_id>/procedures/<str:doctor_code>/", views.api_clinic_procedures, name="api_clinic_procedures"),
     path("api/generate/", views.api_generate_review, name="api_generate_review"),
     path("api/generate-basic/", views.api_generate_review_basic, name="api_generate_review_basic"),
+    path("api/generate-series/", views.api_generate_series, name="api_generate_series"),
+    path("api/generate-reply/", views.api_generate_reply, name="api_generate_reply"),
+    path("api/generate-with-style/", views.api_generate_with_style, name="api_generate_with_style"),
     path("api/regenerate/", views.api_regenerate_review, name="api_regenerate_review"),
     path("api/generate-prompt/", views.api_generate_prompt, name="api_generate_prompt"),
     path("api/generate-from-prompt/", views.api_generate_review_from_prompt, name="api_generate_review_from_prompt"),
@@ -92,4 +96,22 @@ urlpatterns = [
     path("api/content-type-presets/", views.api_get_content_type_presets, name="api_get_content_type_presets"),
     path("api/content-type-presets/add/", views.api_add_content_type_preset, name="api_add_content_type_preset"),
     path("api/load-content-type-presets/", views.api_load_content_type_presets, name="api_load_content_type_presets"),
+
+    # 서버 설정
+    path("server-settings/", views.server_settings, name="server_settings"),
+    path("api/firewall-status/", views.api_firewall_status, name="api_firewall_status"),
+    path("api/access-logs/", views.api_access_logs, name="api_access_logs"),
+    path("api/access-logs/clear/", views.api_clear_access_logs, name="api_clear_access_logs"),
+
+    # 프롬프트 템플릿 관리
+    path("prompts/", views.prompt_template_list, name="prompt_template_list"),
+    path("prompts/new/", views.prompt_template_edit, name="prompt_template_new"),
+    path("prompts/<int:pk>/", views.prompt_template_edit, name="prompt_template_edit"),
+    path("api/prompt-templates/", views.api_prompt_templates, name="api_prompt_templates"),
+    path("api/prompt-templates/<int:pk>/", views.api_prompt_template_detail, name="api_prompt_template_detail"),
+    path("api/prompt-templates/<int:pk>/delete/", views.api_prompt_template_delete, name="api_prompt_template_delete"),
+    path("api/prompt-templates/<int:pk>/set-default/", views.api_prompt_template_set_default, name="api_prompt_template_set_default"),
+    path("api/prompt-templates/<int:pk>/toggle/", views.api_prompt_template_toggle, name="api_prompt_template_toggle"),
+    path("api/prompt-templates/<int:pk>/versions/", views.api_prompt_template_versions, name="api_prompt_template_versions"),
+    path("api/prompt-templates/<int:pk>/restore/<int:version>/", views.api_prompt_template_restore, name="api_prompt_template_restore"),
 ]

@@ -774,6 +774,24 @@ class Review(models.Model):
         return f"Review {self.pk} - {self.source}"
 
 
+class AccessLog(models.Model):
+    """접속 로그"""
+    ip_address = models.GenericIPAddressField(verbose_name="IP 주소")
+    path = models.CharField(max_length=500, verbose_name="요청 경로")
+    method = models.CharField(max_length=10, verbose_name="HTTP 메소드")
+    user_agent = models.TextField(blank=True, verbose_name="User Agent")
+    referer = models.TextField(blank=True, verbose_name="Referer")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="접속 시간")
+
+    class Meta:
+        verbose_name = "접속 로그"
+        verbose_name_plural = "접속 로그 목록"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.ip_address} - {self.path} ({self.created_at.strftime('%Y-%m-%d %H:%M:%S')})"
+
+
 class ImageAsset(models.Model):
     """이미지 자산"""
     review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name='images', null=True, blank=True)
@@ -789,3 +807,57 @@ class ImageAsset(models.Model):
 
     def __str__(self):
         return f"Image {self.pk}"
+
+
+class PromptTemplate(models.Model):
+    """프롬프트 템플릿"""
+    MODE_CHOICES = [
+        ('basic', 'Basic'),
+        ('basic_plus', 'Basic Plus'),
+        ('pro_header', 'Pro - 헤더'),
+        ('pro_guidelines', 'Pro - 가이드라인'),
+    ]
+
+    mode = models.CharField(max_length=20, choices=MODE_CHOICES, verbose_name="모드")
+    name = models.CharField(max_length=100, verbose_name="템플릿 이름")
+    content = models.TextField(verbose_name="프롬프트 내용")
+    description = models.TextField(blank=True, verbose_name="설명")
+    is_default = models.BooleanField(default=False, verbose_name="기본 템플릿")
+    is_active = models.BooleanField(default=True, verbose_name="활성화")
+    version = models.PositiveIntegerField(default=1, verbose_name="버전")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "프롬프트 템플릿"
+        verbose_name_plural = "프롬프트 템플릿 목록"
+        ordering = ['-is_default', '-updated_at']
+
+    def __str__(self):
+        default_mark = " (기본)" if self.is_default else ""
+        return f"[{self.get_mode_display()}] {self.name} v{self.version}{default_mark}"
+
+    def save(self, *args, **kwargs):
+        # 기본 템플릿 설정 시 같은 모드의 다른 템플릿 기본 해제
+        if self.is_default:
+            PromptTemplate.objects.filter(mode=self.mode, is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+
+
+class PromptTemplateVersion(models.Model):
+    """프롬프트 템플릿 버전 이력"""
+    template = models.ForeignKey(PromptTemplate, on_delete=models.CASCADE, related_name='versions')
+    version = models.PositiveIntegerField(verbose_name="버전")
+    content = models.TextField(verbose_name="프롬프트 내용")
+    changed_by = models.CharField(max_length=100, blank=True, verbose_name="변경자")
+    change_note = models.TextField(blank=True, verbose_name="변경 사유")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "프롬프트 버전 이력"
+        verbose_name_plural = "프롬프트 버전 이력 목록"
+        ordering = ['-version']
+        unique_together = ['template', 'version']
+
+    def __str__(self):
+        return f"{self.template.name} v{self.version}"

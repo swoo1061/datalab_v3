@@ -1,0 +1,279 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}프롬프트 관리{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">프롬프트 템플릿 관리</h1>
+    <p class="page-subtitle">리뷰 생성에 사용되는 프롬프트를 확인하고 수정합니다</p>
+  </div>
+  <a href="{% url 'dashboard:prompt_template_new' %}" class="btn btn-primary">
+    + 템플릿 추가
+  </a>
+</div>
+
+<!-- 탭 네비게이션 -->
+<div class="tabs mb-4">
+  <button class="tab-btn active" data-mode="basic">Basic</button>
+  <button class="tab-btn" data-mode="basic_plus">Basic Plus</button>
+  <button class="tab-btn" data-mode="pro_header">Pro - 헤더</button>
+  <button class="tab-btn" data-mode="pro_guidelines">Pro - 가이드라인</button>
+</div>
+
+<!-- 탭 콘텐츠 -->
+{% for mode, templates in templates_by_mode.items %}
+<div class="tab-content {% if mode == 'basic' %}active{% endif %}" data-mode="{{ mode }}">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{{ mode_labels|default_if_none:""|dictsort:0|first }}</span>
+      <span class="text-muted text-sm">{{ templates.count }}개 템플릿</span>
+    </div>
+
+    {% if templates %}
+      <div class="template-list">
+        {% for template in templates %}
+        <div class="template-item {% if template.is_default %}is-default{% endif %}" data-id="{{ template.pk }}">
+          <div class="template-header">
+            <div class="template-info">
+              <h4 class="template-name">
+                {{ template.name }}
+                {% if template.is_default %}
+                  <span class="tag tag-primary">기본</span>
+                {% endif %}
+                <span class="tag tag-muted">v{{ template.version }}</span>
+              </h4>
+              {% if template.description %}
+                <p class="template-desc">{{ template.description }}</p>
+              {% endif %}
+            </div>
+            <div class="template-actions">
+              {% if not template.is_default %}
+              <button class="btn btn-ghost btn-sm set-default-btn" data-id="{{ template.pk }}" title="기본으로 설정">
+                기본 설정
+              </button>
+              {% endif %}
+              <a href="{% url 'dashboard:prompt_template_edit' template.pk %}" class="btn btn-secondary btn-sm">
+                수정
+              </a>
+              {% if not template.is_default %}
+              <button class="btn btn-ghost btn-sm delete-btn" data-id="{{ template.pk }}" data-name="{{ template.name }}" style="color: var(--danger);">
+                삭제
+              </button>
+              {% endif %}
+            </div>
+          </div>
+          <div class="template-preview">
+            <button class="preview-toggle" onclick="togglePreview(this)">
+              프롬프트 미리보기 ▼
+            </button>
+            <pre class="preview-content hidden">{{ template.content }}</pre>
+          </div>
+          <div class="template-meta">
+            <span class="text-muted text-sm">
+              마지막 수정: {{ template.updated_at|date:"Y-m-d H:i" }}
+            </span>
+            {% if template.versions.count > 0 %}
+            <a href="{% url 'dashboard:prompt_template_edit' template.pk %}#versions" class="text-sm">
+              {{ template.versions.count }}개 이전 버전
+            </a>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-center" style="padding: 60px;">
+        <p class="text-muted" style="margin-bottom: 20px;">등록된 템플릿이 없습니다</p>
+        <a href="{% url 'dashboard:prompt_template_new' %}" class="btn btn-primary">
+          템플릿 추가하기
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+<style>
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  padding-bottom: 0;
+}
+.tab-btn {
+  padding: 12px 20px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--text-muted, #6b7280);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.2s;
+}
+.tab-btn:hover {
+  color: var(--text-primary, #111827);
+}
+.tab-btn.active {
+  color: var(--primary, #3b82f6);
+  border-bottom-color: var(--primary, #3b82f6);
+  font-weight: 500;
+}
+.tab-content {
+  display: none;
+}
+.tab-content.active {
+  display: block;
+}
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+.template-item {
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--card-bg, #fff);
+}
+.template-item.is-default {
+  border-color: var(--primary, #3b82f6);
+  background: rgba(59, 130, 246, 0.02);
+}
+.template-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.template-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.template-desc {
+  color: var(--text-muted, #6b7280);
+  font-size: 0.9rem;
+  margin: 4px 0 0;
+}
+.template-actions {
+  display: flex;
+  gap: 8px;
+}
+.template-preview {
+  margin: 12px 0;
+}
+.preview-toggle {
+  background: none;
+  border: none;
+  color: var(--primary, #3b82f6);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0;
+}
+.preview-toggle:hover {
+  text-decoration: underline;
+}
+.preview-content {
+  background: var(--bg-secondary, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.template-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+
+// 탭 전환
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.mode;
+
+    // 탭 버튼 활성화
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // 탭 콘텐츠 전환
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector(`.tab-content[data-mode="${mode}"]`).classList.add('active');
+  });
+});
+
+// 미리보기 토글
+function togglePreview(btn) {
+  const content = btn.nextElementSibling;
+  content.classList.toggle('hidden');
+  btn.textContent = content.classList.contains('hidden')
+    ? '프롬프트 미리보기 ▼'
+    : '프롬프트 미리보기 ▲';
+}
+
+// 기본 설정
+document.querySelectorAll('.set-default-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.id;
+    if (!confirm('이 템플릿을 기본 템플릿으로 설정하시겠습니까?')) return;
+
+    try {
+      const resp = await fetch(`/dashboard/api/prompt-templates/${id}/set-default/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrfToken}
+      });
+      const data = await resp.json();
+      if (data.success) {
+        location.reload();
+      } else {
+        alert(data.error || '오류가 발생했습니다.');
+      }
+    } catch (err) {
+      alert('오류가 발생했습니다.');
+    }
+  });
+});
+
+// 삭제
+document.querySelectorAll('.delete-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.id;
+    const name = btn.dataset.name;
+    if (!confirm(`'${name}' 템플릿을 삭제하시겠습니까?`)) return;
+
+    try {
+      const resp = await fetch(`/dashboard/api/prompt-templates/${id}/delete/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrfToken}
+      });
+      const data = await resp.json();
+      if (data.success) {
+        location.reload();
+      } else {
+        alert(data.error || '오류가 발생했습니다.');
+      }
+    } catch (err) {
+      alert('오류가 발생했습니다.');
+    }
+  });
+});
+</script>
+{% endblock %}
