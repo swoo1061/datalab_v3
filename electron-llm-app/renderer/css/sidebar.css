@@ -1,0 +1,62 @@
+/* ================================
+   sidebar.css
+================================ */
+
+.sidebar {
+  height: 100%;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 125px;
+}
+
+.sidebar .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar .brand strong {
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+.sidebar .nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+}
+
+.sidebar .nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 10px;
+  color: #374151;
+  font-size: 13px;
+}
+
+.sidebar .nav a:hover {
+  background: #f3f4f6;
+}
+
+.sidebar .nav a.active {
+  background: #eef2ff;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.sidebar .footer {
+  margin-top: auto;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}

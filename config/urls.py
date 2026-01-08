@@ -9,14 +9,19 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    # 외부 공개 영역
-    path('', include('apps.core.urls')),        # ✅ 루트는 core
 
     # 인증
     path('accounts/', include('accounts.urls')),
 
     # 내부 대시보드 (로그인 필수)
     path('dashboard/', include('apps.dashboard.urls')),
+
+    # 외부 공개 영역
+    path('', include('apps.core.urls')),        # ✅ 루트는 core
+    # ⭐ Electron 전용 API
+    path("api/accounts/", include("accounts.urls_api")),
+    # ⭐ ML 관련 API
+    path("api/", include("apps.data.urls")),
 ]
 
 if settings.DEBUG:

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | Dashboard</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
+</head>
+<body>
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope dashboard-page">
+      <section class="page-canvas">
+
+      <div class="page-head">
+        <h1 class="h1">대시보드</h1>
+        <p class="sub">리뷰 생성, 병원 관리, 운영 데이터를 한 곳에서 관리합니다.</p>
+      </div>
+
+      <section class="kpi grid">
+        <div class="card kpi-card">
+          <div class="kpi-label">오늘 생성 리뷰</div>
+          <div class="kpi-value" id="kpiReviews">-</div>
+          <div class="kpi-sub muted">최근 24시간 기준</div>
+        </div>
+
+        <div class="card kpi-card">
+          <div class="kpi-label">등록 병원</div>
+          <div class="kpi-value" id="kpiClinics">-</div>
+          <div class="kpi-sub muted">활성 병원 수</div>
+        </div>
+
+        <div class="card kpi-card">
+          <div class="kpi-label">모델 사용</div>
+          <div class="kpi-value" id="kpiModels">-</div>
+          <div class="kpi-sub muted">사용 가능 모델</div>
+        </div>
+
+        <div class="card kpi-card">
+          <div class="kpi-label">알림</div>
+          <div class="kpi-value" id="kpiAlerts">-</div>
+          <div class="kpi-sub muted">처리 필요 항목</div>
+        </div>
+      </section>
+
+      <section class="grid main-grid">
+        <div class="card">
+          <div class="card-hd">빠른 실행</div>
+          <div class="card-bd quick">
+            <button class="btn btn-primary" onclick="goReview()">✍️ AI 리뷰 생성</button>
+            <button class="btn" onclick="goClinicGuide()">🏥 병원 가이드</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd">작업 안내</div>
+          <div class="card-bd">
+            <ul class="bullets">
+              <li>병원 가이드는 의료진/시술/수가를 테이블로 관리합니다.</li>
+              <li>수가가 없으면 “상담 필요”로 자동 표시됩니다.</li>
+              <li>원장 없는 병원도 수가 단독으로 노출 가능합니다.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/header.js"></script>
+<script src="js/dashboard.js"></script>
+<script>
+  (async () => {
+    await loadLayout();          // ⭐ 사이드바 로드
+    await loadHeader("대시보드"); // 기존 header.js 그대로
+  })();
+</script>
+</body>
+</html>

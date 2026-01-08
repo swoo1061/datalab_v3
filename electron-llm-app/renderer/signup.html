@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>직원 계정 생성</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/signup.css" />
+</head>
+
+<body class="center-screen">
+  <div class="signup-card">
+    <h1 class="logo">Datalab90</h1>
+    <p class="subtitle">직원 계정 생성</p>
+
+    <div class="row-3-7">
+    <input id="name" placeholder="이름" />
+    <input id="birthDate" placeholder="생년월일 (YYYY-MM-DD)" />
+    </div>
+
+    <input id="phone" placeholder="전화번호" />
+    <input id="email" placeholder="이메일" />
+    <input id="username" placeholder="아이디" />
+    <input id="password" type="password" placeholder="비밀번호" />
+
+    <!-- 직급 선택 -->
+    <div class="position-select">
+      <div class="position-btn" data-value="manager">매니저</div>
+      <div class="position-btn" data-value="leader">팀장</div>
+      <div class="position-btn" data-value="ceo">대표</div>
+    </div>
+
+    <button class="primary" onclick="signup()">회원가입</button>
+
+    <button class="link-btn" onclick="goLogin()">로그인으로 돌아가기</button>
+
+    <p class="hint">관리자 승인 후 로그인 가능합니다</p>
+    <p id="message" class="hint"></p>
+  </div>
+
+  <script src="js/signup.js"></script>
+</body>
+</html>

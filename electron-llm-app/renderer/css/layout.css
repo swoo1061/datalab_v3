@@ -1,0 +1,115 @@
+/* ================================
+   layout.css (앱 골격)
+================================ */
+
+.app-root {
+  min-height: 100vh;
+}
+
+.app-header-slot {
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-w);
+  right: 0;
+  height: var(--header-h);
+  z-index: 1000;
+}
+
+.app-sidebar-slot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-w);
+  height: 100vh;
+  z-index: 1100;
+}
+
+.app-main {
+  padding-top: var(--header-h);
+  padding-left: var(--sidebar-w);
+}
+
+.page-scope {
+  padding: 28px 32px;
+  min-height: calc(100vh - var(--header-h));
+}
+
+/* 공통 카드/테이블 베이스 (page-scope 내부에서만 쓰는 걸 권장) */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.card-hd {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.card-bd {
+  padding: 16px;
+}
+
+.grid {
+  display: grid;
+  gap: 14px;
+}
+
+.btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.btn:hover { background: var(--surface-2); }
+
+.btn-primary {
+  border-color: transparent;
+  background: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover { background: var(--primary-2); }
+
+.input, .select {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th, .table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  background: #fcfcfd;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 12px;
+  color: var(--muted);
+}

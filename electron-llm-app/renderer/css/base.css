@@ -1,0 +1,75 @@
+/* ================================
+   base.css (RESET + TOKENS ONLY)
+   - layout 금지
+   - page css는 page-scope에서만
+================================ */
+
+:root {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #f9fafb;
+
+  --text: #111827;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+
+  --primary: #4f46e5;
+  --primary-2: #4338ca;
+
+  --shadow: 0 10px 24px rgba(0,0,0,0.06);
+  --shadow-sm: 0 4px 14px rgba(0,0,0,0.06);
+
+  --radius: 10px;
+  --radius-sm: 8px;
+
+  --header-h: 56px;
+  --sidebar-w: 125px;
+
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--text);
+  background: #eaeef8;
+}
+
+.page-container {
+  margin-top: 56px;
+  padding: 16px 20px;   /* 좌우 여백 살짝만 */
+}
+
+.page-canvas {
+  max-width: 1440px;
+  margin: 0 auto 48px;
+  padding: 28px 36px;
+
+  background: #ffffff;
+  border-radius: 16px;
+
+  box-shadow:
+    0 24px 48px rgba(17, 24, 39, 0.08),
+    0 8px 24px rgba(17, 24, 39, 0.06);
+  min-height: calc(100vh - 56px - 16px - 48px);
+}
+
+a { color: inherit; text-decoration: none; }
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+.hidden { display: none !important; }
+
+.muted { color: var(--muted); }

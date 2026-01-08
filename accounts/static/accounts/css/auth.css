@@ -1,3 +1,5 @@
+
+
 .auth-wrap {
   min-height: calc(100vh - 160px);
   display: flex;
@@ -68,4 +70,105 @@
   font-size: 0.85rem;
   color: #4f46e5;
   text-decoration: none;
+}
+
+/* signup 전용 스코프 */
+.auth-page {
+  background: #f8fafc;
+  padding: 40px 0;
+}
+
+/* 박스 */
+.auth-box {
+  max-width: 420px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  padding: 40px;
+}
+
+/* 타이틀 */
+.auth-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.auth-desc {
+  color: #64748b;
+  margin-bottom: 28px;
+}
+
+/* 필드 */
+.auth-field {
+  margin-bottom: 18px;
+}
+.auth-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.auth-field input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5f5;
+}
+
+/* 직급 버튼 (핵심) */
+.auth-page .auth-position {
+  display: flex;
+  gap: 8px;
+}
+
+.auth-page .auth-position-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 10px 0;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+}
+
+.auth-page .auth-position-btn.active {
+  background: #eef2ff;
+  border-color: #4f46e5;
+  color: #4f46e5;
+  font-weight: 600;
+}
+
+/* footer */
+.auth-footer {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.auth-message {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.auth-message.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.auth-message.warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.auth-message.success {
+  background: #dcfce7;
+  color: #166534;
 }

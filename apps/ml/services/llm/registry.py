@@ -1,0 +1,29 @@
+LLM_MODELS = [
+    {
+        "key": "gpt-4.1-mini",
+        "label": "GPT-4.1 Mini",
+        "vendor": "openai",
+        "speed": "보통",
+        "quality": "중",
+        "cost_level": "저렴",
+        "recommended": False,
+    },
+    {
+        "key": "gpt-4.1",
+        "label": "GPT-4.1",
+        "vendor": "openai",
+        "speed": "보통",
+        "quality": "고",
+        "cost_level": "중간",
+        "recommended": True,
+    },
+    {
+        "key": "claude-4.5",
+        "label": "Claude Sonnet 4.5",
+        "vendor": "anthropic",
+        "speed": "빠름",
+        "quality": "고",
+        "cost_level": "중간",
+        "recommended": True,
+    },
+]

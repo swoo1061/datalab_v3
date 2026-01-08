@@ -1,20 +1,32 @@
 {% extends 'core/base_public.html' %}
 {% load static %}
+
 {% block title %}로그인 | Datalab90{% endblock %}
 
 {% block header_actions %}
 <!-- 로그인 페이지에서는 헤더 버튼 숨김 -->
 {% endblock %}
 
-{% block content %}
+{% block css %}
 <link rel="stylesheet" href="{% static 'accounts/css/auth.css' %}">
+{% endblock %}
 
+{% block content %}
 <div class="auth-wrap">
   <div class="auth-box">
     <h1 class="auth-title">관리자 로그인</h1>
     <p class="auth-desc">
       Datalab90 내부 시스템은 승인된 계정만 사용할 수 있습니다.
     </p>
+
+    {# 🔥 메시지 출력 (이게 핵심) #}
+    {% if messages %}
+      {% for message in messages %}
+        <div class="auth-message {{ message.tags }}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
 
     <form method="post">
       {% csrf_token %}
@@ -35,7 +47,7 @@
     </form>
 
     <div class="auth-footer">
-      <a href="{% url 'accounts:signup' %}">계정 신청</a>
+      <!-- <a href="{% url 'accounts:signup' %}">계정 신청</a> -->
     </div>
   </div>
 </div>

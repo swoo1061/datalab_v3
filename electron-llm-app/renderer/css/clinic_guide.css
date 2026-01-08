@@ -1,0 +1,144 @@
+.clinic-page .topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.clinic-page .h1 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.clinic-page .sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.clinic-page .actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.clinic-page .summary {
+  margin-top: 16px;
+  grid-template-columns: 2fr 1fr;
+}
+
+.clinic-page .title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.clinic-page .value {
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.clinic-page .meta {
+  margin-top: 14px;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.clinic-page .meta .label {
+  font-size: 12px;
+}
+
+.clinic-page .meta-value {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.clinic-page .bullets {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.clinic-page .main {
+  margin-top: 14px;
+  grid-template-columns: 280px 1fr;
+}
+
+.clinic-page .nav .nav-list {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.clinic-page .nav-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: #fff;
+  font-size: 13px;
+  color: #374151;
+}
+
+.clinic-page .nav-item:hover {
+  background: #f3f4f6;
+}
+
+.clinic-page .nav-item.active {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.clinic-page .content-hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.clinic-page .content-title {
+  margin-top: 4px;
+  font-weight: 800;
+}
+
+.clinic-page #priceTable th:last-child,
+.clinic-page #priceTable td:last-child {
+  text-align: right;
+}
+
+.clinic-page .price {
+  font-weight: 700;
+}
+
+.clinic-page .need-consult {
+  color: #9ca3af;
+  font-weight: 700;
+}
+
+.clinic-page .bottom {
+  margin-top: 14px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.clinic-page .pill {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: #374151;
+  margin: 0 6px 6px 0;
+}

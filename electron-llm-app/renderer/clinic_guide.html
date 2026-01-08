@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | 병원 가이드</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/clinic_guide.css" />
+</head>
+<body>
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope clinic-page">
+
+      <div class="topbar">
+        <div>
+          <h1 class="h1">병원 가이드</h1>
+          <p class="sub">의료진 / 시술 / 수가를 실무형 테이블로 관리합니다.</p>
+        </div>
+
+        <div class="actions">
+          <select id="clinicSelect" class="select"></select>
+          <button class="btn" onclick="reloadClinic()">새로고침</button>
+        </div>
+      </div>
+
+      <!-- 병원 요약 카드 -->
+      <section class="grid summary">
+        <div class="card">
+          <div class="card-bd">
+            <div class="title-row">
+              <div>
+                <div class="label muted">병원명</div>
+                <div class="value" id="clinicName">-</div>
+              </div>
+              <span class="badge" id="clinicIdBadge">ID -</span>
+            </div>
+
+            <div class="meta grid">
+              <div>
+                <div class="label muted">위치</div>
+                <div class="meta-value" id="clinicLocation">-</div>
+              </div>
+              <div>
+                <div class="label muted">운영시간</div>
+                <div class="meta-value" id="clinicHours">-</div>
+              </div>
+              <div>
+                <div class="label muted">주차</div>
+                <div class="meta-value" id="clinicParking">-</div>
+              </div>
+              <div>
+                <div class="label muted">상담 프로세스</div>
+                <div class="meta-value" id="clinicProcess">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 빠른 메모 / 상태 -->
+        <div class="card">
+          <div class="card-hd">체크 포인트</div>
+          <div class="card-bd">
+            <ul class="bullets">
+              <li>수가가 없으면 자동으로 <b>상담 필요</b> 표시</li>
+              <li>원장 없음 → 좌측 탭에 <b>공통 수가</b> 탭으로 표시</li>
+              <li>데이터는 API 기준으로 그대로 렌더링</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 의료진 / 수가 -->
+      <section class="grid main">
+        <aside class="card nav">
+          <div class="card-hd">의료진</div>
+          <div class="nav-list" id="doctorTabs"></div>
+        </aside>
+
+        <div class="card content">
+          <div class="card-hd">
+            <div class="content-hd">
+              <div>
+                <div class="muted" style="font-size:12px;">선택 의료진</div>
+                <div class="content-title" id="doctorTitle">-</div>
+              </div>
+              <div class="content-tools">
+                <span class="badge" id="priceCount">항목 0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-bd">
+            <table class="table" id="priceTable">
+              <thead>
+                <tr>
+                  <th style="width: 38%;">시술/항목</th>
+                  <th style="width: 22%;">카테고리</th>
+                  <th style="width: 20%;">담당</th>
+                  <th style="width: 20%; text-align:right;">금액</th>
+                </tr>
+              </thead>
+              <tbody id="priceTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 상담실장 / 사후관리 -->
+      <section class="grid bottom">
+        <div class="card">
+          <div class="card-hd">상담실장</div>
+          <div class="card-bd" id="consultants">-</div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd">사후관리</div>
+          <div class="card-bd" id="aftercare">-</div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/header.js"></script>
+<script src="js/clinic_guide.js"></script>
+<script>
+  (async () => {
+    await loadLayout();          // ⭐ 사이드바 로드
+    await loadHeader("대시보드"); // 기존 header.js 그대로
+  })();
+</script>
+</body>
+</html>

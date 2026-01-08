@@ -156,3 +156,16 @@ LOGGING = {
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/dashboard/"
 LOGOUT_REDIRECT_URL = "/"
+
+# ===== 세션 / CSRF (Electron 대응 핵심) =====
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
+
+SESSION_COOKIE_NAME = "sessionid"
+
+SESSION_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
+
+CORS_ALLOW_CREDENTIALS = True
