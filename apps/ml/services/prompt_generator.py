@@ -177,17 +177,37 @@ class ReviewPromptConfig:
     cafe: Optional[Dict] = None
     consultant_name: Optional[str] = None
     custom_instructions: Optional[str] = None
+    header_template_id: Optional[int] = None  # Pro 헤더 템플릿 ID
+    guidelines_template_id: Optional[int] = None  # Pro 가이드라인 템플릿 ID
 
 
 class ReviewPromptBuilder:
     """리뷰 프롬프트 빌더"""
-    
+
     def __init__(self, config: ReviewPromptConfig):
         self.config = config
         self.clinic = config.clinic_data
         self.doctor = self._get_doctor()
         self.price_info = self._get_price_info()
         self.consultant = self._get_consultant()
+
+        # DB에서 Pro 템플릿 조회
+        self.header_template = self._load_template('pro_header', config.header_template_id)
+        self.guidelines_template = self._load_template('pro_guidelines', config.guidelines_template_id)
+
+    def _load_template(self, mode: str, template_id: Optional[int] = None) -> Optional[str]:
+        """DB에서 프롬프트 템플릿 로드"""
+        try:
+            from apps.data.models import PromptTemplate
+
+            if template_id:
+                template = PromptTemplate.objects.filter(pk=template_id, mode=mode, is_active=True).first()
+            else:
+                template = PromptTemplate.objects.filter(mode=mode, is_default=True, is_active=True).first()
+
+            return template.content if template else None
+        except Exception:
+            return None
     
     def _get_doctor(self) -> Optional[Dict]:
         """담당 의료진 정보 가져오기"""
@@ -240,8 +260,10 @@ class ReviewPromptBuilder:
     def _build_header(self) -> str:
         ctp = self.config.content_type_profile  # ContentTypeProfile 데이터
 
-        header = """당신은 실제로 시술을 받았거나 받을 환자로서 자연스러운 시술후기, 경험, 상담후기, 질문글들을 작성합니다.
+        # DB 템플릿이 있으면 사용, 없으면 기본값
+        DEFAULT_HEADER = """당신은 실제로 시술을 받았거나 받을 환자로서 자연스러운 시술후기, 경험, 상담후기, 질문글들을 작성합니다.
 광고가 아닌 진짜 의견과 사실, 경험담처럼 작성해주세요."""
+        header = self.header_template if self.header_template else DEFAULT_HEADER
 
         # ContentTypeProfile이 있으면 해당 데이터 사용
         if ctp:
@@ -679,17 +701,22 @@ class ReviewPromptBuilder:
 {f'- 비교 언급 가능: {allowed_text}' if allowed_text else ''}"""
     
     def _build_guidelines_section(self) -> str:
-        return """
-═══════════════════════════════════════════════════════════════
-✍️ 작성 가이드라인
-═══════════════════════════════════════════════════════════════
-1. 위 정보를 바탕으로 실제 경험한 것처럼 자연스럽게 작성
+        # DB 템플릿이 있으면 사용, 없으면 기본값
+        DEFAULT_GUIDELINES = """1. 위 정보를 바탕으로 실제 경험한 것처럼 자연스럽게 작성
 2. 모든 정보를 다 넣지 말고, 자연스럽게 일부만 선택적으로 언급
 3. 광고처럼 보이지 않도록 솔직한 톤 유지
 4. 작은 불편함도 언급하면 더 신뢰감 있음 (예: 대기시간, 주차 불편 등)
 5. 금지 단어는 절대 사용하지 않기
 6. 과장된 표현 ("최고", "완전 강추", "인생병원") 자제
 7. 구체적인 경험과 감정 위주로 작성"""
+
+        guidelines = self.guidelines_template if self.guidelines_template else DEFAULT_GUIDELINES
+
+        return f"""
+═══════════════════════════════════════════════════════════════
+✍️ 작성 가이드라인
+═══════════════════════════════════════════════════════════════
+{guidelines}"""
     
     def _build_custom_section(self) -> str:
         return f"""
@@ -708,7 +735,9 @@ def build_review_prompt(
     persona: Optional[Dict] = None,
     cafe: Optional[Dict] = None,
     consultant_name: Optional[str] = None,
-    custom_instructions: Optional[str] = None
+    custom_instructions: Optional[str] = None,
+    header_template_id: Optional[int] = None,
+    guidelines_template_id: Optional[int] = None
 ) -> str:
     """
     리뷰 생성 프롬프트 빌드 (편의 함수)
@@ -813,6 +842,8 @@ def build_review_prompt(
         cafe=cafe,
         consultant_name=consultant_name,
         custom_instructions=custom_instructions,
+        header_template_id=header_template_id,
+        guidelines_template_id=guidelines_template_id,
     )
 
     builder = ReviewPromptBuilder(config)
@@ -828,7 +859,9 @@ def build_prompt_from_models(
     persona=None,  # Persona model
     cafe=None,  # CafeProfile model
     consultant_name: Optional[str] = None,
-    custom_instructions: Optional[str] = None
+    custom_instructions: Optional[str] = None,
+    header_template_id: Optional[int] = None,
+    guidelines_template_id: Optional[int] = None
 ) -> str:
     """
     Django 모델에서 직접 프롬프트 빌드
@@ -930,4 +963,6 @@ def build_prompt_from_models(
         cafe=cafe,
         consultant_name=consultant_name,
         custom_instructions=custom_instructions,
+        header_template_id=header_template_id,
+        guidelines_template_id=guidelines_template_id,
     )

@@ -164,9 +164,33 @@
         </div>
       </div>
 
-      <!-- Step 9: 추가 지시사항 -->
+      <!-- Step 9: 프롬프트 템플릿 (헤더 & 가이드라인) -->
       <div class="form-group">
-        <label class="form-label">9. 추가 지시사항 (선택)</label>
+        <label class="form-label">9. 프롬프트 템플릿</label>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <!-- 헤더 템플릿 -->
+          <div class="flex gap-2 items-center">
+            <span style="min-width: 70px; font-size: 0.85rem; color: var(--muted);">헤더:</span>
+            <select id="headerTemplateSelect" class="form-select" style="flex: 1;">
+              <option value="">기본 헤더</option>
+            </select>
+            <button type="button" class="btn btn-ghost btn-sm" id="previewHeaderBtn">미리보기</button>
+          </div>
+          <!-- 가이드라인 템플릿 -->
+          <div class="flex gap-2 items-center">
+            <span style="min-width: 70px; font-size: 0.85rem; color: var(--muted);">가이드:</span>
+            <select id="guidelinesTemplateSelect" class="form-select" style="flex: 1;">
+              <option value="">기본 가이드라인</option>
+            </select>
+            <button type="button" class="btn btn-ghost btn-sm" id="previewGuidelinesBtn">미리보기</button>
+          </div>
+          <a href="{% url 'dashboard:prompt_template_list' %}" class="btn btn-ghost btn-sm" style="align-self: flex-start;" target="_blank">템플릿 관리</a>
+        </div>
+      </div>
+
+      <!-- Step 10: 추가 지시사항 -->
+      <div class="form-group">
+        <label class="form-label">10. 추가 지시사항 (선택)</label>
         <textarea name="custom_instructions" id="customInstructions" class="form-textarea"
                   placeholder="예: 친구한테 추천하는 느낌으로, 가격 언급은 피해주세요"></textarea>
       </div>

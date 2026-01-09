@@ -88,6 +88,18 @@
         </div>
       </div>
 
+      <!-- 프롬프트 템플릿 선택 -->
+      <div class="form-group" style="margin-top: 20px;">
+        <label class="form-label">프롬프트 템플릿</label>
+        <div class="flex gap-2 items-center">
+          <select name="template_id" id="templateSelect" class="form-select" style="max-width: 300px;">
+            <option value="">기본 템플릿</option>
+          </select>
+          <button type="button" class="btn btn-ghost btn-sm" id="previewTemplateBtn">미리보기</button>
+          <a href="{% url 'dashboard:prompt_template_list' %}" class="btn btn-ghost btn-sm" target="_blank">관리</a>
+        </div>
+      </div>
+
       <!-- AI 모델 선택 -->
       <div class="form-group" style="margin-top: 20px;">
         <label class="form-label">AI 모델 선택</label>

@@ -181,3 +181,72 @@ document.addEventListener('DOMContentLoaded', () => {
     promptCard.open = false;
   });
 });
+// 프롬프트 복사
+document.getElementById('copyPromptBtn').addEventListener('click', function() {
+  navigator.clipboard.writeText(promptEditor.value).then(() => {
+    this.textContent = '복사됨!';
+    setTimeout(() => { this.textContent = '복사'; }, 2000);
+  });
+});
+
+// 템플릿 목록 로드
+const templateSelect = document.getElementById('templateSelect');
+let templatesData = [];
+
+async function loadTemplates() {
+  try {
+    const response = await fetch('/dashboard/api/prompt-templates/?mode=basic');
+    const data = await response.json();
+    templatesData = data.templates || [];
+
+    // 기존 옵션 유지 (기본 템플릿)
+    templateSelect.innerHTML = '<option value="">기본 템플릿</option>';
+
+    templatesData.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.name + (t.is_default ? ' (기본)' : '');
+      if (t.is_default) {
+        opt.selected = true;
+      }
+      templateSelect.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('템플릿 로드 실패:', err);
+  }
+}
+
+// 템플릿 미리보기
+document.getElementById('previewTemplateBtn').addEventListener('click', async function() {
+  const templateId = templateSelect.value;
+
+  if (!templateId) {
+    alert('기본 템플릿이 선택되어 있습니다. 다른 템플릿을 선택해주세요.');
+    return;
+  }
+
+  const template = templatesData.find(t => t.id == templateId);
+  if (template) {
+    // 간단한 모달로 표시
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;';
+    modal.innerHTML = `
+      <div style="background:white;border-radius:12px;max-width:800px;width:90%;max-height:80vh;display:flex;flex-direction:column;">
+        <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="margin:0;font-size:1.1rem;">${template.name} (v${template.version})</h3>
+          <button style="background:none;border:none;font-size:1.5rem;cursor:pointer;" onclick="this.closest('div[style*=fixed]').remove()">&times;</button>
+        </div>
+        <div style="padding:20px;overflow-y:auto;">
+          <pre style="white-space:pre-wrap;word-break:break-word;font-size:0.85rem;line-height:1.6;margin:0;">${template.content}</pre>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+  }
+});
+
+// 페이지 로드 시 템플릿 로드
+loadTemplates();

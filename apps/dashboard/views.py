@@ -181,11 +181,21 @@ def api_generate_review_basic(request):
 
     user_input = data.get("user_input", "").strip()
     model = data.get("model", "claude-sonnet-4-5-20241022")
+    template_id = data.get("template_id")  # 선택적 템플릿 ID
 
     if not user_input:
         return JsonResponse({"error": "리뷰 정보를 입력해주세요."}, status=400)
 
-    base_prompt = """당신은 실제로 시술을 받았거나 받을 환자로서 자연스러운 시술후기, 경험, 상담후기, 질문, 고민, 의견, 잡담들을 작성합니다.
+    # DB에서 프롬프트 템플릿 조회
+    from apps.data.models import PromptTemplate
+
+    if template_id:
+        template = PromptTemplate.objects.filter(pk=template_id, mode='basic').first()
+    else:
+        template = PromptTemplate.objects.filter(mode='basic', is_default=True).first()
+
+    # 기본 프롬프트 (템플릿이 없는 경우 폴백)
+    DEFAULT_BASIC_PROMPT = """당신은 실제로 시술을 받았거나 받을 환자로서 자연스러운 시술후기, 경험, 상담후기, 질문, 고민, 의견, 잡담들을 작성합니다.
 광고가 아닌 진짜 의견과 사실, 경험담처럼 작성해주세요.
 아래 정보를 바탕으로 자연스럽고 진정성 있는 후기를 작성해주세요.
 
@@ -201,6 +211,7 @@ def api_generate_review_basic(request):
 
 자연스러운 후기를 작성해주세요:"""
 
+    base_prompt = template.content if template else DEFAULT_BASIC_PROMPT
     prompt = base_prompt.format(user_input=user_input)
 
     try:
@@ -287,6 +298,13 @@ def api_generate_review(request):
     custom_instructions = data.get("custom_instructions", "")
     model = data.get("model", "gpt-5-mini")  # 모델 선택
 
+    # Pro 템플릿 ID (헤더 & 가이드라인)
+    header_template_id = data.get("header_template_id")
+    guidelines_template_id = data.get("guidelines_template_id")
+    # 문자열을 int로 변환 (빈 문자열 또는 None 처리)
+    header_template_id = int(header_template_id) if header_template_id else None
+    guidelines_template_id = int(guidelines_template_id) if guidelines_template_id else None
+
     # 직접입력 값 처리
     clinic_custom = data.get("clinic_custom", "")
     doctor_custom = data.get("doctor_custom", "")
@@ -357,6 +375,8 @@ def api_generate_review(request):
             cafe=cafe,
             consultant_name=consultant_name,
             custom_instructions=custom_instructions,
+            header_template_id=header_template_id,
+            guidelines_template_id=guidelines_template_id,
         )
 
         # 리뷰 생성 (선택된 모델 사용)
@@ -463,6 +483,13 @@ def api_generate_prompt(request):
     consultant_name = data.get("consultant_name")
     custom_instructions = data.get("custom_instructions", "")
 
+    # Pro 템플릿 ID (헤더 & 가이드라인)
+    header_template_id = data.get("header_template_id")
+    guidelines_template_id = data.get("guidelines_template_id")
+    # 문자열을 int로 변환 (빈 문자열 또는 None 처리)
+    header_template_id = int(header_template_id) if header_template_id else None
+    guidelines_template_id = int(guidelines_template_id) if guidelines_template_id else None
+
     # 직접입력 값 처리
     clinic_custom = data.get("clinic_custom", "")
     doctor_custom = data.get("doctor_custom", "")
@@ -533,6 +560,8 @@ def api_generate_prompt(request):
             cafe=cafe,
             consultant_name=consultant_name,
             custom_instructions=custom_instructions,
+            header_template_id=header_template_id,
+            guidelines_template_id=guidelines_template_id,
         )
 
         return JsonResponse({
@@ -1689,3 +1718,718 @@ def export_llm_usage_excel(request):
 
     wb.save(response)
     return response
+
+# =====================================================
+# 서버 설정
+# =====================================================
+
+def server_settings(request):
+    """서버 설정 페이지"""
+    import socket
+    import subprocess
+
+    # 현재 서버 IP 정보 가져오기
+    try:
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+    except Exception:
+        local_ip = "알 수 없음"
+
+    # 최근 접속 로그 (최근 100건)
+    recent_logs = AccessLog.objects.all()[:100]
+
+    # 고유 IP 목록 (오늘)
+    from django.utils import timezone
+    from datetime import timedelta
+    today = timezone.now().date()
+    today_logs = AccessLog.objects.filter(created_at__date=today)
+    unique_ips_today = today_logs.values('ip_address').distinct().count()
+
+    context = {
+        "local_ip": local_ip,
+        "recent_logs": recent_logs,
+        "total_logs": AccessLog.objects.count(),
+        "unique_ips_today": unique_ips_today,
+    }
+    return render(request, "dashboard/server_settings.html", context)
+
+
+@require_http_methods(["GET"])
+def api_firewall_status(request):
+    """방화벽 규칙 상태 확인 API"""
+    import subprocess
+
+    try:
+        # netsh 명령어로 dtlab90 규칙 확인
+        result = subprocess.run(
+            ['netsh', 'advfirewall', 'firewall', 'show', 'rule', 'name=dtlab90'],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            encoding='cp949',  # Windows 한글 인코딩
+            errors='ignore'
+        )
+
+        # 규칙이 존재하면 출력에 "dtlab90"이 포함됨
+        rule_exists = 'dtlab90' in result.stdout or result.returncode == 0
+
+        # 더 정확한 확인: "사용" 또는 "Enabled" 체크
+        is_enabled = False
+        if rule_exists:
+            output_lower = result.stdout.lower()
+            if '사용' in result.stdout or 'enabled' in output_lower or 'yes' in output_lower:
+                is_enabled = True
+
+        return JsonResponse({
+            "success": True,
+            "rule_exists": rule_exists,
+            "is_enabled": is_enabled,
+            "status": "open" if (rule_exists and is_enabled) else "closed",
+            "rule_name": "dtlab90",
+        })
+
+    except subprocess.TimeoutExpired:
+        return JsonResponse({
+            "success": False,
+            "error": "명령어 실행 시간 초과",
+            "status": "unknown"
+        })
+    except FileNotFoundError:
+        return JsonResponse({
+            "success": False,
+            "error": "netsh 명령어를 찾을 수 없습니다",
+            "status": "unknown"
+        })
+    except Exception as e:
+        return JsonResponse({
+            "success": False,
+            "error": str(e),
+            "status": "unknown"
+        })
+
+
+@require_http_methods(["GET"])
+def api_access_logs(request):
+    """접속 로그 목록 API"""
+    limit = int(request.GET.get('limit', 50))
+    offset = int(request.GET.get('offset', 0))
+
+    logs = AccessLog.objects.all()[offset:offset + limit]
+
+    logs_data = [
+        {
+            "id": log.id,
+            "ip_address": log.ip_address,
+            "path": log.path,
+            "method": log.method,
+            "user_agent": log.user_agent[:100] if log.user_agent else "",
+            "created_at": log.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        }
+        for log in logs
+    ]
+
+    return JsonResponse({
+        "success": True,
+        "logs": logs_data,
+        "total": AccessLog.objects.count(),
+    })
+
+
+@require_http_methods(["POST"])
+def api_clear_access_logs(request):
+    """접속 로그 전체 삭제 API"""
+    deleted_count, _ = AccessLog.objects.all().delete()
+    return JsonResponse({
+        "success": True,
+        "deleted_count": deleted_count,
+    })
+
+
+# =====================================================
+# Basic Plus - 시리즈 생성 및 스타일 기반 생성
+# =====================================================
+
+def review_generate_basic_plus(request):
+    """Basic Plus 리뷰 생성 페이지"""
+    from apps.ml.services.llm_service import AVAILABLE_MODELS
+
+    models_list = []
+    for provider, models in AVAILABLE_MODELS.items():
+        for model_id, info in models.items():
+            models_list.append({
+                "id": model_id,
+                "provider": provider,
+                "name": info["name"],
+                "desc": info["desc"],
+            })
+
+    return render(request, "dashboard/review_generate_basic_plus.html", {
+        "models": models_list,
+    })
+
+
+@require_http_methods(["POST"])
+def api_generate_series(request):
+    """컨텐츠 시리즈 한번에 생성 API"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    user_input = data.get("user_input", "").strip()
+    content_types = data.get("content_types", [])
+    content_lengths = data.get("content_lengths", {})  # 각 컨텐츠별 글자수
+    model = data.get("model", "claude-sonnet-4-5-20250929")
+    template_id = data.get("template_id")  # 선택적 템플릿 ID
+
+    # 다양성 설정
+    temperature = data.get("temperature", 0.85)
+    persona = data.get("persona", {})
+    situation = data.get("situation", {})
+
+    if not user_input:
+        return JsonResponse({"error": "기본 정보를 입력해주세요."}, status=400)
+
+    if not content_types:
+        return JsonResponse({"error": "최소 하나의 컨텐츠를 선택해주세요."}, status=400)
+
+    # 컨텐츠 타입 이름 매핑
+    type_names = {
+        'question': '고민 & 질문',
+        'research': '발품/손품',
+        'consultation': '방문상담 후기',
+        'day0': '시술 당일 후기',
+        'month1': '시술 후 1개월 후기',
+        'month2': '시술 후 2개월 후기',
+        'month3': '시술 후 3개월 후기',
+    }
+
+    type_descriptions = {
+        'question': '시술 전 커뮤니티에 올리는 고민/질문글. 아직 시술을 받기 전이라 결과를 모름.',
+        'research': '병원 비교, 검색 과정 공유. 여러 병원을 알아보고 비교하는 과정.',
+        'consultation': '상담 받고 온 후기. 병원 방문 후 느낌, 상담 내용 공유.',
+        'day0': '시술 직후 생생한 후기. 당일의 긴장감, 시술 과정, 직후 상태.',
+        'month1': '시술 후 1개월 경과. 회복 과정, 변화 느낌.',
+        'month2': '시술 후 2개월 경과. 안정화 단계, 주변 반응.',
+        'month3': '시술 후 3개월 경과. 최종 결과, 만족도, 재방문 의향.',
+    }
+
+    # 생성할 컨텐츠 목록 (길이 포함)
+    content_list = []
+    for ct in content_types:
+        length = content_lengths.get(ct, 500)
+        content_list.append(f"- [{type_names.get(ct, ct)}] ({length}자 내외): {type_descriptions.get(ct, '')}")
+
+    # 페르소나 정보 구성
+    persona_desc = ""
+    if persona:
+        persona_parts = []
+        if persona.get("age"):
+            persona_parts.append(persona["age"])
+        if persona.get("gender"):
+            persona_parts.append(persona["gender"])
+        if persona.get("job"):
+            persona_parts.append(persona["job"])
+        if persona.get("personality"):
+            persona_parts.append(f"성격: {persona['personality']}")
+        if persona.get("tone"):
+            persona_parts.append(f"말투: {persona['tone']}")
+        if persona.get("experience"):
+            persona_parts.append(f"시술 경험: {persona['experience']}")
+        if persona_parts:
+            persona_desc = f"\n## 글쓴이 페르소나 (반드시 반영)\n" + ", ".join(persona_parts)
+
+    # 상황 변수 정보 구성
+    situation_desc = ""
+    if situation:
+        sit_parts = []
+        if situation.get("consult"):
+            sit_parts.append(f"상담 분위기: {situation['consult']}")
+        if situation.get("pain"):
+            sit_parts.append(f"시술 통증: {situation['pain']}")
+        if situation.get("downtime"):
+            sit_parts.append(f"다운타임: {situation['downtime']}")
+        if situation.get("satisfaction"):
+            sit_parts.append(f"만족도: {situation['satisfaction']}")
+        if situation.get("price"):
+            sit_parts.append(f"가격 느낌: {situation['price']}")
+        if situation.get("revisit"):
+            sit_parts.append(f"재방문 의향: {situation['revisit']}")
+        if sit_parts:
+            situation_desc = f"\n## 상황 변수 (해당 시점 글에 반영)\n" + "\n".join(sit_parts)
+
+    # DB에서 프롬프트 템플릿 조회
+    from apps.data.models import PromptTemplate
+
+    if template_id:
+        template = PromptTemplate.objects.filter(pk=template_id, mode='basic_plus').first()
+    else:
+        template = PromptTemplate.objects.filter(mode='basic_plus', is_default=True).first()
+
+    # 기본 프롬프트 (템플릿이 없는 경우 폴백)
+    DEFAULT_BASIC_PLUS_PROMPT = """당신은 실제로 미용 시술을 받는 사람의 관점에서 시간 순서대로 일련의 글을 작성합니다.
+한 사람이 시술을 결심하고, 알아보고, 상담받고, 시술받고, 회복하는 전 과정을 자연스럽게 기록합니다.
+
+## 핵심 원칙
+1. **일관된 페르소나**: 모든 글에서 동일한 사람의 말투, 성격, 걱정, 기대가 느껴져야 합니다.
+2. **시간적 연속성**: 앞선 글에서 언급한 내용(병원명, 원장님, 가격, 경험 등)이 이후 글에 자연스럽게 연결됩니다.
+3. **감정의 흐름**: 처음 걱정/기대 → 상담 후 안심 → 시술 당일 긴장 → 회복 과정의 변화
+4. **시점 준수**: 각 글은 해당 시점에서만 알 수 있는 정보만 포함. 미래 결과 언급 금지.
+5. **자연스러운 문체**: 광고가 아닌 실제 경험담, 카페/커뮤니티 글처럼.
+
+## 표현 다양화 가이드
+- 문장 시작 다양하게: "솔직히", "진짜", "근데", "아", "흠", "일단", "뭔가", "사실" 등
+- 감탄/추임새: "헐", "오", "와", "대박", "ㅋㅋ", "ㅎㅎ", "ㅠㅠ", "..." 활용
+- 불필요한 수식어 빼기: 간결하고 직관적인 표현
+- 구어체 표현: "~거든요", "~잖아요", "~같아요", "~더라고요" 자연스럽게
+- 개인적 감정: "솔직히 좀 무서웠는데", "은근 기대됨", "약간 후회될뻔" 등
+{persona_desc}{situation_desc}
+
+## 사용자 제공 정보
+{user_input}
+
+## 생성할 컨텐츠 (순서대로, 지정된 글자수 준수!)
+{content_list}
+
+## 출력 형식 (반드시 준수)
+각 컨텐츠를 아래 형식으로 구분하여 작성:
+
+[고민 & 질문]
+(해당 글자수에 맞는 내용)
+
+=======
+
+[발품/손품]
+(해당 글자수에 맞는 내용)
+
+=======
+
+(이하 동일한 형식으로 계속)
+
+## 주의사항
+- 각 컨텐츠의 지정된 글자수를 최대한 맞춰주세요
+- 구분선은 반드시 ======= (등호 7개 이상) 사용
+- 이모지는 적당히 (과하지 않게)
+- 자연스러운 구어체, 오타 가능
+- 줄바꿈(엔터)은 최소화: 문단 사이는 한 줄만 띄우기. 연속 빈 줄 금지.
+
+지금부터 시리즈를 작성해주세요:"""
+
+    prompt_template = template.content if template else DEFAULT_BASIC_PLUS_PROMPT
+    series_prompt = prompt_template.format(
+        persona_desc=persona_desc,
+        situation_desc=situation_desc,
+        user_input=user_input,
+        content_list=chr(10).join(content_list)
+    )
+
+    try:
+        from apps.ml.services.llm_service import generate_review_with_prompt
+        # max_tokens를 8000으로 늘려서 긴 시리즈도 생성 가능
+        # temperature 파라미터 추가로 창의성 조절
+        result = generate_review_with_prompt(
+            series_prompt,
+            model=model,
+            max_tokens=8000,
+            return_usage=True,
+            temperature=temperature
+        )
+        generated_text = result["text"]
+
+        # 파싱: ======= 구분자로 분리
+        parts = re.split(r'\n=+\n', generated_text)
+
+        series = []
+        for i, part in enumerate(parts):
+            part = part.strip()
+            if not part:
+                continue
+
+            # [타입] 형식 추출 시도
+            type_match = re.match(r'\[([^\]]+)\]', part)
+            if type_match:
+                detected_type = type_match.group(1)
+                content = part[type_match.end():].strip()
+            else:
+                detected_type = content_types[i] if i < len(content_types) else f"part_{i}"
+                content = part
+
+            # 타입 이름 -> 코드 변환
+            type_code = None
+            for code, name in type_names.items():
+                if code in detected_type.lower() or name in detected_type:
+                    type_code = code
+                    break
+
+            if not type_code and i < len(content_types):
+                type_code = content_types[i]
+            elif not type_code:
+                type_code = f"content_{i}"
+
+            series.append({
+                "type": type_code,
+                "content": content,
+                "char_count": len(content),
+            })
+
+        # 원화 환산
+        cost_krw = result["cost_usd"] * 1450
+
+        return JsonResponse({
+            "success": True,
+            "series": series,
+            "prompt": series_prompt,  # 프롬프트도 반환
+            "usage": {
+                "input_tokens": result["input_tokens"],
+                "output_tokens": result["output_tokens"],
+                "cost_usd": round(result["cost_usd"], 6),
+                "cost_krw": round(cost_krw, 2),
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({"error": f"생성 실패: {str(e)}"}, status=500)
+
+
+@require_http_methods(["POST"])
+def api_generate_reply(request):
+    """스타일 기반 댓글 답변 생성 API"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    source_text = data.get("source_text", "").strip()
+    comment = data.get("comment", "").strip()
+    model = data.get("model", "claude-sonnet-4-5-20241022")
+
+    if not source_text:
+        return JsonResponse({"error": "원본 글이 필요합니다."}, status=400)
+
+    if not comment:
+        return JsonResponse({"error": "답변할 댓글을 입력해주세요."}, status=400)
+
+    reply_prompt = f"""당신은 아래 원본 글을 작성한 사람입니다.
+원본 글의 말투, 성격, 경험을 그대로 유지하면서 댓글에 자연스럽게 답변해주세요.
+
+## 원본 글 (이 글을 쓴 사람의 관점 유지)
+{source_text}
+
+## 받은 댓글
+{comment}
+
+## 답변 작성 원칙
+1. 원본 글의 말투와 스타일 유지 (존댓말/반말, 이모지 사용 빈도 등)
+2. 실제로 그 경험을 한 사람으로서 구체적으로 답변
+3. 자연스럽고 친근한 답변 (광고 느낌 X)
+4. 질문에 대해 성실하게 답변하되, 과장하지 않음
+5. 적절한 길이 (100~300자 정도)
+
+답변:"""
+
+    try:
+        from apps.ml.services.llm_service import generate_review_with_prompt
+        result = generate_review_with_prompt(reply_prompt, model=model, return_usage=True)
+
+        return JsonResponse({
+            "success": True,
+            "reply": result["text"],
+            "usage": {
+                "input_tokens": result["input_tokens"],
+                "output_tokens": result["output_tokens"],
+                "cost_usd": round(result["cost_usd"], 6),
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({"error": f"생성 실패: {str(e)}"}, status=500)
+
+
+@require_http_methods(["POST"])
+def api_generate_with_style(request):
+    """추출된 스타일로 새 글 생성 API"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    source_text = data.get("source_text", "").strip()
+    prompt = data.get("prompt", "").strip()
+    model = data.get("model", "claude-sonnet-4-5-20241022")
+
+    if not source_text:
+        return JsonResponse({"error": "스타일 원본이 필요합니다."}, status=400)
+
+    if not prompt:
+        return JsonResponse({"error": "생성할 글의 조건을 입력해주세요."}, status=400)
+
+    style_prompt = f"""아래 원본 글의 작성자와 동일한 사람이 새로운 글을 작성합니다.
+원본 글의 말투, 표현 방식, 성격, 감정 표현 스타일을 그대로 유지해주세요.
+
+## 원본 글 (스타일 참고)
+{source_text}
+
+## 새로 작성할 글의 조건
+{prompt}
+
+## 작성 원칙
+1. 원본 글과 동일한 사람이 쓴 것처럼 말투/스타일 완벽 유지
+2. 원본에서 언급된 병원, 시술 등의 맥락 유지
+3. 자연스러운 경험담 형식
+4. 적절한 길이 (600~1000자)
+
+새 글:"""
+
+    try:
+        from apps.ml.services.llm_service import generate_review_with_prompt
+        result = generate_review_with_prompt(style_prompt, model=model, return_usage=True)
+
+        # 원화 환산
+        cost_krw = result["cost_usd"] * 1450
+
+        return JsonResponse({
+            "success": True,
+            "content": result["text"],
+            "usage": {
+                "input_tokens": result["input_tokens"],
+                "output_tokens": result["output_tokens"],
+                "cost_usd": round(result["cost_usd"], 6),
+                "cost_krw": round(cost_krw, 2),
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({"error": f"생성 실패: {str(e)}"}, status=500)
+
+
+# =====================================================
+# 프롬프트 템플릿 관리
+# =====================================================
+
+from apps.data.models import PromptTemplate, PromptTemplateVersion
+
+
+def prompt_template_list(request):
+    """프롬프트 템플릿 목록 페이지"""
+    templates = PromptTemplate.objects.all()
+
+    # 모드별로 그룹화
+    templates_by_mode = {
+        'basic': templates.filter(mode='basic'),
+        'basic_plus': templates.filter(mode='basic_plus'),
+        'pro_header': templates.filter(mode='pro_header'),
+        'pro_guidelines': templates.filter(mode='pro_guidelines'),
+    }
+
+    context = {
+        'templates_by_mode': templates_by_mode,
+        'mode_labels': {
+            'basic': 'Basic',
+            'basic_plus': 'Basic Plus',
+            'pro_header': 'Pro - 헤더',
+            'pro_guidelines': 'Pro - 가이드라인',
+        },
+    }
+    return render(request, "dashboard/prompt_template_list.html", context)
+
+
+def prompt_template_edit(request, pk=None):
+    """프롬프트 템플릿 생성/수정 페이지"""
+    if pk:
+        template = get_object_or_404(PromptTemplate, pk=pk)
+    else:
+        template = None
+
+    if request.method == 'POST':
+        mode = request.POST.get('mode', '').strip()
+        name = request.POST.get('name', '').strip()
+        content = request.POST.get('content', '').strip()
+        description = request.POST.get('description', '').strip()
+        is_default = request.POST.get('is_default') == 'on'
+        change_note = request.POST.get('change_note', '').strip()
+
+        if not mode or not name or not content:
+            return render(request, "dashboard/prompt_template_edit.html", {
+                "template": template,
+                "error": "모드, 이름, 내용은 필수입니다."
+            })
+
+        if template:
+            # 기존 템플릿 수정 - 버전 이력 저장
+            PromptTemplateVersion.objects.create(
+                template=template,
+                version=template.version,
+                content=template.content,
+                change_note=change_note or f"v{template.version} 백업",
+            )
+
+            template.mode = mode
+            template.name = name
+            template.content = content
+            template.description = description
+            template.is_default = is_default
+            template.version += 1
+            template.save()
+        else:
+            # 새 템플릿 생성
+            template = PromptTemplate.objects.create(
+                mode=mode,
+                name=name,
+                content=content,
+                description=description,
+                is_default=is_default,
+            )
+
+        return render(request, "dashboard/prompt_template_edit.html", {
+            "template": template,
+            "success": "저장되었습니다."
+        })
+
+    # 버전 이력 가져오기
+    versions = []
+    if template:
+        versions = template.versions.all()[:10]
+
+    return render(request, "dashboard/prompt_template_edit.html", {
+        "template": template,
+        "versions": versions,
+    })
+
+
+@require_http_methods(["GET"])
+def api_prompt_templates(request):
+    """프롬프트 템플릿 목록 API"""
+    mode = request.GET.get('mode')
+
+    if mode:
+        templates = PromptTemplate.objects.filter(mode=mode, is_active=True)
+    else:
+        templates = PromptTemplate.objects.filter(is_active=True)
+
+    data = [
+        {
+            "id": t.pk,
+            "mode": t.mode,
+            "mode_display": t.get_mode_display(),
+            "name": t.name,
+            "description": t.description,
+            "content": t.content,
+            "is_default": t.is_default,
+            "version": t.version,
+            "updated_at": t.updated_at.strftime('%Y-%m-%d %H:%M'),
+        }
+        for t in templates
+    ]
+
+    return JsonResponse({"success": True, "templates": data})
+
+
+@require_http_methods(["GET"])
+def api_prompt_template_detail(request, pk):
+    """프롬프트 템플릿 상세 API"""
+    template = get_object_or_404(PromptTemplate, pk=pk)
+
+    return JsonResponse({
+        "success": True,
+        "template": {
+            "id": template.pk,
+            "mode": template.mode,
+            "mode_display": template.get_mode_display(),
+            "name": template.name,
+            "description": template.description,
+            "content": template.content,
+            "is_default": template.is_default,
+            "version": template.version,
+            "updated_at": template.updated_at.strftime('%Y-%m-%d %H:%M'),
+        }
+    })
+
+
+@require_http_methods(["POST"])
+def api_prompt_template_delete(request, pk):
+    """프롬프트 템플릿 삭제 API"""
+    template = get_object_or_404(PromptTemplate, pk=pk)
+
+    if template.is_default:
+        return JsonResponse({"success": False, "error": "기본 템플릿은 삭제할 수 없습니다."}, status=400)
+
+    name = template.name
+    template.delete()
+
+    return JsonResponse({"success": True, "message": f"'{name}' 템플릿이 삭제되었습니다."})
+
+
+@require_http_methods(["POST"])
+def api_prompt_template_set_default(request, pk):
+    """프롬프트 템플릿 기본 설정 API"""
+    template = get_object_or_404(PromptTemplate, pk=pk)
+    template.is_default = True
+    template.save()  # save()에서 같은 모드의 다른 템플릿 기본 해제
+
+    return JsonResponse({
+        "success": True,
+        "message": f"'{template.name}'이(가) 기본 템플릿으로 설정되었습니다."
+    })
+
+
+@require_http_methods(["POST"])
+def api_prompt_template_toggle(request, pk):
+    """프롬프트 템플릿 활성화 토글 API"""
+    template = get_object_or_404(PromptTemplate, pk=pk)
+    template.is_active = not template.is_active
+    template.save()
+
+    return JsonResponse({
+        "success": True,
+        "is_active": template.is_active,
+        "message": f"'{template.name}' {'활성화' if template.is_active else '비활성화'}됨"
+    })
+
+
+@require_http_methods(["GET"])
+def api_prompt_template_versions(request, pk):
+    """프롬프트 템플릿 버전 이력 API"""
+    template = get_object_or_404(PromptTemplate, pk=pk)
+    versions = template.versions.all()
+
+    data = [
+        {
+            "version": v.version,
+            "content": v.content,
+            "change_note": v.change_note,
+            "created_at": v.created_at.strftime('%Y-%m-%d %H:%M'),
+        }
+        for v in versions
+    ]
+
+    return JsonResponse({
+        "success": True,
+        "template_name": template.name,
+        "current_version": template.version,
+        "versions": data
+    })
+
+
+@require_http_methods(["POST"])
+def api_prompt_template_restore(request, pk, version):
+    """프롬프트 템플릿 특정 버전으로 복원 API"""
+    template = get_object_or_404(PromptTemplate, pk=pk)
+    version_obj = get_object_or_404(PromptTemplateVersion, template=template, version=version)
+
+    # 현재 버전 백업
+    PromptTemplateVersion.objects.create(
+        template=template,
+        version=template.version,
+        content=template.content,
+        change_note=f"v{version}으로 복원하기 전 백업",
+    )
+
+    # 복원
+    template.content = version_obj.content
+    template.version += 1
+    template.save()
+
+    return JsonResponse({
+        "success": True,
+        "message": f"v{version}으로 복원되었습니다. (현재 버전: v{template.version})"
+    })
