@@ -1,3 +1,5 @@
+console.log("review_generate_v2.js loaded"); // 디버깅 로그
+
 // 데이터 저장용
 let currentClinicData = null;
 let currentReviewId = null;
@@ -183,6 +185,8 @@ cafeSelect.addEventListener('change', function() {
 function collectFormData() {
   const formData = new FormData(reviewForm);
   const data = Object.fromEntries(formData.entries());
+  // 🔥 모델 확정 (유일한 기준)
+  data.model = getSelectedModel();
 
   // 직접입력 값 처리
   if (data.clinic_id === '__custom__') {
@@ -616,5 +620,60 @@ document.getElementById('previewGuidelinesBtn').addEventListener('click', functi
   if (template) showTemplatePreviewModal(template);
 });
 
-// 페이지 로드 시 템플릿 로드
+async function generateReview() {
+  const payload = buildPayload();
+
+  console.log("🔥 GENERATE PAYLOAD", payload); //디버깅용
+
+  try {
+    const res = await fetch("/dashboard/api/generate-review", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      throw new Error(data.error || "생성 실패");
+    }
+
+    renderResult(data);
+  } catch (e) {
+    console.error(e); // 디버깅용
+    alert("리뷰 생성 실패: " + e.message);
+  }
+}
+
+function renderResult(data) {
+  const box = document.getElementById("resultBox");
+  if (!box) return;
+
+  box.innerHTML = `
+    <h3>생성된 리뷰</h3>
+    <pre>${data.review}</pre>
+    <div class="meta">
+      <span>모델: ${data.model_used}</span>
+      <span>글자수: ${data.char_count}</span>
+    </div>
+  `;
+}
+
+/* ================================
+   AI 모델 선택 (단일 기준)
+================================ */
+function getSelectedModel() {
+  // 1️⃣ radio 버튼 우선
+  const checked = document.querySelector('input[name="model"]:checked');
+  if (checked) return checked.value;
+
+  // 2️⃣ select box (있을 경우)
+  const select = document.getElementById("modelSelect");
+  if (select && select.value) return select.value;
+
+  // 3️⃣ 기본값 (🔥 Claude Opus 4.5)
+  return "claude-opus-4-5-20241022";
+}
 loadProTemplates();

@@ -73,3 +73,14 @@ button {
 .hidden { display: none !important; }
 
 .muted { color: var(--muted); }
+
+/* Chrome / Electron */
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Firefox */
+body {
+  scrollbar-width: none;
+}

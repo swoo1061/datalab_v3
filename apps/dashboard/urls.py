@@ -3,7 +3,6 @@
 """
 from django.urls import path
 from . import views
-from apps.dashboard.api.clinic import clinic_detail_api
 
 app_name = "dashboard"
 
@@ -45,8 +44,6 @@ urlpatterns = [
     path("clinics/import/", views.clinic_import, name="clinic_import"),
     path("api/clinics/<int:pk>/delete/", views.api_clinic_delete, name="api_clinic_delete"),
     path("api/clinics/<int:pk>/toggle/", views.api_clinic_toggle, name="api_clinic_toggle"),
-    # 병원 가이드 - 의사 및 시술 정보 API
-    path("api/clinics/<int:clinic_id>/detail/", clinic_detail_api, name="api_clinic_detail"),
     
     # API 엔드포인트
     path("api/clinic/<int:clinic_id>/doctors/", views.api_clinic_doctors, name="api_clinic_doctors"),

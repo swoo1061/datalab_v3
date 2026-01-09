@@ -40,7 +40,6 @@
                 <div class="label muted">병원명</div>
                 <div class="value" id="clinicName">-</div>
               </div>
-              <span class="badge" id="clinicIdBadge">ID -</span>
             </div>
 
             <div class="meta grid">
@@ -63,18 +62,6 @@
             </div>
           </div>
         </div>
-
-        <!-- 빠른 메모 / 상태 -->
-        <div class="card">
-          <div class="card-hd">체크 포인트</div>
-          <div class="card-bd">
-            <ul class="bullets">
-              <li>수가가 없으면 자동으로 <b>상담 필요</b> 표시</li>
-              <li>원장 없음 → 좌측 탭에 <b>공통 수가</b> 탭으로 표시</li>
-              <li>데이터는 API 기준으로 그대로 렌더링</li>
-            </ul>
-          </div>
-        </div>
       </section>
 
       <!-- 의료진 / 수가 -->
@@ -88,11 +75,9 @@
           <div class="card-hd">
             <div class="content-hd">
               <div>
-                <div class="muted" style="font-size:12px;">선택 의료진</div>
-                <div class="content-title" id="doctorTitle">-</div>
+
               </div>
               <div class="content-tools">
-                <span class="badge" id="priceCount">항목 0</span>
               </div>
             </div>
           </div>
@@ -101,10 +86,8 @@
             <table class="table" id="priceTable">
               <thead>
                 <tr>
-                  <th style="width: 38%;">시술/항목</th>
-                  <th style="width: 22%;">카테고리</th>
-                  <th style="width: 20%;">담당</th>
-                  <th style="width: 20%; text-align:right;">금액</th>
+                  <th style="width: 70%;">시술/항목</th>
+                  <th style="width: 30%; text-align:right;">금액</th>
                 </tr>
               </thead>
               <tbody id="priceTbody"></tbody>
@@ -136,7 +119,7 @@
 <script>
   (async () => {
     await loadLayout();          // ⭐ 사이드바 로드
-    await loadHeader("대시보드"); // 기존 header.js 그대로
+    await loadHeader("병원 가이드"); // 기존 header.js 그대로
   })();
 </script>
 </body>

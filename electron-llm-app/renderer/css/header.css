@@ -1,17 +1,44 @@
-/* ================================
-   header.css (완전 독립)
-================================ */
-
 .header-scope {
-  height: var(--header-h);
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+
+  height: var(--header-h, 56px);
   padding: 0 18px;
+
+  width: 100%;          /* 🔥 핵심 */
+  min-width: 0; 
+
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  background: var(--surface, #ffffff);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+
+  /* 🔥 드래그 핵심 */
+  -webkit-app-region: drag;
+
+  /* hover 효과는 “약하게”만 */
+  transition: background 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
+/* ✅ 클릭/입력은 드래그 제외 (이거 없으면 클릭도 안되거나 드래그도 꼬임) */
+.header-scope a,
+.header-scope button,
+.header-scope input,
+.header-scope select,
+.header-scope textarea,
+.header-scope .user-area,
+.header-scope .user-area * {
+  -webkit-app-region: no-drag;
+}
+
+/* ----------------
+   내용 스타일
+---------------- */
 .header-scope .app-brand {
   display: flex;
   align-items: center;
@@ -36,26 +63,25 @@
 .header-scope .user-chip {
   padding: 7px 10px;
   border-radius: 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border, #e5e7eb);
   background: #fff;
   font-size: 13px;
 }
 
-.header-scope .user-chip:hover { background: var(--surface-2); }
+.header-scope .user-chip:hover { background: var(--surface-2, #f3f4f6); }
 
 .header-scope .profile-popup {
   position: absolute;
   right: 0;
   top: 44px;
   width: 240px;
-  background: white;
+  background: #fff;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border, #e5e7eb);
   padding: 12px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow, 0 12px 30px rgba(0,0,0,.12));
   z-index: 2000;
 }
-
 .header-scope .profile-row { margin-bottom: 8px; }
 
 .header-scope .position-text {
@@ -136,4 +162,15 @@
   font-weight: 600;
   text-align: right;
   word-break: break-all;
+}
+/* ================================
+   “상단 10px에 마우스 오면” 강조
+   (레이아웃 안 흔들리는 안전 버전)
+================================ */
+
+/* 헤더 자체는 항상 보임. hover 시만 살짝 강조 */
+.header-scope:hover {
+  background: rgba(255, 255, 255, 0.85);
+  border-bottom-color: var(--border, #e5e7eb);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
 }

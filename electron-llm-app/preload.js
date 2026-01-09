@@ -69,7 +69,7 @@ contextBridge.exposeInMainWorld("api", {
   },
 
   getClinicDetail: (clinicId) =>
-  requestJson(`/dashboard/api/clinics/${clinicId}/detail/`, {
+  requestJson(`/api/clinics/${clinicId}/detail/`, {
     method: "GET",
   }),
 

@@ -13,7 +13,7 @@ function goReview() {
 }
 
 function goClinicGuide() {
-  navigate("clinic");
+  navigate("clinic_guide");
 }
 
 // ================================

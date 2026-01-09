@@ -7,7 +7,10 @@ let state = {
   clinicId: null,
   doctorId: null,
   model: null,
+  personas: [],
 };
+
+let isGenerating = false;
 
 // ================================
 // 병원 목록
@@ -30,8 +33,11 @@ async function loadClinics() {
 // 병원 → 원장
 // ================================
 async function onClinicChange() {
+  console.log("doctors:", doctors); //디버깅 로그
   const clinicId = document.getElementById("clinicSelect").value;
+
   state.clinicId = clinicId;
+  state.doctorId = null;
 
   const doctorSelect = document.getElementById("doctorSelect");
   doctorSelect.innerHTML = '<option value="">원장님을 선택하세요</option>';
@@ -48,15 +54,12 @@ async function onClinicChange() {
     opt.textContent = d.name;
     doctorSelect.appendChild(opt);
   });
-
-  doctorSelect.onchange = () => {
-    state.doctorId = doctorSelect.value;
-  };
 }
 
 // ================================
 // AI 모델
 // ================================
+console.log("LLM models:", models); //디버깅 로그
 async function loadModels() {
   const models = await window.api.getLLMModels();
   const container = document.getElementById("modelList");
@@ -70,52 +73,61 @@ async function loadModels() {
   models.forEach(m => {
     const card = document.createElement("div");
     card.className = "model-card";
-    if (m.recommended) card.classList.add("recommended");
 
     card.innerHTML = `
       <strong>${m.name}</strong>
       <div class="meta">${(m.provider || "UNKNOWN").toUpperCase()}</div>
     `;
 
-    card.onclick = (e) => selectModel(m.key, e);
+    card.addEventListener("click", () => {
+      selectModel(m.key, card);
+    });
+
     container.appendChild(card);
 
     if (!state.model && m.recommended) {
-      selectModel(m.key, { currentTarget: card });
+      selectModel(m.key, card);
     }
   });
 }
 
-function selectModel(modelKey, event) {
+function selectModel(modelKey, el) {
   state.model = modelKey;
 
   document
     .querySelectorAll(".model-card")
-    .forEach(el => el.classList.remove("selected"));
+    .forEach(card => card.classList.remove("selected"));
 
-  event.currentTarget.classList.add("selected");
+  el.classList.add("selected");
 }
 
 // ================================
 // 리뷰 생성
 // ================================
 async function generateReview() {
+  if (isGenerating) return;
   if (!state.clinicId) return alert("병원을 선택하세요.");
   if (!state.model) return alert("AI 모델을 선택하세요.");
 
+  isGenerating = true;
+
   const resultBox = document.getElementById("result");
-  resultBox.value = "리뷰 생성 중...";
+  resultBox.value = "⏳ AI가 리뷰를 생성 중입니다...";
 
   try {
     const res = await window.api.generateReview({
       clinic_id: state.clinicId,
       doctor_id: state.doctorId,
       model: state.model,
+      personas: state.personas,
     });
-    resultBox.value = res.review_text;
+
+    resultBox.value = res.review_text || "리뷰 결과가 없습니다.";
   } catch (e) {
     console.error(e);
-    resultBox.value = "리뷰 생성 실패";
+    resultBox.value = "❌ 리뷰 생성 실패";
+  } finally {
+    isGenerating = false;
   }
 }
 
@@ -128,26 +140,34 @@ function copyResult() {
   );
 }
 
-function navigate(page) {
-  if (window.nav?.go) window.nav.go(page);
-  else window.location.href = `${page}.html`;
-}
-
-function goDashboard() {
-  navigate("dashboard");
-}
-
 // ================================
 // 초기 실행
 // ================================
 window.addEventListener("DOMContentLoaded", async () => {
   await loadClinics();
   await loadModels();
+
+  document
+    .getElementById("clinicSelect")
+    .addEventListener("change", onClinicChange);
+
+  document
+    .getElementById("doctorSelect")
+    .addEventListener("change", (e) => {
+      state.doctorId = e.target.value || null;
+    });
+
+  document
+    .getElementById("personaInput")
+    .addEventListener("input", (e) => {
+      state.personas = e.target.value
+        .split(",")
+        .map(v => v.trim())
+        .filter(Boolean);
+    });
 });
 
 // ================================
 // 전역 바인딩
 // ================================
-window.onClinicChange = onClinicChange;
 window.generateReview = generateReview;
-window.goDashboard = goDashboard;

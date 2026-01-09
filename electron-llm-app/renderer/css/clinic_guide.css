@@ -25,7 +25,6 @@
 
 .clinic-page .summary {
   margin-top: 16px;
-  grid-template-columns: 2fr 1fr;
 }
 
 .clinic-page .title-row {
@@ -131,14 +130,12 @@
 }
 
 .clinic-page .pill {
-  display: inline-flex;
   align-items: center;
   height: 26px;
   padding: 0 10px;
-  border-radius: 999px;
-  background: #f3f4f6;
-  border: 1px solid var(--border);
   font-size: 12px;
   color: #374151;
   margin: 0 6px 6px 0;
 }
+
+

@@ -4,12 +4,16 @@ const path = require("path");
 let win;
 
 function createWindow() {
-  // 🔥 메뉴 완전 제거
+  // 메뉴 제거
   Menu.setApplicationMenu(null);
 
   win = new BrowserWindow({
     width: 1200,
     height: 800,
+
+    frame: false,            // 🔥 이게 핵심 (OS 타이틀바 제거)
+    titleBarStyle: "hidden", // (Windows에선 거의 영향 없음, 있어도 무방)
+
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -19,20 +23,14 @@ function createWindow() {
   });
 
   win.loadFile("renderer/login.html");
-// ✅ 새로고침 단축키 등록
-  globalShortcut.register("CommandOrControl+R", () => {
-    if (win) win.reload();
-  });
 
-  globalShortcut.register("F5", () => {
-    if (win) win.reload();
-  });
+  // 새로고침
+  globalShortcut.register("CommandOrControl+R", () => win?.reload());
+  globalShortcut.register("F5", () => win?.reload());
 
-
-  // 🔧 DevTools 단축키 등록
+  // DevTools
   globalShortcut.register("CommandOrControl+Shift+I", () => {
-    if (!win) return;
-    win.webContents.toggleDevTools();
+    win?.webContents.toggleDevTools();
   });
 }
 
@@ -42,7 +40,6 @@ ipcMain.handle("go", (e, page) => {
 
 app.whenReady().then(createWindow);
 
-// 앱 종료 시 단축키 해제
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
 });

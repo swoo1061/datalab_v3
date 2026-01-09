@@ -23,7 +23,7 @@ from django.db.models.functions import TruncDate
 
 from apps.data.models import (
     Review, Campaign, ImageAsset,
-    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile, LLMUsageLog, ClinicDoctor, ClinicPrice
+    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile, LLMUsageLog, ClinicDoctor, ClinicPrice, AccessLog
 )
 from apps.ml.services.clinic_normalizer import normalize_clinic_payload
 from apps.ml.services.clinic_md_llm import parse_clinic_md_with_llm

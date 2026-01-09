@@ -22,44 +22,66 @@
       <div class="topbar">
         <div>
           <h1 class="h1">AI 리뷰 생성</h1>
-          <p class="sub">병원/의료진/모델 선택 후 즉시 결과를 생성합니다.</p>
-        </div>
-        <div class="actions">
-          <button class="btn" onclick="goDashboard()">대시보드</button>
+          <p class="sub">병원 · 원장 · 모델 · 페르소나를 선택해 리뷰를 생성합니다.</p>
         </div>
       </div>
 
       <section class="grid main">
+        <!-- 설정 -->
         <div class="card">
-          <div class="card-hd">설정</div>
+          <div class="card-hd">리뷰 생성 설정</div>
           <div class="card-bd">
+
             <div class="field">
-              <label class="label">병원 선택</label>
-              <select id="clinicSelect" class="select" onchange="onClinicChange()">
+              <label class="label">1. 병원 선택</label>
+              <select id="clinicSelect" class="select">
                 <option value="">병원을 선택하세요</option>
               </select>
             </div>
 
             <div class="field">
-              <label class="label">담당 원장</label>
+              <label class="label">2. 담당 원장 (선택)</label>
               <select id="doctorSelect" class="select" disabled>
                 <option value="">원장님을 선택하세요</option>
               </select>
             </div>
 
             <div class="field">
-              <label class="label">AI 모델</label>
+              <label class="label">3. AI 모델</label>
               <div id="modelList" class="model-list"></div>
             </div>
 
-            <button class="btn btn-primary" style="width:100%;" onclick="generateReview()">리뷰 생성</button>
+            <div class="field">
+              <label class="label">4. 페르소나 키워드</label>
+              <input
+                id="personaInput"
+                class="input"
+                placeholder="예: 20대 여성, 자연스러움, 후기체, 신뢰감"
+              />
+              <div class="hint">쉼표(,)로 여러 개 입력</div>
+            </div>
+
+            <button
+              class="btn btn-primary"
+              style="width:100%;"
+              onclick="generateReview()"
+            >
+              리뷰 생성
+            </button>
+
           </div>
         </div>
 
+        <!-- 결과 -->
         <div class="card">
           <div class="card-hd">결과</div>
           <div class="card-bd">
-            <textarea id="result" class="result" readonly placeholder="리뷰 생성 결과가 여기에 표시됩니다."></textarea>
+            <textarea
+              id="result"
+              class="result"
+              readonly
+              placeholder="리뷰 생성 결과가 여기에 표시됩니다."
+            ></textarea>
 
             <div class="result-actions">
               <button class="btn" onclick="copyResult()">복사</button>
@@ -78,8 +100,8 @@
 <script src="js/review.js"></script>
 <script>
   (async () => {
-    await loadLayout();          // ⭐ 사이드바 로드
-    await loadHeader("AI 리뷰 생성"); // 기존 header.js 그대로
+    await loadLayout();
+    await loadHeader("AI 리뷰 생성");
   })();
 </script>
 </body>
