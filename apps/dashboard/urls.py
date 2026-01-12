@@ -25,6 +25,9 @@ urlpatterns = [
     path("generate/basic-plus/", views.review_generate_basic_plus, name="generate_review_basic_plus"),
     path("generate/pro/", views.review_generate_v2, name="generate_review_pro"),
     path("generate/v2/", views.review_generate_v2, name="generate_review_v2"),  # 호환용
+
+    # 앱 리뷰 생성
+    path("generate/app/gangnam/", views.app_review_gangnam, name="app_review_gangnam"),
     
     # 생성된 리뷰 관리
     path("generated/", views.generated_review_list, name="generated_list"),
@@ -46,6 +49,7 @@ urlpatterns = [
     path("api/generate-series/", views.api_generate_series, name="api_generate_series"),
     path("api/generate-reply/", views.api_generate_reply, name="api_generate_reply"),
     path("api/generate-with-style/", views.api_generate_with_style, name="api_generate_with_style"),
+    path("api/generate-gangnam-review/", views.api_generate_gangnam_review, name="api_generate_gangnam_review"),
     path("api/regenerate/", views.api_regenerate_review, name="api_regenerate_review"),
     path("api/generate-prompt/", views.api_generate_prompt, name="api_generate_prompt"),
     path("api/generate-from-prompt/", views.api_generate_review_from_prompt, name="api_generate_review_from_prompt"),
