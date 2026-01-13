@@ -4,10 +4,13 @@
   <meta charset="UTF-8" />
   <title>Datalab90 | AI 리뷰 생성</title>
 
+  <!-- 기존 공통 CSS -->
   <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/header.css" />
+
+  <!-- review 전용 -->
   <link rel="stylesheet" href="css/review.css" />
 </head>
 <body>
@@ -22,76 +25,133 @@
       <div class="topbar">
         <div>
           <h1 class="h1">AI 리뷰 생성</h1>
-          <p class="sub">병원 · 원장 · 모델 · 페르소나를 선택해 리뷰를 생성합니다.</p>
         </div>
       </div>
 
-      <section class="grid main">
-        <!-- 설정 -->
-        <div class="card">
-          <div class="card-hd">리뷰 생성 설정</div>
+      <!-- ================== 메인 레이아웃 ================== -->
+      <section class="review-layout">
+
+        <!-- 좌측 설정 -->
+        <div class="card review-left">
+          <div class="card-hd">리뷰 설정</div>
           <div class="card-bd">
 
-            <div class="field">
-              <label class="label">1. 병원 선택</label>
+            <div class="row">
+              <label>병원</label>
               <select id="clinicSelect" class="select">
                 <option value="">병원을 선택하세요</option>
               </select>
             </div>
 
-            <div class="field">
-              <label class="label">2. 담당 원장 (선택)</label>
-              <select id="doctorSelect" class="select" disabled>
-                <option value="">원장님을 선택하세요</option>
-              </select>
+            <div class="row">
+              <label>리뷰 유형</label>
+              <div class="chip-group single" id="reviewType">
+                <button data-value="고민/질문">고민/질문</button>
+                <button data-value="발품/손품 후기">발품·손품</button>
+                <button data-value="방문 상담 후기">상담 후기</button>
+                <button data-value="시술 당일 후기">시술 당일</button>
+                <button data-value="경과 후기">경과 후기</button>
+              </div>
             </div>
 
-            <div class="field">
-              <label class="label">3. AI 모델</label>
-              <div id="modelList" class="model-list"></div>
+            <div class="row">
+              <label>후기 시점</label>
+              <div class="chip-group single" id="reviewTiming">
+                <button data-value="시술 전">시술 전</button>
+                <button data-value="시술 직후">직후</button>
+                <button data-value="1주 후">1주 후</button>
+                <button data-value="1개월 후">1개월</button>
+                <button data-value="3개월 후">3개월</button>
+              </div>
             </div>
 
-            <div class="field">
-              <label class="label">4. 페르소나 키워드</label>
+            <div class="row">
+              <label>강조 키워드</label>
+              <div class="chip-group multi" id="keywordGroup">
+                <button>자연스러움</button>
+                <button>통증 적음</button>
+                <button>회복 빠름</button>
+                <button>친절한 상담</button>
+                <button>가격 만족</button>
+                <button>대기시간 짧음</button>
+                <button>재방문 의사</button>
+                <button>지인 추천</button>
+              </div>
+            </div>
+
+            <div class="row">
+              <label>페르소나 키워드 (직접 입력)</label>
               <input
                 id="personaInput"
                 class="input"
-                placeholder="예: 20대 여성, 자연스러움, 후기체, 신뢰감"
+                placeholder="예: 20대 여성, 첫 시술, 자연스러움 중시"
               />
-              <div class="hint">쉼표(,)로 여러 개 입력</div>
+              <div class="hint">쉼표(,)로 구분</div>
             </div>
 
-            <button
-              class="btn btn-primary"
-              style="width:100%;"
-              onclick="generateReview()"
-            >
+            <div class="row">
+              <label>AI 모델</label>
+              <div id="modelList" class="model-list"></div>
+            </div>
+
+            <button class="btn btn-primary full" onclick="generateReview()">
               리뷰 생성
             </button>
 
           </div>
         </div>
 
-        <!-- 결과 -->
-        <div class="card">
-          <div class="card-hd">결과</div>
+        <!-- 우측 미리보기 -->
+        <div class="card review-right">
+          <div class="card-hd">미리보기</div>
           <div class="card-bd">
-            <textarea
-              id="result"
-              class="result"
-              readonly
-              placeholder="리뷰 생성 결과가 여기에 표시됩니다."
-            ></textarea>
 
-            <div class="result-actions">
-              <button class="btn" onclick="copyResult()">복사</button>
-              <button class="btn" onclick="generateReview()">다시 생성</button>
+            
+            <!-- 선택 요약 -->
+            <ul class="summary" id="summary"></ul>
+            
+            <!-- 🔥 페르소나 요약 (프롬프트 위) -->
+            <div class="persona-preview">
+              <strong>👤 페르소나</strong>
+              <div id="personaPreview" class="persona-tags"></div>
             </div>
+
+            <!-- 프롬프트 -->
+            <div class="preview">
+              <h4>🧠 프롬프트 미리보기</h4>
+
+              <div id="previewMeta" class="preview-meta"></div>
+
+              <pre id="promptPreview" class="prompt-box"></pre>
+            </div>
+
           </div>
         </div>
+
       </section>
 
     </main>
+  </div>
+</div>
+
+<!-- 결과 모달 -->
+<div id="reviewModal" class="modal hidden">
+  <div class="modal-backdrop" onclick="closeModal()"></div>
+
+  <div class="modal-panel card">
+    <div class="card-hd">
+      <strong>AI 리뷰 결과</strong>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+
+    <!-- 🔥 반드시 modal-body -->
+    <div class="modal-body">
+      <div id="reviewLoading" class="review-loading hidden">
+        AI가 리뷰를 작성 중입니다…
+      </div>
+
+      <div id="modalReview" class="review-output"></div>
+    </div>
   </div>
 </div>
 

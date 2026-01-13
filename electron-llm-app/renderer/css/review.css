@@ -1,59 +1,290 @@
-.review-page .topbar {
+/* =================================================
+   Review Page – FULL CSS (단일본)
+================================================= */
+
+body.modal-open {
+  overflow: hidden;
+  height: 100vh;
+  touch-action: none;
+}
+
+.review-layout {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 20px;
+}
+
+/* 카드 */
+.card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+}
+
+.card-hd {
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.card-bd {
+  padding: 16px;
+}
+
+/* row */
+.row {
+  margin-bottom: 16px;
+}
+
+.row label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+/* select / input */
+.select,
+.input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  font-size: 13px;
+}
+
+/* chip */
+.chip-group {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.review-page .h1 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
-.review-page .sub { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
-
-.review-page .main {
-  margin-top: 16px;
-  grid-template-columns: 380px 1fr;
+.chip-group button {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
 }
 
-.review-page .field { margin-bottom: 14px; }
-.review-page .label { display:block; font-size: 12px; color:#374151; margin-bottom: 6px; }
+.chip-group.single button.active {
+  background: #eef2ff;
+  border-color: #6366f1;
+  color: #4338ca;
+}
 
-.review-page .model-list {
+.chip-group.multi button.active {
+  background: #dcfce7;
+  border-color: #16a34a;
+  color: #166534;
+}
+
+/* 🔥 모델 가로 정렬 */
+.model-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.model-card {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.model-card.selected {
+  background: #eef2ff;
+  border-color: #6366f1;
+  color: #4338ca;
+}
+
+/* persona preview */
+.persona-preview {
+  margin-bottom: 14px;
+}
+
+.preview-meta {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.persona-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preview-row {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.preview-label {
+  color: #6b7280;
+}
+
+.preview-value {
+  color: #111827;
+}
+
+.prompt-box {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.persona-tags span {
+  background: #eef2ff;
+  color: #4338ca;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+/* summary & preview */
+.summary {
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.preview pre {
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+/* =========================
+   MODAL – FINAL STABLE
+========================= */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+
+  /* 🔥 중앙 정렬의 핵심 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  overscroll-behavior: none;
+}
+
+/* 카드 */
+.modal-panel {
+  position: relative;
+  width: 720px;
+  max-width: calc(100vw - 32px);
+  height: 70vh;
+
+  background: #fff;
+  border-radius: 14px;
+
   display: flex;
   flex-direction: column;
-  gap: 8px;
+
+  overflow: hidden;
 }
 
-.review-page .model-card {
-  padding: 10px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+/* 헤더 고정 */
+.modal-panel .card-hd {
+  flex-shrink: 0;
+}
+
+/* 🔥 스크롤 컨테이너 */
+.modal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+
+  overflow-y: auto;
+
+  /* 스크롤바 숨김 */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+#reviewModal .result {
+  height: 360px !important;
+  min-height: 360px !important;
+  resize: none !important;
+}
+
+.review-output {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #111827;
+
+  white-space: pre-wrap;   /* 줄바꿈 유지 */
+  word-break: keep-all;
+
+  /* 박스 느낌 제거 */
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.review-page .h1 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  margin-top: -11px;
+}
+
+/* =========================
+   REVIEW LOADING
+========================= */
+
+.review-loading {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.review-loading.hidden {
+  display: none;
+}
+
+#reviewModal .close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
   cursor: pointer;
-  font-size: 13px;
-  background: #fff;
-}
-
-.review-page .model-card .meta {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.review-page .model-card.selected {
-  border-color: #c7d2fe;
-  background: #eef2ff;
-}
-
-.review-page .result {
-  width: 100%;
-  height: 380px;
-  resize: none;
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.review-page .result-actions {
-  margin-top: 10px;
-  display: flex;
-  gap: 8px;
+  color: #6b7280;
 }

@@ -61,11 +61,14 @@
 .header-scope .user-area { position: relative; }
 
 .header-scope .user-chip {
-  padding: 7px 10px;
+  padding: 4px 8px;
   border-radius: 10px;
   border: 1px solid var(--border, #e5e7eb);
   background: #fff;
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
 }
 
 .header-scope .user-chip:hover { background: var(--surface-2, #f3f4f6); }
@@ -126,10 +129,10 @@
 /* 기본 정보 모달 */
 .profile-info-modal {
   position: fixed;
-  top: 50%;
-  left: 50%;
+  top: 25%;
+  left: 87%;
   transform: translate(-50%, -50%);
-  width: 380px;
+  width: 250px;
   background: #ffffff;
   border-radius: 14px;
   padding: 18px 18px;
@@ -143,6 +146,25 @@
   font-size: 15px;
   font-weight: 700;
   color: var(--text);
+}
+
+
+/* 이 모달 안의 닫기 버튼만 우상단 */
+#profileInfoModal .popup-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+#profileInfoModal .popup-btn:hover {
+  color: #111827;
 }
 
 .info-row {
@@ -173,4 +195,126 @@
   background: rgba(255, 255, 255, 0.85);
   border-bottom-color: var(--border, #e5e7eb);
   box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+}
+
+/* ==============================
+   Profile Popup Avatar
+============================== */
+
+.profile-avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.profile-avatar {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  color: #fff;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.profile-avatar:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.avatar-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 6px;
+}
+
+/* ==============================
+   Global Search (Header Center)
+============================== */
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.global-search {
+  width: 420px;
+  max-width: 100%;
+  position: relative;
+}
+
+.global-search input {
+  width: 100%;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: #f9fafb;
+  font-size: 13px;
+  outline: none;
+
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.global-search input::placeholder {
+  color: #9ca3af;
+}
+
+.global-search input:focus {
+  background: #ffffff;
+  border-color: var(--primary, #6366f1);
+}
+
+/* ==============================
+   Live Clock (Header Right)
+============================== */
+
+.live-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #ffffff;
+  user-select: none;
+}
+
+.clock-date {
+  font-size: 10.5px;
+  color: #6b7280;
+  line-height: 1.2;
+}
+
+.clock-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  line-height: 1.2;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }

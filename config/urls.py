@@ -11,6 +11,7 @@ urlpatterns = [
 
     # ⭐ API는 최상단에서 먼저 처리 (중요)
     path("api/accounts/", include("accounts.urls_api")),
+    path("api/", include("apps.ml.urls_api")),
     path("api/", include("apps.data.urls")),
 
     # 인증

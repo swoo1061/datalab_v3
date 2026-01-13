@@ -1,54 +1,135 @@
+/* 헤드 */
 .dashboard-page .page-head .h1 {
   margin: 0;
   font-size: 20px;
-  letter-spacing: -0.02em;
+  font-weight: 700;
 }
+
 .dashboard-page .page-head .sub {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.dashboard-page .kpi {
-  margin-top: 18px;
-  grid-template-columns: repeat(4, 1fr);
-}
-
-.dashboard-page .kpi-card {
-  padding: 14px 16px;
-}
-
-.dashboard-page .kpi-label {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.dashboard-page .kpi-value {
-  margin-top: 8px;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.dashboard-page .kpi-sub {
   margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* 필터 */
+.filter-bar {
+  margin: 14px 0 6px;
+  display: flex;
+  gap: 8px;
+}
+
+.filter {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.filter.active {
+  background: #4338ca;
+  color: #fff;
+  border-color: #4338ca;
+}
+
+/* 카드 그리드 */
+.clinic-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+/* 카드 */
+.clinic-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+/* 상단 */
+.clinic-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* 로고 */
+.clinic-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.clinic-logo img {
+  max-width: 24px;
+  max-height: 24px;
+  object-fit: contain;
+}
+
+/* 정보 */
+.clinic-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.clinic-name {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.clinic-type {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  width: fit-content;
+  margin-left: auto;
+}
+
+/* 산부인과 - 노랑 */
+.clinic-type.type-ob {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* 성형외과 - 분홍 */
+.clinic-type.type-ps {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+/* 피부과 - 파랑 */
+.clinic-type.type-derma {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+/* 액션 */
+.clinic-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+
+/* 버튼 사이즈 */
+.btn.sm {
+  padding: 3px 4px;
   font-size: 12px;
 }
 
-.dashboard-page .main-grid {
-  margin-top: 14px;
-  grid-template-columns: 1fr 1fr;
-}
-
-.dashboard-page .quick {
-  display: flex;
-  gap: 10px;
-}
-
-.dashboard-page .bullets {
-  margin: 0;
-  padding-left: 18px;
-  color: #374151;
-  font-size: 13px;
-  line-height: 1.6;
+.btn.ghost {
+  background: #f9fafb;
 }

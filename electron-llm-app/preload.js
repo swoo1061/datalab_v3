@@ -33,11 +33,8 @@ async function requestJson(path, options = {}) {
   return data;
 }
 
-// ================================
-// API 노출
-// ================================
 contextBridge.exposeInMainWorld("api", {
-  // 인증
+  // 인증 (Django HTTP)
   login: (username, password) =>
     requestJson("/api/accounts/login/", {
       method: "POST",
@@ -54,7 +51,7 @@ contextBridge.exposeInMainWorld("api", {
       method: "GET",
     }),
 
-  // 병원 / 원장
+  // 병원
   getClinics: async () => {
     const data = await requestJson("/api/clinics/", { method: "GET" });
     return data.results;
@@ -69,29 +66,20 @@ contextBridge.exposeInMainWorld("api", {
   },
 
   getClinicDetail: (clinicId) =>
-  requestJson(`/api/clinics/${clinicId}/detail/`, {
-    method: "GET",
-  }),
+    requestJson(`/api/clinics/${clinicId}/detail/`, { method: "GET" }),
 
-  // ⭐ LLM 모델 (중요)
   getLLMModels: async () => {
-    const data = await requestJson("/api/llm/models/", {
-      method: "GET",
-    });
-    return data.results; // ✅ 핵심 수정
+    const data = await requestJson("/api/llm/models/", { method: "GET" });
+    return data.results;
   },
 
-  // 리뷰 생성
   generateReview: (payload) =>
-    requestJson("/api/reviews/generate/", {
+    requestJson("/api/review/", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
 });
 
-// ================================
-// 화면 이동
-// ================================
 contextBridge.exposeInMainWorld("nav", {
   go: (page) => ipcRenderer.invoke("go", page),
 });

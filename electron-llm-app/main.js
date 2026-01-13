@@ -35,7 +35,15 @@ function createWindow() {
 }
 
 ipcMain.handle("go", (e, page) => {
-  win.loadFile(`renderer/${page}.html`);
+  // page 예시: "clinic_guide?clinic=봄빛 병원"
+  const [file, queryString] = page.split("?");
+
+  win.loadFile(
+    path.join(__dirname, "renderer", `${file}.html`),
+    {
+      search: queryString ? `?${queryString}` : "",
+    }
+  );
 });
 
 app.whenReady().then(createWindow);
