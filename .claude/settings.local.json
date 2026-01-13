@@ -24,7 +24,8 @@
       "Bash(git push:*)",
       "Bash(cat:*)",
       "Bash(git checkout:*)",
-      "Bash(cmd //c \"taskkill /PID 72736 /F\")"
+      "Bash(cmd //c \"taskkill /PID 72736 /F\")",
+      "Bash(ping:*)"
     ]
   }
 }

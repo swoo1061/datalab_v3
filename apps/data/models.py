@@ -944,6 +944,7 @@ class PromptTemplate(models.Model):
         ('basic_plus', 'Basic Plus'),
         ('pro_header', 'Pro - 헤더'),
         ('pro_guidelines', 'Pro - 가이드라인'),
+        ('app_gangnam', '앱 - 강남언니'),
     ]
 
     mode = models.CharField(max_length=20, choices=MODE_CHOICES, verbose_name="모드")

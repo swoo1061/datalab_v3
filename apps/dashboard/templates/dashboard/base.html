@@ -41,6 +41,11 @@
           📝 생성 목록
         </a>
 
+        <div class="nav-section">어플 리뷰 생성</div>
+        <a href="{% url 'dashboard:app_review_gangnam' %}" class="{% if 'gangnam' in request.resolver_match.url_name %}active{% endif %}">
+          💄 강남언니
+        </a>
+
         <div class="nav-section">프리셋 관리</div>
         <a href="{% url 'dashboard:preset_extractor' %}" class="{% if 'style' in request.resolver_match.url_name or 'preset_extractor' in request.resolver_match.url_name %}active{% endif %}">
           🔍 프리셋 추출

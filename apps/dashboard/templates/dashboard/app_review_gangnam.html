@@ -1,0 +1,915 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}강남언니 후기 생성{% endblock %}
+
+{% block extra_css %}
+<style>
+  .form-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .form-section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: var(--brand);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* 접을 수 있는 섹션 */
+  .collapsible-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .collapsible-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+  }
+  .collapsible-header:hover {
+    background: var(--bg);
+  }
+  .collapsible-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--brand);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .collapsible-toggle {
+    font-size: 0.85rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .collapsible-toggle .arrow {
+    transition: transform 0.2s;
+  }
+  .collapsible-section.open .collapsible-toggle .arrow {
+    transform: rotate(180deg);
+  }
+  .collapsible-content {
+    display: none;
+    padding: 0 20px 20px;
+  }
+  .collapsible-section.open .collapsible-content {
+    display: block;
+  }
+  .collapsible-summary {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-left: 12px;
+  }
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .form-row-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* 별점 */
+  .star-rating-input {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .star-rating-input input[type="range"] {
+    width: 200px;
+    accent-color: #fbbf24;
+  }
+  .star-display {
+    font-size: 1.5rem;
+    color: #fbbf24;
+    margin-left: 12px;
+  }
+  .star-value {
+    font-weight: 600;
+    margin-left: 8px;
+    color: var(--text);
+  }
+
+  /* 결과 영역 */
+  .result-section {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .result-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text);
+  }
+  .result-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .char-count {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .char-count.warning {
+    color: #f59e0b;
+  }
+  .char-count.error {
+    color: #ef4444;
+  }
+  .result-content {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    min-height: 60px;
+    white-space: pre-wrap;
+    line-height: 1.6;
+    font-size: 0.9rem;
+  }
+  .result-content:empty::before {
+    content: "생성 버튼을 눌러주세요";
+    color: var(--muted);
+  }
+
+  /* 태그 */
+  .tag-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    background: var(--brand-bg);
+    border: 1px solid var(--brand-light);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tag-chip:hover {
+    background: var(--brand-light);
+  }
+  .tag-chip.selected {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
+  .tag-chip input {
+    display: none;
+  }
+
+  /* 복사 버튼 */
+  .copy-btn {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .copy-btn:hover {
+    background: var(--brand-bg);
+    border-color: var(--brand);
+  }
+  .copy-btn.copied {
+    background: #d1fae5;
+    border-color: #10b981;
+    color: #059669;
+  }
+
+  /* 로딩 */
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .loading-box {
+    background: white;
+    padding: 30px 50px;
+    border-radius: 12px;
+    text-align: center;
+  }
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--brand);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* 날짜 정보 */
+  .date-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--brand-bg);
+    border-radius: 8px;
+    margin: 0 16px 16px;
+    font-size: 0.9rem;
+  }
+  .date-item {
+    color: var(--muted);
+  }
+  .date-item strong {
+    color: var(--text);
+  }
+  .date-divider {
+    color: var(--border);
+  }
+
+  /* 슬라이더 */
+  .slider-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .slider-group input[type="range"] {
+    flex: 1;
+    height: 6px;
+    accent-color: var(--brand);
+  }
+  .slider-value {
+    min-width: 30px;
+    font-weight: 600;
+    color: var(--brand);
+  }
+
+  /* 결과 태그 표시 */
+  .result-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .result-tag {
+    display: inline-block;
+    padding: 4px 10px;
+    background: var(--brand-bg);
+    color: var(--brand);
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .usage-info {
+    display: flex;
+    gap: 16px;
+    font-size: 0.85rem;
+    color: var(--muted);
+    padding: 12px;
+    background: var(--bg);
+    border-radius: 8px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">강남언니 후기 생성</h1>
+    <p class="page-subtitle">강남언니 앱 리뷰 작성 플로우에 맞춰 AI가 후기를 생성합니다</p>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- 왼쪽: 입력 폼 -->
+  <div>
+    <!-- 1. 기본 정보 -->
+    <div class="form-section">
+      <div class="form-section-title">
+        <span>1. 시술 정보</span>
+      </div>
+
+      <div class="form-row form-row-3">
+        <div class="form-group">
+          <label class="form-label">병원명 *</label>
+          <input type="text" id="hospital_name" class="form-input" placeholder="예: OO성형외과">
+        </div>
+        <div class="form-group">
+          <label class="form-label">시술 종류 *</label>
+          <input type="text" id="procedure_type" class="form-input" placeholder="예: 눈매교정">
+        </div>
+        <div class="form-group">
+          <label class="form-label">담당 의사</label>
+          <input type="text" id="doctor_name" class="form-input" placeholder="예: 김OO 원장님">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">시술 상세</label>
+        <input type="text" id="procedure_detail" class="form-input" placeholder="예: 앞트임 제외, 눈꼬리만, 콧대+콧볼 축소">
+        <p class="form-hint">제외 부위, 특화 부위, 추가 옵션 등 상세 내용</p>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">마취 여부</label>
+          <select id="anesthesia" class="form-select">
+            <option value="">선택</option>
+            <option value="수면마취">수면마취</option>
+            <option value="국소마취">국소마취</option>
+            <option value="부분수면마취">부분수면마취</option>
+            <option value="전신마취">전신마취</option>
+            <option value="마취 없음">마취 없음</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">가격대 (선택)</label>
+          <input type="text" id="price_range" class="form-input" placeholder="예: 200만원대">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">시술일자</label>
+          <input type="date" id="procedure_date" class="form-input">
+          <p class="form-hint">비워두면 임의 날짜 생성</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">작성일자</label>
+          <input type="date" id="write_date" class="form-input">
+          <p class="form-hint">비워두면 오늘 날짜</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 시술 경험 정보 (접을 수 있음) -->
+    <div class="collapsible-section" id="experience-section">
+      <div class="collapsible-header" onclick="toggleSection('experience-section')">
+        <div class="collapsible-title">
+          <span>2. 시술 경험</span>
+          <span class="collapsible-summary" id="experience-summary">(기본값 사용)</span>
+        </div>
+        <div class="collapsible-toggle">
+          수정 <span class="arrow">▼</span>
+        </div>
+      </div>
+      <div class="collapsible-content">
+        <div class="form-group">
+          <label class="form-label">시술 전 고민 / 시술 결정 계기</label>
+          <textarea id="before_concern" class="form-textarea" rows="2" placeholder="예: 쌍꺼풀이 풀려서, 눈이 작아보여서, 결혼 전 예뻐지고 싶어서"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">시술 결과 만족도</label>
+          <select id="satisfaction_level" class="form-select">
+            <option value="매우 만족">매우 만족</option>
+            <option value="만족">만족</option>
+            <option value="보통">보통</option>
+            <option value="약간 아쉬움">약간 아쉬움</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">강조하고 싶은 좋은 점</label>
+          <textarea id="good_points_hint" class="form-textarea" rows="2" placeholder="예: 자연스러운 라인, 붓기 빨리 빠짐, 친절한 상담"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">아쉬운 점 (선택)</label>
+          <textarea id="bad_points_hint" class="form-textarea" rows="2" placeholder="예: 대기시간 길었음, 붓기가 좀 오래감 (없으면 비워두세요)"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 페르소나 (접을 수 있음) -->
+    <div class="collapsible-section" id="persona-section">
+      <div class="collapsible-header" onclick="toggleSection('persona-section')">
+        <div class="collapsible-title">
+          <span>3. 작성자 설정</span>
+          <span class="collapsible-summary" id="persona-summary">(20대 중후반 여성, 친근한)</span>
+        </div>
+        <div class="collapsible-toggle">
+          수정 <span class="arrow">▼</span>
+        </div>
+      </div>
+      <div class="collapsible-content">
+        <div class="form-row form-row-3">
+          <div class="form-group">
+            <label class="form-label">연령대</label>
+            <select id="persona_age" class="form-select" onchange="updatePersonaSummary()">
+              <option value="20대 초반">20대 초반</option>
+              <option value="20대 중후반" selected>20대 중후반</option>
+              <option value="30대 초반">30대 초반</option>
+              <option value="30대 중후반">30대 중후반</option>
+              <option value="40대">40대</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">성별</label>
+            <select id="persona_gender" class="form-select" onchange="updatePersonaSummary()">
+              <option value="여성" selected>여성</option>
+              <option value="남성">남성</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">말투</label>
+            <select id="persona_tone" class="form-select" onchange="updatePersonaSummary()">
+              <option value="친근한">친근한</option>
+              <option value="차분한">차분한</option>
+              <option value="활발한">활발한</option>
+              <option value="꼼꼼한">꼼꼼한</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">이모티콘 사용</label>
+          <select id="emoji_usage" class="form-select">
+            <option value="적당히">적당히</option>
+            <option value="많이">많이</option>
+            <option value="거의 안함">거의 안함</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 피해야 할 표현 -->
+    <div class="form-section">
+      <div class="form-section-title">
+        <span>4. 피해야 할 표현</span>
+      </div>
+      <div class="form-group">
+        <textarea id="forbidden_expressions" class="form-textarea" rows="2" placeholder="예: 대만족, 강추, 인생OO, 찐후기 (쉼표로 구분)"></textarea>
+        <p class="form-hint">생성 시 피해야 할 표현이나 단어를 입력하세요. 중복되는 표현 방지에 유용합니다.</p>
+      </div>
+    </div>
+
+    <!-- 5. AI 설정 -->
+    <div class="form-section">
+      <div class="form-section-title">
+        <span>5. AI 설정</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">AI 모델</label>
+        <select id="model" class="form-select">
+          {% for model in models %}
+          <option value="{{ model.id }}" {% if 'sonnet' in model.id|lower %}selected{% endif %}>
+            {{ model.name }} ({{ model.provider }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">창의성 (Temperature)</label>
+        <div class="slider-group">
+          <input type="range" id="temperature" min="0.5" max="1.0" step="0.05" value="0.85">
+          <span class="slider-value" id="temp_value">0.85</span>
+        </div>
+        <p class="form-hint">높을수록 다양한 표현 (권장: 0.8~0.95)</p>
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-lg" style="width: 100%;" id="generateBtn">
+      후기 생성하기
+    </button>
+  </div>
+
+  <!-- 오른쪽: 결과 (앱 플로우 순서대로) -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">생성 결과 (앱 입력 순서)</h3>
+        <button class="btn btn-secondary btn-sm" id="copyAllBtn" style="display: none;">
+          전체 복사
+        </button>
+      </div>
+
+      <!-- 날짜 정보 표시 -->
+      <div id="dateInfo" class="date-info" style="display: none;">
+        <span class="date-item">📅 시술일: <strong id="display_procedure_date">-</strong></span>
+        <span class="date-divider">|</span>
+        <span class="date-item">✍️ 작성일: <strong id="display_write_date">-</strong></span>
+      </div>
+
+      <div id="resultContainer">
+        <!-- 1. 시술 전 고민과 시술을 결정한 계기 -->
+        <div class="result-section" data-section="before_worry">
+          <div class="result-header">
+            <span class="result-title">1. 시술 전 고민과 시술을 결정한 계기</span>
+            <div class="result-meta">
+              <span class="char-count">0자</span>
+              <button class="copy-btn" onclick="copySection('before_worry')">복사</button>
+            </div>
+          </div>
+          <div class="result-content" id="result_before_worry"></div>
+        </div>
+
+        <!-- 2. 병원/이벤트 선택 이유 태그 -->
+        <div class="result-section" data-section="reason_tags">
+          <div class="result-header">
+            <span class="result-title">2. 이 병원 및 이벤트를 선택한 이유 (태그)</span>
+            <button class="copy-btn" onclick="copyTags('reason')">복사</button>
+          </div>
+          <div class="tag-container" id="tags_reason"></div>
+        </div>
+
+        <!-- 3. 시술 결과 후기 -->
+        <div class="result-section" data-section="result_review">
+          <div class="result-header">
+            <span class="result-title">3. 시술 결과 후기</span>
+            <div class="result-meta">
+              <span class="char-count">0자 (최소 10자)</span>
+              <button class="copy-btn" onclick="copySection('result_review')">복사</button>
+            </div>
+          </div>
+          <div class="result-content" id="result_result_review"></div>
+        </div>
+
+        <!-- 4. 좋았던 점 태그 -->
+        <div class="result-section" data-section="good_tags">
+          <div class="result-header">
+            <span class="result-title">4. 좋았던 점 (태그)</span>
+            <button class="copy-btn" onclick="copyTags('good')">복사</button>
+          </div>
+          <div class="tag-container" id="tags_good"></div>
+        </div>
+
+        <!-- 5. 아쉬운 점 태그 -->
+        <div class="result-section" data-section="bad_tags">
+          <div class="result-header">
+            <span class="result-title">5. 아쉬운 점 (태그)</span>
+            <button class="copy-btn" onclick="copyTags('bad')">복사</button>
+          </div>
+          <div class="tag-container" id="tags_bad"></div>
+        </div>
+
+        <!-- 6. 아쉬운 점 선택 이유 -->
+        <div class="result-section" data-section="bad_reason">
+          <div class="result-header">
+            <span class="result-title">6. 아쉬운 점을 선택한 이유</span>
+            <div class="result-meta">
+              <span class="char-count">0자 (최소 10자)</span>
+              <button class="copy-btn" onclick="copySection('bad_reason')">복사</button>
+            </div>
+          </div>
+          <div class="result-content" id="result_bad_reason"></div>
+        </div>
+
+        <!-- 7. 전체 경험 총점 -->
+        <div class="result-section" data-section="rating">
+          <div class="result-header">
+            <span class="result-title">7. 전체 경험 총점</span>
+          </div>
+          <div id="result_rating" style="font-size: 1.5rem; color: #fbbf24;">
+            -
+          </div>
+        </div>
+
+        <!-- 8. 추가 의견 -->
+        <div class="result-section" data-section="additional">
+          <div class="result-header">
+            <span class="result-title">8. 추가 의견</span>
+            <div class="result-meta">
+              <span class="char-count">0자 (최소 10자)</span>
+              <button class="copy-btn" onclick="copySection('additional')">복사</button>
+            </div>
+          </div>
+          <div class="result-content" id="result_additional"></div>
+        </div>
+      </div>
+
+      <!-- 사용량 정보 -->
+      <div id="usageInfo" class="usage-info" style="display: none; margin-top: 16px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 로딩 오버레이 -->
+<div id="loadingOverlay" class="loading-overlay" style="display: none;">
+  <div class="loading-box">
+    <div class="loading-spinner"></div>
+    <p>후기를 생성하고 있습니다...</p>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 태그 목록 (강남언니 앱 기준)
+const REASON_TAGS = ['합리적 가격', '높은 평점', '후기 내용', '의사 전문성', '병원 인지도', '병원 위치', '재방문', '지인 추천', '병원 시설', '최신 기기', '앱결제', '포인트 사용', '기타'];
+const GOOD_TAGS = ['빠른 효과', '결과 만족', '부작용 없음', '적은 통증', '흉터 없음', '빠른 회복', '일상 생활 가능', '꼼꼼한 시술', '애프터케어', '기타', '없어요'];
+const BAD_TAGS = ['효과 없음', '결과 불만족', '부작용 있음', '시술 중 통증', '시술 후 통증', '흉터 남음', '더딘 회복', '일상 복귀 시간 필요', '성의 없는 시술', '애프터케어 부족', '기타', '없어요'];
+
+// 초기 태그 렌더링
+function renderTags(containerId, tags, maxSelect = 3) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = tags.map(tag => `
+    <label class="tag-chip" data-tag="${tag}">
+      <input type="checkbox" value="${tag}">
+      ${tag}
+    </label>
+  `).join('');
+
+  // 클릭 이벤트
+  container.querySelectorAll('.tag-chip').forEach(chip => {
+    chip.addEventListener('click', function() {
+      const checkbox = this.querySelector('input');
+      const selectedCount = container.querySelectorAll('.tag-chip.selected').length;
+
+      if (!checkbox.checked && selectedCount >= maxSelect) {
+        alert(`최대 ${maxSelect}개까지 선택 가능합니다.`);
+        return;
+      }
+
+      checkbox.checked = !checkbox.checked;
+      this.classList.toggle('selected', checkbox.checked);
+    });
+  });
+}
+
+renderTags('tags_reason', REASON_TAGS);
+renderTags('tags_good', GOOD_TAGS);
+renderTags('tags_bad', BAD_TAGS);
+
+// 접을 수 있는 섹션 토글
+function toggleSection(sectionId) {
+  const section = document.getElementById(sectionId);
+  section.classList.toggle('open');
+}
+
+// 페르소나 요약 업데이트
+function updatePersonaSummary() {
+  const age = document.getElementById('persona_age').value;
+  const gender = document.getElementById('persona_gender').value;
+  const tone = document.getElementById('persona_tone').value;
+  document.getElementById('persona-summary').textContent = `(${age} ${gender}, ${tone})`;
+}
+
+// Temperature 슬라이더
+document.getElementById('temperature').addEventListener('input', function() {
+  document.getElementById('temp_value').textContent = this.value;
+});
+
+// CSRF 토큰
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// 글자수 업데이트
+function updateCharCount(sectionId, text) {
+  const section = document.querySelector(`[data-section="${sectionId}"]`);
+  if (!section) return;
+  const countEl = section.querySelector('.char-count');
+  if (!countEl) return;
+  const len = text ? text.length : 0;
+  countEl.textContent = `${len}자`;
+}
+
+// 섹션 복사
+function copySection(sectionId) {
+  const content = document.getElementById(`result_${sectionId}`).textContent;
+  navigator.clipboard.writeText(content).then(() => {
+    const btn = document.querySelector(`[data-section="${sectionId}"] .copy-btn`);
+    btn.textContent = '복사됨!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '복사';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+// 태그 복사
+function copyTags(type) {
+  const container = document.getElementById(`tags_${type}`);
+  const selectedTags = [];
+  container.querySelectorAll('.tag-chip.selected').forEach(chip => {
+    selectedTags.push(chip.dataset.tag);
+  });
+  const text = selectedTags.join(', ');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = container.closest('.result-section').querySelector('.copy-btn');
+    btn.textContent = '복사됨!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '복사';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+// 태그 자동 선택
+function autoSelectTags(containerId, tagsToSelect) {
+  const container = document.getElementById(containerId);
+
+  // 먼저 모든 태그 선택 해제
+  container.querySelectorAll('.tag-chip').forEach(chip => {
+    chip.classList.remove('selected');
+    chip.querySelector('input').checked = false;
+  });
+
+  // 지정된 태그 선택
+  tagsToSelect.forEach(tagName => {
+    const chip = container.querySelector(`[data-tag="${tagName}"]`);
+    if (chip) {
+      chip.classList.add('selected');
+      chip.querySelector('input').checked = true;
+    }
+  });
+}
+
+// 별점 표시
+function renderStars(rating) {
+  const fullStars = Math.floor(rating);
+  const halfStar = rating % 1 >= 0.5;
+  let stars = '★'.repeat(fullStars);
+  if (halfStar) stars += '½';
+  stars += '☆'.repeat(5 - Math.ceil(rating));
+  return `${stars} (${rating}점)`;
+}
+
+// 생성 요청
+document.getElementById('generateBtn').addEventListener('click', async function() {
+  const hospitalName = document.getElementById('hospital_name').value.trim();
+  const procedureType = document.getElementById('procedure_type').value.trim();
+
+  if (!hospitalName || !procedureType) {
+    alert('병원명과 시술 종류는 필수입니다.');
+    return;
+  }
+
+  // 데이터 수집
+  const data = {
+    hospital_name: hospitalName,
+    procedure_type: procedureType,
+    procedure_detail: document.getElementById('procedure_detail').value.trim(),
+    doctor_name: document.getElementById('doctor_name').value.trim(),
+    anesthesia: document.getElementById('anesthesia').value,
+    price_range: document.getElementById('price_range').value.trim(),
+    procedure_date: document.getElementById('procedure_date').value,
+    write_date: document.getElementById('write_date').value,
+    before_concern: document.getElementById('before_concern').value.trim(),
+    satisfaction_level: document.getElementById('satisfaction_level').value,
+    good_points_hint: document.getElementById('good_points_hint').value.trim(),
+    bad_points_hint: document.getElementById('bad_points_hint').value.trim(),
+    persona_age: document.getElementById('persona_age').value,
+    persona_gender: document.getElementById('persona_gender').value,
+    persona_tone: document.getElementById('persona_tone').value,
+    emoji_usage: document.getElementById('emoji_usage').value,
+    forbidden_expressions: document.getElementById('forbidden_expressions').value.trim(),
+    model: document.getElementById('model').value,
+    temperature: parseFloat(document.getElementById('temperature').value),
+  };
+
+  // 로딩 표시
+  document.getElementById('loadingOverlay').style.display = 'flex';
+
+  try {
+    const response = await fetch('/dashboard/api/generate-gangnam-review/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      // 날짜 표시
+      document.getElementById('display_procedure_date').textContent = result.procedure_date || '-';
+      document.getElementById('display_write_date').textContent = result.write_date || '-';
+      document.getElementById('dateInfo').style.display = 'flex';
+
+      // 결과 표시
+      document.getElementById('result_before_worry').textContent = result.before_worry || '';
+      document.getElementById('result_result_review').textContent = result.result_review || '';
+      document.getElementById('result_bad_reason').textContent = result.bad_reason || '';
+      document.getElementById('result_additional').textContent = result.additional || '';
+      document.getElementById('result_rating').innerHTML = renderStars(result.rating || 4.5);
+
+      // 글자수 업데이트
+      updateCharCount('before_worry', result.before_worry || '');
+      updateCharCount('result_review', result.result_review || '');
+      updateCharCount('bad_reason', result.bad_reason || '');
+      updateCharCount('additional', result.additional || '');
+
+      // 태그 자동 선택
+      autoSelectTags('tags_reason', result.reason_tags || []);
+      autoSelectTags('tags_good', result.good_tags || []);
+      autoSelectTags('tags_bad', result.bad_tags || []);
+
+      // 전체 복사 버튼 표시
+      document.getElementById('copyAllBtn').style.display = 'block';
+
+      // 사용량 표시
+      if (result.usage) {
+        document.getElementById('usageInfo').innerHTML = `
+          <span>입력: ${result.usage.input_tokens.toLocaleString()} 토큰</span>
+          <span>출력: ${result.usage.output_tokens.toLocaleString()} 토큰</span>
+          <span>비용: $${result.usage.cost_usd.toFixed(4)} (₩${result.usage.cost_krw.toFixed(0)})</span>
+        `;
+        document.getElementById('usageInfo').style.display = 'flex';
+      }
+    } else {
+      alert('생성 실패: ' + result.error);
+    }
+  } catch (error) {
+    alert('오류 발생: ' + error.message);
+  } finally {
+    document.getElementById('loadingOverlay').style.display = 'none';
+  }
+});
+
+// 전체 복사
+document.getElementById('copyAllBtn').addEventListener('click', function() {
+  const getSelectedTags = (containerId) => {
+    const tags = [];
+    document.querySelectorAll(`#${containerId} .tag-chip.selected`).forEach(chip => {
+      tags.push(chip.dataset.tag);
+    });
+    return tags.join(', ') || '없음';
+  };
+
+  const fullText = `[시술 전 고민과 시술을 결정한 계기]
+${document.getElementById('result_before_worry').textContent}
+
+[이 병원 및 이벤트를 선택한 이유]
+${getSelectedTags('tags_reason')}
+
+[시술 결과 후기]
+${document.getElementById('result_result_review').textContent}
+
+[좋았던 점]
+${getSelectedTags('tags_good')}
+
+[아쉬운 점]
+${getSelectedTags('tags_bad')}
+
+[아쉬운 점을 선택한 이유]
+${document.getElementById('result_bad_reason').textContent}
+
+[전체 경험 총점]
+${document.getElementById('result_rating').textContent}
+
+[추가 의견]
+${document.getElementById('result_additional').textContent}
+`;
+
+  navigator.clipboard.writeText(fullText).then(() => {
+    const btn = document.getElementById('copyAllBtn');
+    btn.textContent = '복사 완료!';
+    setTimeout(() => {
+      btn.textContent = '전체 복사';
+    }, 2000);
+  });
+});
+</script>
+{% endblock %}
