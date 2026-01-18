@@ -183,6 +183,7 @@ body.modal-open {
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: none;
 }
 
 .modal.hidden {
@@ -194,6 +195,7 @@ body.modal-open {
   inset: 0;
   background: rgba(0,0,0,0.45);
   overscroll-behavior: none;
+  pointer-events: none;
 }
 
 /* 카드 */
@@ -210,6 +212,7 @@ body.modal-open {
   flex-direction: column;
 
   overflow: hidden;
+  pointer-events: auto;
 }
 
 /* 헤더 고정 */

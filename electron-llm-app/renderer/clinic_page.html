@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | 업무 페이지</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/clinic_page.css" />
+</head>
+<body>
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope clinicpage-scope">
+  <section class="page-canvas">
+
+    <!-- 1. 병원 컨텍스트 헤더 -->
+    <header class="clinic-context card">
+      <div class="context-left">
+        <h1 class="h1" id="clinicTitle">병원명</h1>
+      </div>
+
+      <div class="context-kpi">
+        <div class="kpi">
+          <span class="kpi-label">게시글</span>
+          <span class="kpi-value" id="kpiPosts">-</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">후기</span>
+          <span class="kpi-value" id="kpiReviews">-</span>
+        </div>
+        <div class="kpi">
+          <span class="kpi-label">이슈</span>
+          <span class="kpi-value danger" id="kpiIssues">-</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 2. 본문 레이아웃 -->
+    <div class="clinic-body">
+
+      <!-- 필터 패널 -->
+      <aside class="filter-panel card">
+        <div class="filter-group">
+          <label>월</label>
+          <input type="month" id="monthFilter" class="month-input" />
+        </div>
+
+        <div class="filter-group">
+          <label>담당자</label>
+          <select id="assigneeSelect" class="select">
+            <option value="all">전체</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label>구분</label>
+          <div class="seg-tabs vertical">
+            <button class="seg-tab active" data-type="opinion"
+              onclick="setPostType('opinion')">여론</button>
+            <button class="seg-tab" data-type="review"
+              onclick="setPostType('review')">후기</button>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <label>플랫폼</label>
+          <div class="pill-row" id="platformPills"></div>
+        </div>
+
+        <div class="filter-group">
+          <input id="postSearch" class="input" placeholder="제목 검색 (Enter)" />
+        </div>
+
+        <button class="btn primary" onclick="reloadClinicPage()">조회</button>
+      </aside>
+
+      <!-- 결과 영역 -->
+      <section class="result-panel">
+        <div class="post-list card" id="postList">
+          <div class="muted" style="padding:14px;">불러오는 중...</div>
+        </div>
+      </section>
+
+    </div>
+  </section>
+</main>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/header.js"></script>
+<script src="js/clinic_page.js"></script>
+<script>
+  (async () => {
+    await loadLayout();
+    await loadHeader("업무");
+  })();
+</script>
+</body>
+</html>

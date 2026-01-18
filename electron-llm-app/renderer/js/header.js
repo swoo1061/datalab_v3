@@ -90,6 +90,11 @@ function toggleProfile() {
   if (popup) popup.classList.toggle("hidden");
 }
 
+function closeProfilePopup() {
+  const popup = document.getElementById("profilePopup");
+  if (popup) popup.classList.add("hidden");
+}
+
 // ================================
 // 프로필 메뉴
 // ================================
@@ -206,6 +211,8 @@ function startLiveClock() {
 // ================================
 window.loadHeader = loadHeader;
 window.toggleProfile = toggleProfile;
+window.closeProfilePopup = closeProfilePopup;
 window.logout = logout;
 window.openProfileInfo = openProfileInfo;
 window.closeProfileInfo = closeProfileInfo;
+window.quitApp = () => window.api?.quitApp?.();

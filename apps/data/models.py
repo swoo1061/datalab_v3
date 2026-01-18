@@ -824,7 +824,26 @@ class ClinicPrice(models.Model):
     def __str__(self):
         doctor = self.doctor.name if self.doctor else "공통"
         return f"{doctor} - {self.procedure}"
-    
+
+class FavoriteClinic(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="favorite_clinics"
+    )
+    clinic = models.ForeignKey(
+        "data.ClinicGuide",   # 🔥 실제 Clinic 모델 위치에 맞게
+        on_delete=models.CASCADE,
+        related_name="favorited_by"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "clinic")
+
+    def __str__(self):
+        return f"{self.user} ❤️ {self.clinic}"
+
 class GeneratedReview(models.Model):
     """AI 생성 리뷰 기록"""
     clinic = models.ForeignKey(ClinicGuide, on_delete=models.SET_NULL, null=True, verbose_name="병원")
@@ -990,3 +1009,84 @@ class PromptTemplateVersion(models.Model):
 
     def __str__(self):
         return f"{self.template.name} v{self.version}"
+
+class ClinicPost(models.Model):
+    TYPE_CHOICES = [
+        ("opinion", "여론"),
+        ("review", "후기"),
+    ]
+
+    PLATFORM_CHOICES = [
+        ("all", "전체"),
+        ("naver", "네이버"),
+        ("gn_jp", "JP강남언니"),
+        ("gangnam", "강남언니"),
+        ("babytok", "바비톡"),
+        ("yeoshin", "여신티켓"),
+        ("seongyesa", "성예사"),
+        ("dadamo", "대다모"),
+    ]
+
+    STATUS_CHOICES = [
+        ("normal", "정상"),
+        ("hot", "반응중"),
+        ("issue", "이슈"),
+        ("managed", "대응완료"),
+    ]
+
+    clinic = models.ForeignKey("ClinicGuide", on_delete=models.CASCADE, related_name="posts")
+    assignee = models.ForeignKey(    
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="assigned_posts"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, db_index=True)
+    platform = models.CharField(max_length=30, choices=PLATFORM_CHOICES, db_index=True)
+
+    title = models.CharField(max_length=255)
+    url = models.URLField(max_length=1000)
+
+    views = models.IntegerField(default=0)
+    comments = models.IntegerField(default=0)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="normal", db_index=True)
+
+    published_at = models.DateTimeField(null=True, blank=True)  # 글 작성일(있으면)
+    last_crawled_at = models.DateTimeField(null=True, blank=True)  # 마지막 수집 시간
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["clinic", "type", "platform"]),
+            models.Index(fields=["clinic", "type", "-updated_at"]),
+        ]
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"[{self.get_type_display()}] {self.title}"
+
+class ClinicAssignee(models.Model):
+    clinic = models.ForeignKey(
+        "ClinicGuide",
+        on_delete=models.CASCADE,
+        related_name="assignees"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="clinic_assignments"
+    )
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("clinic", "user")
+
+    def __str__(self):
+        return f"{self.clinic.name} - {self.user.username}"
+
+from .models_worklog import DailyWorkLog

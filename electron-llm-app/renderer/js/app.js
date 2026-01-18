@@ -31,5 +31,47 @@ async function loadLayout() {
   await loadComponent("appSidebar", "./components/sidebar.html");
 }
 
+function goMyDashboard() {
+  window.location.href = "my_dashboard.html";
+}
+
 window.navigate = navigate;
 window.loadLayout = loadLayout;
+
+// Fallback: unblock inputs if a full-screen fixed layer gets stuck.
+function releaseBlockingLayers() {
+  const allow = new Set([
+    "app-header-slot",
+    "app-sidebar-slot",
+    "modal-panel",
+    "modal-content",
+    "profile-popup",
+    "profile-info-modal",
+  ]);
+
+  document.querySelectorAll("body *").forEach((el) => {
+    const style = getComputedStyle(el);
+    if (style.position !== "fixed") return;
+
+    const rect = el.getBoundingClientRect();
+    const covers =
+      rect.width >= window.innerWidth - 2 &&
+      rect.height >= window.innerHeight - 2;
+
+    if (!covers) return;
+    if ([...el.classList].some((c) => allow.has(c))) return;
+
+    if (el.classList.contains("modal") || el.classList.contains("modal-backdrop")) {
+      el.classList.add("hidden");
+    }
+
+    el.style.pointerEvents = "none";
+  });
+
+  document.querySelectorAll("input, select, textarea").forEach((el) => {
+    el.disabled = false;
+    el.style.pointerEvents = "auto";
+  });
+}
+
+setInterval(releaseBlockingLayers, 500);

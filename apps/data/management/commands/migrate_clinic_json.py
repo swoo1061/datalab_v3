@@ -11,7 +11,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING("▶ 병원 JSON → 모델 마이그레이션 시작 (단일 병원)"))
 
         # 🔥 여기서 병원 하나만 지정
-        clinic_id = 25
+        clinic_id = 27
         clinics = ClinicGuide.objects.filter(id=clinic_id)
 
         if not clinics.exists():

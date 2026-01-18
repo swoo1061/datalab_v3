@@ -4,14 +4,53 @@
   </div>
 
   <nav class="nav">
-    <a href="dashboard.html" data-nav="dashboard"> 대시보드</a>
-    <a href="review.html" data-nav="review"> AI 리뷰 생성</a>
-    <a href="review.html" data-nav="review"> 플랫폼 리뷰 생성</a>
-    <a href="clinic_guide.html" data-nav="clinic_guide"> 병원 가이드</a>
-    <a href="clinic.html" data-nav="clinic"> 출퇴근 기록</a>
+
+    <div class="nav-group">
+      <div class="nav-group-title" onclick="toggleNav(this)">대시보드</div>
+      <div class="nav-sub">
+        <a href="my_dashboard.html" data-nav="my_dashboard">나의 대시보드</a>
+        <a href="dashboard.html" data-nav="dashboard">전체 대시보드</a>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-title" onclick="toggleNav(this)">AI 생성</div>
+      <div class="nav-sub">
+        <a href="review.html" data-nav="ai_review">AI 리뷰 생성</a>
+        <a href="gangnam_review.html" data-nav="gangnam_review">강남언니</a>
+        <a href="platform_review.html" data-nav="platform_review">바비톡</a>
+        <a href="platform_review.html" data-nav="platform_review">여신티켓</a>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-title" onclick="toggleNav(this)">업무 자료</div>
+      <div class="nav-sub">
+        <a href="clinic_guide.html" data-nav="clinic_guide">아이디 자료</a>
+        <a href="clinic_guide.html" data-nav="clinic_guide">블로그 체험단</a>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-title" onclick="toggleNav(this)">병원 관리</div>
+      <div class="nav-sub">
+        <a href="clinic_guide.html" data-nav="clinic_guide">병원 가이드</a>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-title" onclick="toggleNav(this)">인사관리</div>
+      <div class="nav-sub">
+        <a href="attendance.html" data-nav="attendance">출퇴근 기록</a>
+        <a href="attendance.html" data-nav="attendance">휴가 관리</a>
+        <a href="attendance.html" data-nav="attendance">직원 정보</a>
+      </div>
+    </div>
+
   </nav>
 
-  <div class="footer">
-    demo
-  </div>
+  <div class="footer">demo</div>
 </aside>
+
+<!-- 🔥 이 한 줄이 핵심 -->
+<script src="js/sidebar.js"></script>

@@ -126,6 +126,17 @@
 
 .header-scope .popup-btn:hover { background: #e5e7eb; }
 
+.header-scope .popup-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.header-scope .popup-actions .popup-btn {
+  width: 100%;
+}
+
 /* 기본 정보 모달 */
 .profile-info-modal {
   position: fixed;

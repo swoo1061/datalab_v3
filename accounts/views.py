@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from .forms import SignupForm
 from .models import UserProfile
 from django.urls import reverse
+
 # Create your views here.
 
 
@@ -69,3 +70,4 @@ def signup_view(request):
         form = SignupForm()
 
     return render(request, "accounts/signup.html", {"form": form})
+

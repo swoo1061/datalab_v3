@@ -47,6 +47,7 @@
   border-radius: 12px;
   padding: 12px;
   background: #fff;
+  position: relative;
 }
 
 /* 상단 */
@@ -55,6 +56,7 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
+  position: relative;
 }
 
 /* 로고 */
@@ -89,6 +91,9 @@
 }
 
 .clinic-type {
+  position: absolute;
+  top: 12px;
+  right: -5px;
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 999px;
@@ -132,4 +137,23 @@
 
 .btn.ghost {
   background: #f9fafb;
+}
+
+/* ⭐ 즐겨찾기 버튼 */
+.favorite-btn {
+  position: absolute;
+  top: -15px;
+  right: -13px;
+
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+
+  color: #d1d5db;
+  z-index: 3;
+}
+
+.favorite-btn.active {
+  color: #facc15;
 }

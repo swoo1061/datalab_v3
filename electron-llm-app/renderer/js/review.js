@@ -5,6 +5,7 @@ let state = {
   clinicName: null,
   modelKey: null,
   modelName: null,
+
   reviewType: null,
   reviewTiming: null,
   keywords: [],
@@ -14,8 +15,8 @@ let state = {
 /* ---------- util ---------- */
 function normalizeArray(data) {
   if (Array.isArray(data)) return data;
-  if (Array.isArray(data.results)) return data.results;
-  if (Array.isArray(data.data)) return data.data;
+  if (data?.results) return data.results;
+  if (data?.data) return data.data;
   return [];
 }
 
@@ -30,7 +31,6 @@ function setupSingleGroup(containerId, key) {
 
       state[key] = active ? null : btn.dataset.value;
       if (!active) btn.classList.add("active");
-
       updatePreview();
     };
   });
@@ -40,10 +40,8 @@ function setupMultiGroup(containerId) {
   document.querySelectorAll(`#${containerId} button`).forEach(btn => {
     btn.onclick = () => {
       btn.classList.toggle("active");
-      state.keywords = Array.from(
-        document.querySelectorAll(`#${containerId} .active`)
-      ).map(b => b.innerText);
-
+      state.keywords = [...document.querySelectorAll(`#${containerId} .active`)]
+        .map(b => b.innerText);
       updatePreview();
     };
   });
@@ -52,33 +50,30 @@ function setupMultiGroup(containerId) {
 /* ---------- clinics ---------- */
 async function loadClinics() {
   const clinics = normalizeArray(await window.api.getClinics());
-  const select = clinicSelect;
 
   clinics.forEach(c => {
     const opt = document.createElement("option");
     opt.value = c.id;
     opt.textContent = c.name;
-    select.appendChild(opt);
+    clinicSelect.appendChild(opt);
   });
 
-  select.onchange = () => {
-    state.clinicId = select.value || null;
+  clinicSelect.onchange = async () => {
+    state.clinicId = clinicSelect.value || null;
     state.clinicName =
-      select.options[select.selectedIndex]?.text || null;
+      clinicSelect.options[clinicSelect.selectedIndex]?.text || null;
+
     updatePreview();
   };
 }
 
-/* ---------- models (🔥 가로 정렬) ---------- */
+/* ---------- models ---------- */
 async function loadModels() {
   const models = normalizeArray(await window.api.getLLMModels());
-  const container = modelList;
-  container.innerHTML = "";
+  modelList.innerHTML = "";
 
   models.forEach(m => {
-    // 🔥 표시 이름 안전 처리
-    const displayName =
-      m.name || m.label || m.display_name || m.key;
+    const displayName = m.label || m.name || m.key;
 
     const card = document.createElement("div");
     card.className = "model-card";
@@ -86,7 +81,7 @@ async function loadModels() {
 
     card.onclick = () => {
       state.modelKey = m.key;
-      state.modelName = displayName; // ✅ 절대 undefined 안 됨
+      state.modelName = displayName;
 
       document
         .querySelectorAll(".model-card")
@@ -96,16 +91,13 @@ async function loadModels() {
       updatePreview();
     };
 
-    container.appendChild(card);
+    modelList.appendChild(card);
 
-    // 추천 모델 자동 선택
-    if (!state.modelKey && m.recommended) {
-      card.click();
-    }
+    if (!state.modelKey && m.recommended) card.click();
   });
 }
 
-/* ---------- persona input ---------- */
+/* ---------- persona ---------- */
 personaInput.addEventListener("input", e => {
   state.personas = e.target.value
     .split(",")
@@ -117,94 +109,177 @@ personaInput.addEventListener("input", e => {
 
 /* ---------- preview ---------- */
 function updatePreview() {
-  /* ---------- 페르소나 ---------- */
   personaPreview.innerHTML = state.personas.length
     ? state.personas.map(p => `<span>${p}</span>`).join("")
-    : "<span style='color:#9ca3af;font-size:12px;'>미입력</span>";
+    : "<span class='muted'>미입력</span>";
 
-  /* ---------- 메타 정보 ---------- */
-  const metaRows = [];
+  const rows = [];
+  if (state.clinicName) rows.push({ label: "병원", value: state.clinicName });
+  if (state.modelName) rows.push({ label: "AI 모델", value: state.modelName });
+  if (state.reviewType) rows.push({ label: "리뷰 유형", value: state.reviewType });
+  if (state.reviewTiming) rows.push({ label: "후기 시점", value: state.reviewTiming });
+  if (state.keywords.length)
+    rows.push({ label: "강조", value: state.keywords.join(", ") });
 
-  if (state.clinicName) {
-    metaRows.push({ label: "병원", value: state.clinicName });
-  }
-  if (state.modelName) {
-    metaRows.push({ label: "AI 모델", value: state.modelName });
-  }
-  if (state.reviewType) {
-    metaRows.push({ label: "리뷰 유형", value: state.reviewType });
-  }
-  if (state.reviewTiming) {
-    metaRows.push({ label: "후기 시점", value: state.reviewTiming });
-  }
-  if (state.keywords.length) {
-    metaRows.push({
-      label: "강조 포인트",
-      value: state.keywords.join(", "),
-    });
-  }
+  previewMeta.innerHTML = rows.length
+    ? rows.map(r => `
+        <div class="preview-row">
+          <div class="preview-label">${r.label}</div>
+          <div class="preview-value">${r.value}</div>
+        </div>
+      `).join("")
+    : "<span class='muted'>선택된 조건 없음</span>";
 
-  previewMeta.innerHTML = metaRows.length
-    ? metaRows
-        .map(
-          r => `
-          <div class="preview-row">
-            <div class="preview-label">${r.label}</div>
-            <div class="preview-value">${r.value}</div>
-          </div>
-        `
-        )
-        .join("")
-    : "<div style='color:#9ca3af;font-size:12px;'>선택된 설정 없음</div>";
+  promptPreview.innerText =
+    "※ 실제 프롬프트는 병원 가이드 + 선택 조건을 기반으로 프론트에서 생성됩니다.";
+}
 
-  /* ---------- 실제 프롬프트 ---------- */
-  const promptLines = [];
+/* ---------- 🔥 PROMPT BUILD ---------- */
+function buildPrompt() {
+  const lines = [];
+
+  lines.push(`병원명: ${state.clinicName}`);
+  if (state.reviewType) lines.push(`리뷰 유형: ${state.reviewType}`);
+  if (state.reviewTiming) lines.push(`후기 시점: ${state.reviewTiming}`);
 
   if (state.personas.length) {
-    promptLines.push(`페르소나: ${state.personas.join(", ")}`);
+    lines.push(`작성자 페르소나: ${state.personas.join(", ")}`);
   }
-  metaRows.forEach(r => {
-    promptLines.push(`${r.label}: ${r.value}`);
-  });
 
-  promptLines.push(
-    "",
-    "위 조건을 반영해 실제 사용자가 작성한 것처럼",
-    "과한 느낌 없이 자연스럽고 솔직한 후기를 작성하라."
+  if (state.keywords.length) {
+    lines.push(`강조 키워드: ${state.keywords.join(", ")}`);
+  }
+
+  if (state.clinicGuide) {
+    lines.push("");
+    lines.push("병원 가이드:");
+    lines.push(JSON.stringify(state.clinicGuide, null, 2));
+  }
+
+  lines.push("");
+  lines.push(
+    "위 조건을 반영하여 실제 고객이 작성한 것처럼 자연스럽고 솔직한 리뷰를 작성하라."
   );
 
-  promptPreview.innerText = promptLines.join("\n");
+  return lines.join("\n");
 }
 
 /* ---------- generate ---------- */
 async function generateReview() {
-  if (!state.clinicId || !state.modelKey) {
-    alert("병원과 AI 모델만 선택하세요.");
+  if (!state.modelKey) {
+    alert("AI 모델을 선택하세요.");
     return;
   }
 
-  openModal(); // ✅ 여기
-  reviewLoading.classList.remove("hidden");
+  const btn = document.getElementById("generateReviewBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "리뷰 생성 중...";
+  }
+  forceInteractive();
+  startInteractionWatchdog();
   modalReview.innerText = "";
+  let ok = false;
 
-  const res = await window.api.generateReview({
-    clinic_id: state.clinicId,
+  // ✅ 서버가 요구하는 단 하나의 입력
+  const prompt = `
+병원: ${state.clinicName || "미선택"}
+리뷰 유형: ${state.reviewType || "일반 후기"}
+후기 시점: ${state.reviewTiming || "미지정"}
+강조 포인트: ${state.keywords.join(", ") || "없음"}
+페르소나: ${state.personas.join(", ") || "없음"}
+
+위 조건을 반영해 실제 사용자가 작성한 것처럼
+자연스럽고 솔직한 후기를 작성해주세요.
+  `.trim();
+
+  const payload = {
     model: state.modelKey,
     context: {
-      type: state.reviewType,
-      timing: state.reviewTiming,
-      keywords: state.keywords,
-      personas: state.personas,
+      prompt, // 🔥 이거 하나면 끝
     },
-  });
+  };
 
-  reviewLoading.classList.add("hidden");
-  modalReview.innerText = res.review_text || "";
+  try {
+    const res = await window.api.generateReview(payload);
+    modalReview.innerText = res.review_text || "";
+    openModal();
+    ok = true;
+  } catch (e) {
+    console.error("❌ generateReview error:", e);
+    alert("리뷰 생성 실패");
+    forceCloseModal();
+    clearModalOverlays();
+  } finally {
+    reviewLoading.classList.add("hidden");
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = "리뷰 생성";
+    }
+    if (!ok) {
+      forceCloseModal();
+      clearModalOverlays();
+    }
+  }
 }
 
 /* ---------- modal ---------- */
+function openModal() {
+  document.body.style.overflow = "hidden";
+  reviewModal.classList.remove("hidden");
+}
+
 function closeModal() {
+  document.body.style.overflow = "";
   reviewModal.classList.add("hidden");
+}
+
+function forceCloseModal() {
+  document.body.style.overflow = "";
+  if (reviewModal) {
+    reviewModal.classList.add("hidden");
+    reviewModal.style.display = "none";
+    requestAnimationFrame(() => {
+      reviewModal.style.display = "";
+    });
+  }
+}
+
+function clearModalOverlays() {
+  document.body.style.overflow = "";
+  document.body.style.pointerEvents = "auto";
+  document.querySelectorAll(".modal, .modal-backdrop").forEach((el) => {
+    el.classList.add("hidden");
+    el.style.display = "none";
+    el.style.pointerEvents = "none";
+    requestAnimationFrame(() => {
+      el.style.display = "";
+      el.style.pointerEvents = "";
+    });
+  });
+}
+
+function forceInteractive() {
+  document.body.style.pointerEvents = "auto";
+  document.querySelectorAll("input, select, textarea").forEach((el) => {
+    el.disabled = false;
+    el.style.pointerEvents = "auto";
+  });
+  clearModalOverlays();
+}
+
+function startInteractionWatchdog() {
+  const start = Date.now();
+  const tick = () => {
+    const hasVisibleModal = document.querySelector(".modal:not(.hidden)");
+    if (!hasVisibleModal) {
+      forceInteractive();
+    }
+    if (Date.now() - start < 10000) {
+      setTimeout(tick, 500);
+    }
+  };
+  setTimeout(tick, 0);
 }
 
 /* ---------- init ---------- */
@@ -216,24 +291,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   await loadClinics();
   await loadModels();
 });
-
-function openModal() {
-  document.body.style.overflow = "hidden"; // 🔥 배경 스크롤 차단
-  reviewModal.classList.remove("hidden");
-}
-
-function closeModal() {
-  document.body.style.overflow = ""; // 원래대로 복구
-  reviewModal.classList.add("hidden");
-}
-
-reviewModal.addEventListener("wheel", (e) => {
-  e.stopPropagation();
-}, { passive: false });
-
-reviewModal.addEventListener("touchmove", (e) => {
-  e.stopPropagation();
-}, { passive: false });
 
 /* ---------- global ---------- */
 window.generateReview = generateReview;

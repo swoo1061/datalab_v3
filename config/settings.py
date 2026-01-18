@@ -41,7 +41,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'config.middleware.ElectronCorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'config.middleware.SessionHeaderMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -112,11 +114,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # REST Framework
 REST_FRAMEWORK = {
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # 개발용, 프로덕션에서는 변경 필요
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
 }
 
 # OpenAI API
@@ -159,15 +164,27 @@ LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/dashboard/"
 LOGOUT_REDIRECT_URL = "/"
 
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+]
+
 # ===== 세션 / CSRF (Electron 대응 핵심) =====
-SESSION_ENGINE = "django.contrib.sessions.backends.db"
+ALLOWED_HOSTS = ["*"]
 
 SESSION_COOKIE_NAME = "sessionid"
-
+SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "None"
-SESSION_COOKIE_SECURE = True
-
+SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SAMESITE = "None"
-CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = False
 
-CORS_ALLOW_CREDENTIALS = True
+
+SESSION_ENGINE = "django.contrib.sessions.backends.db"

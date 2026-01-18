@@ -42,7 +42,7 @@
 
 .clinic-page .meta {
   margin-top: 14px;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(1, 4fr);
 }
 
 .clinic-page .meta .label {

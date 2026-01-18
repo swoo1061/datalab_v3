@@ -8,13 +8,39 @@ window.addEventListener("DOMContentLoaded", async () => {
   const rememberEl = document.getElementById("rememberLogin");
   if (rememberEl) rememberEl.checked = saved;
 
+  initLoginClock();
+
   if (!saved) return;
 
   try {
     await window.api.getMe();
-    window.nav.go("dashboard");
+    window.nav.go("my_dashboard");
   } catch {}
 });
+
+function initLoginClock() {
+  const timeEl = document.getElementById("loginTime");
+  const dateEl = document.getElementById("loginDate");
+  if (!timeEl || !dateEl) return;
+
+  const update = () => {
+    const now = new Date();
+    timeEl.innerText = now.toLocaleTimeString("ko-KR", {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    dateEl.innerText = now.toLocaleDateString("ko-KR", {
+      month: "long",
+      day: "numeric",
+      weekday: "short",
+    });
+  };
+
+  update();
+  setInterval(update, 1000);
+}
 
 // 🔒 로딩 상태 관리
 function setLoading(loading) {
@@ -59,7 +85,7 @@ async function login() {
     if (remember) localStorage.setItem(KEY_REMEMBER, "true");
     else localStorage.removeItem(KEY_REMEMBER);
 
-    window.nav.go("dashboard");
+    window.nav.go("my_dashboard");
 
   } catch (e) {
     console.error("❌ login error", e);
@@ -88,5 +114,10 @@ function goSignup() {
   window.nav.go("signup");
 }
 
+function quitApp() {
+  window.api?.quitApp?.();
+}
+
 window.login = login;
 window.goSignup = goSignup;
+window.quitApp = quitApp;

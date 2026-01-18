@@ -26,4 +26,13 @@ LLM_MODELS = [
         "cost_level": "중간",
         "recommended": True,
     },
+    {
+        "key": "claude-opus",
+        "label": "Claude Opus 4.5",
+        "vendor": "anthropic",
+        "speed": "빠름",
+        "quality": "최고",
+        "cost_level": "높음",
+        "recommended": False,
+    },
 ]

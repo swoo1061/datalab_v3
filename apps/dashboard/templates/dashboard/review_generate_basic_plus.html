@@ -367,6 +367,29 @@
             <span class="len-label">자</span>
           </div>
           <div class="content-type-row">
+            <input type="checkbox" id="ct-week1" value="week1">
+            <label for="ct-week1">1주일차 후기</label>
+            <input type="number" id="len-week1" class="len-input"
+                  value="500" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
+
+          <div class="content-type-row">
+            <input type="checkbox" id="ct-week2" value="week2">
+            <label for="ct-week2">2주일차 후기</label>
+            <input type="number" id="len-week2" class="len-input"
+                  value="500" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
+
+          <div class="content-type-row">
+            <input type="checkbox" id="ct-week3" value="week3">
+            <label for="ct-week3">3주일차 후기</label>
+            <input type="number" id="len-week3" class="len-input"
+                  value="500" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
             <input type="checkbox" id="ct-month1" value="month1" checked>
             <label for="ct-month1">1개월 후기</label>
             <input type="number" id="len-month1" class="len-input" value="500" min="200" max="1500" step="50">
@@ -950,7 +973,22 @@ function getCookie(name) {
   return cookieValue;
 }
 
-// 시리즈 생성
+const CONTENT_ORDER = [
+  'question',
+  'research',
+  'consultation',
+  'day0',
+  'week1',
+  'week2',
+  'week3',
+  'month1',
+  'month2',
+  'month3',
+];
+
+/* =========================
+   시리즈 생성
+========================= */
 async function generateSeries() {
   const input = document.getElementById('series-input').value.trim();
   if (!input) {
@@ -958,26 +996,56 @@ async function generateSeries() {
     return;
   }
 
-  // 선택된 컨텐츠 타입 및 길이 수집
+  /* -------------------------
+     컨텐츠 타입 & 길이 수집
+     (기존 로직 유지)
+  ------------------------- */
   const contentTypes = [];
   const contentLengths = {};
+
   document.querySelectorAll('#tab-series .content-type-row').forEach(row => {
     const checkbox = row.querySelector('input[type="checkbox"]');
     const lenInput = row.querySelector('.len-input');
+
     if (checkbox.checked) {
       contentTypes.push(checkbox.value);
       contentLengths[checkbox.value] = parseInt(lenInput.value) || 500;
     }
   });
 
+  /* -------------------------
+     🆕 아무것도 체크 안 했을 경우
+     기본 세트 자동 적용
+  ------------------------- */
   if (contentTypes.length === 0) {
-    alert('최소 하나의 컨텐츠를 선택해주세요.');
-    return;
+    const defaultTypes = [
+      'question',
+      'research',
+      'consultation',
+      'day0',
+      'week1',
+      'week2',
+      'month1',
+    ];
+
+    defaultTypes.forEach(type => {
+      contentTypes.push(type);
+      const lenEl = document.getElementById(`len-${type}`);
+      contentLengths[type] = lenEl ? parseInt(lenEl.value) || 500 : 500;
+    });
   }
+
+  /* -------------------------
+     🆕 컨텐츠 타입 순서 정렬
+     (뒤죽박죽 문제 핵심 해결)
+  ------------------------- */
+  contentTypes.sort(
+    (a, b) => CONTENT_ORDER.indexOf(a) - CONTENT_ORDER.indexOf(b)
+  );
 
   const model = document.getElementById('series-model').value;
 
-  // 다양성 설정 수집
+  // 다양성 설정 수집 (기존 유지)
   const diversitySettings = collectDiversitySettings();
 
   document.getElementById('series-placeholder').style.display = 'none';
@@ -1012,13 +1080,11 @@ async function generateSeries() {
       outputEl.innerHTML = formatSeriesOutput(data.series);
       outputEl.style.display = 'block';
 
-      // 프롬프트 저장
       if (data.prompt) {
         lastPrompt = data.prompt;
         document.getElementById('prompt-content').textContent = data.prompt;
       }
 
-      // 사용량 표시
       if (data.usage) {
         document.getElementById('series-usage').innerHTML = `
           <span>입력: ${data.usage.input_tokens.toLocaleString()} 토큰</span>
@@ -1062,6 +1128,9 @@ function formatSeriesOutput(series) {
     'research': '발품/손품',
     'consultation': '방문상담 후기',
     'day0': '시술 당일',
+    'week1': '1주일차 후기',
+    'week2': '2주일차 후기',
+    'week3': '3주일차 후기',
     'month1': '1개월 후기',
     'month2': '2개월 후기',
     'month3': '3개월 후기',

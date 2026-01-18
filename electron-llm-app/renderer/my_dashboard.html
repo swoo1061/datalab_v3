@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>Datalab90 | Dashboard</title>
+  <title>Datalab90 | 나의 대시보드</title>
 
   <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/layout.css" />
@@ -13,23 +13,25 @@
 <body>
 
 <div class="app-root">
+  <!-- 사이드바 -->
   <div class="app-sidebar-slot" id="appSidebar"></div>
+
+  <!-- 헤더 -->
   <div class="app-header-slot" id="appHeader"></div>
 
   <div class="app-main">
-    <main class="page-scope dashboard-page">
-      <section class="page-canvas">
+            <main class="page-scope dashboard-page">
+        <section class="page-canvas">
 
-        <!-- 헤드 -->
-        <header class="page-head">
-          <h1 class="h1">대시보드</h1>
-        </header>
+            <header class="page-head">
+            <h1 class="h1">나의 대시보드</h1>
+            <p class="sub">개인공간</p>
+            </header>
 
-        <!-- ✅ 카드가 JS로 렌더링될 영역 -->
-        <section class="clinic-grid" id="clinicGrid"></section>
+            <section id="myClinicGrid" class="clinic-grid"></section>
 
-      </section>
-    </main>
+        </section>
+        </main>
   </div>
 </div>
 
@@ -38,11 +40,11 @@
 <script src="js/header.js"></script>
 <script src="js/clinic_data.js"></script>
 <script src="js/clinic_cards.js"></script>
-<script src="js/dashboard.js"></script>
+<script src="js/my_dashboard.js"></script>
 <script>
   (async () => {
     await loadLayout();
-    await loadHeader("대시보드");
+    await loadHeader("나의 대시보드");
   })();
 </script>
 </body>

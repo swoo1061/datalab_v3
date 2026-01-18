@@ -9,6 +9,14 @@
 <body class="center-screen">
 
 <div class="login-card">
+  <header class="login-header">
+    <div class="login-header-time">
+      <span id="loginDate">----</span>
+      <span id="loginTime">--:--</span>
+    </div>
+    <button class="login-quit" onclick="quitApp()">앱 종료</button>
+  </header>
+
   <h1 class="logo">Datalab90</h1>
   <p class="subtitle">Internal System</p>
 
@@ -23,9 +31,9 @@
   </div>
   <!-- ✅ 체크 영역 -->
   <div class="checkbox-row">
-  <input type="checkbox" id="rememberLogin" />
-  <label for="rememberLogin">로그인 상태 유지</label>
-</div>
+    <input type="checkbox" id="rememberLogin" />
+    <label for="rememberLogin">로그인 상태 유지</label>
+  </div>
 
   <p class="hint">내부 사용자만 접속 가능합니다</p>
 </div>
