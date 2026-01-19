@@ -104,8 +104,25 @@ function bindProfileMenu() {
       const action = item.dataset.action;
       if (action === "profile") openProfileInfo();
       if (action === "attendance") alert("출퇴근 기록 준비중");
-      if (action === "my-dashboard") window.nav.go("dashboard");
+      if (action === "my_dashboard") window.nav.go("my_dashboard");
     };
+  });
+}
+
+function applyTheme(theme) {
+  const nextTheme = theme || "classic";
+  document.body.dataset.theme = nextTheme;
+  localStorage.setItem("appTheme", nextTheme);
+  document.querySelectorAll(".theme-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.theme === nextTheme);
+  });
+}
+
+function bindThemeSelector() {
+  const saved = localStorage.getItem("appTheme") || "classic";
+  applyTheme(saved);
+  document.querySelectorAll(".theme-btn").forEach((btn) => {
+    btn.addEventListener("click", () => applyTheme(btn.dataset.theme));
   });
 }
 

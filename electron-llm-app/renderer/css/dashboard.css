@@ -35,10 +35,69 @@
 
 /* 카드 그리드 */
 .clinic-grid {
-  margin-top: 14px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
+  overflow: visible;
+}
+
+/* 패널 레이아웃 */
+.dashboard-panels {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.dashboard-panel .card-bd {
+  padding: 16px;
+}
+
+.week-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.week-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.week-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  min-width: 160px;
+  text-align: center;
+}
+
+.week-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  width: 100%;
+}
+
+.week-panel .card-bd {
+  text-align: left;
+}
+
+.week-panel .week-head {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+  margin-bottom: 0;
+}
+
+.week-title {
+  font-size: 16px;
+  color: #111827;
 }
 
 /* 카드 */
@@ -48,6 +107,15 @@
   padding: 12px;
   background: #fff;
   position: relative;
+  z-index: 1;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.clinic-card:hover {
+  transform: translateY(-2px);
+  border-color: #c7d2fe;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  z-index: 3;
 }
 
 /* 상단 */
@@ -124,10 +192,120 @@
 /* 액션 */
 .clinic-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  position: relative;
+}
+
+.review-menu {
+  position: absolute;
+  left: 0;
+  top: 36px;
+  z-index: 5;
+  min-width: 210px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  display: none;
+}
+
+.more-menu {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  z-index: 6;
+  width: 180px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  display: none;
+}
+
+.more-menu.open {
+  display: grid;
   gap: 6px;
 }
 
+.more-menu .menu-item {
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 11px;
+  color: #111827;
+  cursor: pointer;
+}
+
+.more-menu .menu-item:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.more-menu .menu-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.more-menu .contract-input {
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 0 8px;
+  font-size: 11px;
+  background: #fff;
+}
+.review-menu.open {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.review-menu .menu-item {
+  height: 28px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 11px;
+  color: #111827;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.review-menu .menu-item:hover {
+  background: inherit;
+  border-color: inherit;
+}
+
+.review-menu .theme-ai {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4338ca;
+}
+
+.review-menu .theme-gangnam {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+
+.review-menu .theme-babytok {
+  background: #f3e8ff;
+  border-color: #d8b4fe;
+  color: #7c3aed;
+}
+
+.review-menu .theme-yeoshin {
+  background: #fdf2f8;
+  border-color: #fbcfe8;
+  color: #be185d;
+}
 
 /* 버튼 사이즈 */
 .btn.sm {

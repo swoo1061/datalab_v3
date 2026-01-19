@@ -177,43 +177,96 @@
     <!-- Header -->
     <header class="modal-header">
       <h3>생성 결과 (앱 입력 순서)</h3>
-      <button id="closeReviewModal" class="close-btn">✕</button>
+      <button id="closeReviewModal" class="close-btn" aria-label="닫기">X</button>
     </header>
 
     <!-- Body -->
     <section class="modal-body">
-      <!-- Meta -->
-      <div class="review-meta">
-        <span>📅 시술일: <b id="surgeryDate">-</b></span>
-        <span>✍️ 작성일: <b id="createdDate">-</b></span>
+      <div id="dateInfo" class="date-info" style="display: none;">
+        <span class="date-item">시술일: <strong id="display_procedure_date">-</strong></span>
+        <span class="date-divider">|</span>
+        <span class="date-item">작성일: <strong id="display_write_date">-</strong></span>
       </div>
 
-      <!-- Sections -->
-      <div id="reviewSections" class="review-sections-container"></div>
+      <div class="modal-grid">
+        <div class="modal-main">
+          <div class="result-section" data-section="before_worry">
+            <div class="result-header">
+              <span class="result-title">시술 전 고민과 시술을 결정한 계기</span>
+              <div class="result-meta">
+                <span class="char-count">0자</span>
+                <button class="copy-btn" data-copy-section="before_worry">복사</button>
+              </div>
+            </div>
+            <div class="result-content" id="result_before_worry"></div>
+          </div>
 
-<!-- 강남언니 태그 선택 영역 -->
-<section class="gangnam-tags">
+          <div class="result-section" data-section="result_review">
+            <div class="result-header">
+              <span class="result-title">시술 결과 후기</span>
+              <div class="result-meta">
+                <span class="char-count">0자 (최소 10자)</span>
+                <button class="copy-btn" data-copy-section="result_review">복사</button>
+              </div>
+            </div>
+            <div class="result-content" id="result_result_review"></div>
+          </div>
 
-  <h4>이 병원을 선택한 이유</h4>
-  <div id="tags_reason" class="tag-container"></div>
+          <div class="result-section" data-section="bad_reason">
+            <div class="result-header">
+              <span class="result-title">아쉬운 점을 선택한 이유</span>
+              <div class="result-meta">
+                <span class="char-count">0자 (최소 10자)</span>
+                <button class="copy-btn" data-copy-section="bad_reason">복사</button>
+              </div>
+            </div>
+            <div class="result-content" id="result_bad_reason"></div>
+          </div>
 
-  <h4>좋았던 점</h4>
-  <div id="tags_good" class="tag-container"></div>
+          <div class="result-section" data-section="rating">
+            <div class="result-header">
+              <span class="result-title">전체 경험 총점</span>
+            </div>
+            <div id="result_rating" class="result-rating">-</div>
+          </div>
 
-  <h4>아쉬운 점</h4>
-  <div id="tags_bad" class="tag-container"></div>
+          <div class="result-section" data-section="additional">
+            <div class="result-header">
+              <span class="result-title">추가 의견</span>
+              <div class="result-meta">
+                <span class="char-count">0자 (최소 10자)</span>
+                <button class="copy-btn" data-copy-section="additional">복사</button>
+              </div>
+            </div>
+            <div class="result-content" id="result_additional"></div>
+          </div>
+        </div>
 
-</section>
+        <aside class="modal-side">
+          <div class="result-section" data-section="reason_tags">
+            <div class="result-header">
+              <span class="result-title">이 병원 및 이벤트를 선택한 이유 (태그)</span>
+            </div>
+            <div class="tag-container" id="tags_reason"></div>
+          </div>
 
-      <!-- Raw Text -->
-      <details class="raw-result-area">
-        <summary>📄 전체 텍스트 추출</summary>
-        <textarea
-          id="reviewResultText"
-          readonly
-          placeholder="리뷰 전체 텍스트가 여기에 표시됩니다"
-        ></textarea>
-      </details>
+          <div class="result-section" data-section="good_tags">
+            <div class="result-header">
+              <span class="result-title">좋았던 점 (태그)</span>
+            </div>
+            <div class="tag-container" id="tags_good"></div>
+          </div>
+
+          <div class="result-section" data-section="bad_tags">
+            <div class="result-header">
+              <span class="result-title">아쉬운 점 (태그)</span>
+            </div>
+            <div class="tag-container" id="tags_bad"></div>
+          </div>
+        </aside>
+      </div>
+
+      <textarea id="reviewResultText" class="raw-hidden" readonly></textarea>
     </section>
 
     <!-- Footer -->

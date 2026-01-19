@@ -3,9 +3,11 @@
   grid-template-columns: 1fr 1fr;
   gap: 24px;
 
-  background: #fff;
+  background: #ffffff;
   padding: 28px;
   border-radius: 16px;
+  border: 1px solid #ffe6d5;
+  box-shadow: 0 18px 36px rgba(255, 120, 0, 0.08);
 }
 
 .form-col {
@@ -35,9 +37,15 @@
 input, select, textarea {
   width: 100%;
   padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  border: 1px solid #ffe1cc;
   font-size: 14px;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #ff7a1a;
+  box-shadow: 0 0 0 3px rgba(255, 122, 26, 0.16);
 }
 
 textarea {
@@ -50,22 +58,21 @@ textarea {
   margin-top: 8px;
 }
 
-#tempValue {
-  font-size: 13px;
-  color: #4f46e5;
-}
-
 .generate-btn {
   grid-column: span 2;
   height: 52px;
   margin-top: 8px;
   border-radius: 14px;
-  background: #4f46e5;
+  background: linear-gradient(135deg, #ff8a1c, #ff6b00);
   color: #fff;
   font-size: 15px;
   font-weight: 700;
   border: none;
   cursor: pointer;
+}
+
+.generate-btn:hover {
+  filter: brightness(0.98);
 }
 
 /* ===== 필드 공통 ===== */
@@ -90,6 +97,44 @@ textarea {
 
 #temperature {
   flex: 1;
+  accent-color: #ff7a1a;
+  height: 8px;
+  border-radius: 999px;
+  background: #ffe8d6;
+  appearance: none;
+  padding: 0;
+}
+
+#temperature::-webkit-slider-runnable-track {
+  height: 8px;
+  background: #ffe8d6;
+  border-radius: 999px;
+}
+
+#temperature::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ff7a1a;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(255, 122, 26, 0.3);
+  margin-top: -4px;
+}
+
+#temperature::-moz-range-track {
+  height: 8px;
+  background: #ffe8d6;
+  border-radius: 999px;
+}
+
+#temperature::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ff7a1a;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(255, 122, 26, 0.3);
 }
 
 #tempValue {
@@ -97,7 +142,7 @@ textarea {
   text-align: right;
   font-size: 13px;
   font-weight: 700;
-  color: #4f46e5;
+  color: #ff7a1a;
 }
 
 p.form-hint {
@@ -131,24 +176,33 @@ p.form-hint {
    MODAL CONTENT
 ====================== */
 .modal-content {
-  position: relative;
-  width: 720px;
+  width: 920px;
   max-width: 95%;
-  max-height: 90vh;
-  margin: 5vh auto;
-  background: #fff;
+  max-height: calc(100vh - 96px);
+  margin: 64px 32px;
+  margin-left: 200px;
+  background: #ffffff;
   border-radius: 14px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   font-size: 14px;
   pointer-events: auto;
+  border: 1px solid #ffe6d5;
+  box-shadow: 0 24px 48px rgba(255, 120, 0, 0.16);
 }
 
 .modal-header,
 .modal-footer {
   padding: 14px 18px;
   border-bottom: 1px solid #eee;
+}
+
+.modal-header {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
 }
 
 .modal-footer {
@@ -165,9 +219,16 @@ p.form-hint {
 }
 
 .close-btn {
-  background: none;
-  border: none;
-  font-size: 18px;
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #ffe1cc;
+  background: #fff3ea;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -180,95 +241,154 @@ p.form-hint {
   padding: 16px;
 }
 
-.review-meta {
-  display: flex;
+.modal-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.modal-body {
+  scrollbar-width: none;
+}
+
+.raw-hidden {
+  display: none;
+}
+
+.modal-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 16px;
-  padding: 10px;
-  background: #f1f5ff;
+}
+
+.modal-main,
+.modal-side {
+  min-width: 0;
+}
+
+.date-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #fff3ea;
+  border: 1px solid #ffe1cc;
   border-radius: 10px;
   margin-bottom: 16px;
   font-size: 13px;
+  color: #6b7280;
+}
+
+.date-item strong {
+  color: #111827;
+}
+
+.date-divider {
+  color: #cbd5f5;
 }
 
 /* ======================
    SECTIONS
 ====================== */
-.review-section {
-  background: #f9fbff;
+.result-section {
+  background: #fff9f4;
+  border: 1px solid #ffe6d5;
   border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
-  font-size: 14px;
-  font-weight: 600;
+  padding: 14px;
+  margin-bottom: 14px;
 }
 
-.section-header {
+.result-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
-.section-header h4 {
-  flex: 1;
-  margin: 0;
-}
-
-.section-header .count {
-  font-size: 12px;
-  color: #666;
-}
-
-.section-header button {
-  font-size: 12px;
-  padding: 4px 8px;
-  cursor: pointer;
-}
-
-.section-body {
+.result-title {
+  font-weight: 700;
   font-size: 13px;
-  margin-top: 12px;
-  line-height: 1.55;
+  color: #7a2f00;
+}
+
+.result-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.char-count {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.result-content {
+  background: #fff;
+  border: 1px solid #ffe1cc;
+  border-radius: 8px;
+  padding: 12px;
+  min-height: 56px;
   white-space: pre-wrap;
+  line-height: 1.6;
+  font-size: 13px;
+  color: #7a2f00;
+}
+
+.result-content:empty::before {
+  content: "생성 버튼을 눌러주세요";
+  color: #9ca3af;
 }
 
 /* ======================
    TAGS
 ====================== */
-.tag-list {
+.tag-container {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
 }
 
-.tag {
-  padding: 4px 10px;
+.tag-chip {
+  padding: 6px 10px;
   border-radius: 999px;
-  background: #eef2ff;
-  color: #4338ca;
+  background: #ffffff;
+  color: #ff7a1a;
   font-size: 12px;
+  border: 1px solid #ffd2b3;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tag-chip.selected {
+  background: #ff7a1a;
+  color: #fff;
+  border-color: #ff7a1a;
 }
 
 /* ======================
    RATING
 ====================== */
-.rating {
-  font-size: 20px;
-  color: #f59e0b;
-  margin-top: 8px;
+.result-rating {
+  font-size: 18px;
+  color: #ff9b2f;
 }
 
 /* ======================
    RAW TEXT
 ====================== */
 .raw-result-area {
-  margin-top: 16px;
+  margin-top: 0;
+  border: 1px solid #ffe1cc;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff3ea;
 }
 
 .raw-result-area summary {
   cursor: pointer;
   font-weight: 600;
   margin-bottom: 8px;
+  list-style: none;
 }
 
 .raw-result-area textarea {
@@ -279,16 +399,40 @@ p.form-hint {
   line-height: 1.6;
 }
 
+.copy-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: #ffffff;
+  border: 1px solid #ffe1cc;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-btn:hover {
+  background: #fff0e4;
+}
+
+@media (max-width: 980px) {
+  .modal-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ======================
    BUTTONS
 ====================== */
 .btn-primary {
-  background: #4f46e5;
+  background: #ff7a1a;
   color: #fff;
   border: none;
   padding: 8px 14px;
   border-radius: 8px;
   cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: #e66e16;
 }
 
 .btn-secondary {

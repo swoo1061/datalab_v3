@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/header.css" />
   <link rel="stylesheet" href="css/clinic_page.css" />
+  <link rel="stylesheet" href="css/schedule.css" />
 </head>
 <body>
 
@@ -42,49 +43,85 @@
       </div>
     </header>
 
-    <!-- 2. 본문 레이아웃 -->
+    <!-- 2. 필터/본문 레이아웃 -->
     <div class="clinic-body">
+      <section class="filter-bar card">
+        <div class="filter-grid">
+          <div class="filter-field">
+            <label>월</label>
+            <input type="month" id="monthFilter" class="month-input" />
+          </div>
 
-      <!-- 필터 패널 -->
-      <aside class="filter-panel card">
-        <div class="filter-group">
-          <label>월</label>
-          <input type="month" id="monthFilter" class="month-input" />
+          <div class="filter-field">
+            <label>구분</label>
+            <div class="seg-tabs">
+              <button class="seg-tab active" data-type="opinion"
+                onclick="setPostType('opinion')">여론</button>
+              <button class="seg-tab" data-type="review"
+                onclick="setPostType('review')">후기</button>
+            </div>
+          </div>
+
+          <div class="filter-field span-2">
+            <label>플랫폼</label>
+            <div class="pill-row" id="platformPills"></div>
+          </div>
+
         </div>
 
-        <div class="filter-group">
-          <label>담당자</label>
-          <select id="assigneeSelect" class="select">
-            <option value="all">전체</option>
-          </select>
+        <div class="filter-actions">
+          <button class="btn primary" onclick="reloadClinicPage()">조회</button>
         </div>
+      </section>
 
-        <div class="filter-group">
-          <label>구분</label>
-          <div class="seg-tabs vertical">
-            <button class="seg-tab active" data-type="opinion"
-              onclick="setPostType('opinion')">여론</button>
-            <button class="seg-tab" data-type="review"
-              onclick="setPostType('review')">후기</button>
+      <section class="result-panel">
+        <div class="result-grid">
+        <div class="result-left">
+        <div class="ai-intake card">
+          <div class="card-hd">데일리 업무 일지 (AI 자동 접수)</div>
+          <div class="card-bd">
+            <div class="ai-intake-grid">
+              <div class="ai-field span-2">
+                <label>URL</label>
+                <input id="aiIntakeUrl" class="input" placeholder="게시글 URL" />
+              </div>
+              <div class="ai-field">
+                <label>플랫폼</label>
+                <select id="aiIntakePlatform" class="select"></select>
+              </div>
+              <div class="ai-field">
+                <label>제목 (선택)</label>
+                <input id="aiIntakeTitle" class="input" placeholder="자동 분류 정확도 향상" />
+              </div>
+              <div class="ai-field span-2">
+                <label>사진 첨부</label>
+                <input id="aiIntakePhotos" class="input" type="file" multiple />
+                <div class="ai-file-hint" id="aiIntakePhotoHint">선택된 파일 없음</div>
+              </div>
+            </div>
+
+            <div class="ai-intake-actions">
+              <button id="aiIntakeSubmit" class="btn primary">AI 처리 후 저장</button>
+              <div class="ai-review-dropdown">
+                <button id="aiIntakeReviewBtn" class="btn">리뷰 작성</button>
+                <div class="ai-review-menu">
+                  <button class="menu-item theme-ai" data-type="ai">AI 리뷰작성</button>
+                  <button class="menu-item theme-gangnam" data-type="gangnam">강남언니</button>
+                  <button class="menu-item theme-babytok" data-type="babytok">바비톡</button>
+                  <button class="menu-item theme-yeoshin" data-type="yeoshin">여신티켓</button>
+                </div>
+              </div>
+              <span id="aiIntakeStatus" class="worklog-status"></span>
+            </div>
+            <p class="ai-intake-hint">댓글/조회수는 크롤링 연동 시 자동 반영됩니다.</p>
           </div>
         </div>
 
-        <div class="filter-group">
-          <label>플랫폼</label>
-          <div class="pill-row" id="platformPills"></div>
         </div>
 
-        <div class="filter-group">
-          <input id="postSearch" class="input" placeholder="제목 검색 (Enter)" />
-        </div>
-
-        <button class="btn primary" onclick="reloadClinicPage()">조회</button>
-      </aside>
-
-      <!-- 결과 영역 -->
-      <section class="result-panel">
         <div class="post-list card" id="postList">
           <div class="muted" style="padding:14px;">불러오는 중...</div>
+        </div>
         </div>
       </section>
 

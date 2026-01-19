@@ -1,0 +1,241 @@
+.posts-dashboard .page-head .h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.posts-dashboard .page-head .sub {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.post-toolbar {
+  margin-top: 16px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.post-toolbar .toolbar-left {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.post-toolbar .toolbar-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.post-filters-panel {
+  margin-top: 10px;
+  padding: 10px 12px;
+}
+
+.post-filters-panel .filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.post-filters-panel .filter-field label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+  display: block;
+}
+
+.post-toolbar .month-input,
+.post-toolbar .select,
+.post-toolbar .input,
+.toolbar-btn {
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  padding: 0 12px;
+  font-size: 13px;
+  color: #111827;
+  box-shadow: 0 8px 18px rgba(99, 102, 241, 0.12);
+}
+
+.toolbar-btn {
+  cursor: pointer;
+}
+
+.filter-summary {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+}
+
+.summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 12px;
+  color: #475569;
+}
+
+.summary-chip strong {
+  font-weight: 700;
+  color: #111827;
+}
+
+.type-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.type-pill {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  font-size: 13px;
+  cursor: pointer;
+  color: #475569;
+  box-shadow: 0 8px 18px rgba(99, 102, 241, 0.12);
+}
+
+.type-pill.active {
+  background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 100%);
+  border-color: #c7d2fe;
+  color: #4338ca;
+}
+
+.platform-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.platform-pill {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  color: #475569;
+}
+
+.platform-pill.active {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+.platform-pill.platform-naver {
+  border-color: #22c55e;
+  color: #15803d;
+}
+
+.platform-pill.platform-gn_jp,
+.platform-pill.platform-gangnam {
+  border-color: #fb923c;
+  color: #c2410c;
+}
+
+.platform-pill.platform-babytok {
+  border-color: #c084fc;
+  color: #7c3aed;
+}
+
+.platform-pill.platform-yeoshin {
+  border-color: #f472b6;
+  color: #be185d;
+}
+
+.platform-pill.platform-seongyesa {
+  border-color: #38bdf8;
+  color: #0369a1;
+}
+
+.platform-pill.platform-dadamo {
+  border-color: #94a3b8;
+  color: #475569;
+}
+
+.post-table {
+  margin-top: 12px;
+}
+
+.table-head,
+.table-row {
+  display: grid;
+  grid-template-columns: 70px 90px minmax(200px, 1.4fr) minmax(140px, 1fr) 90px 70px 70px 70px 90px;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.table-head {
+  color: #94a3b8;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+
+.table-row {
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.table-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-row .url-link {
+  color: #475569;
+  text-decoration: none;
+}
+
+.table-row .url-link:hover {
+  text-decoration: underline;
+}
+
+.table-row a {
+  color: #111827;
+  text-decoration: none;
+}
+
+.table-row a:hover {
+  text-decoration: underline;
+}
+
+.table-muted {
+  color: #94a3b8;
+}
+
+@media (max-width: 1100px) {
+  .post-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .post-filters-panel .filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-head,
+  .table-row {
+    grid-template-columns: 70px 80px 1fr 100px 80px 70px 70px 70px 100px;
+  }
+}

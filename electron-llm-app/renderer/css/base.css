@@ -39,6 +39,39 @@ body {
   background: #eaeef8;
 }
 
+body[data-theme="classic"] {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #f9fafb;
+  --text: #111827;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #4f46e5;
+  --primary-2: #4338ca;
+}
+
+body[data-theme="soft"] {
+  --bg: #f7f5f2;
+  --surface: #ffffff;
+  --surface-2: #f7f3ee;
+  --text: #1f2937;
+  --muted: #7c8798;
+  --border: #e4dfd7;
+  --primary: #ea7a5f;
+  --primary-2: #d96a54;
+}
+
+body[data-theme="midnight"] {
+  --bg: #0f172a;
+  --surface: #111827;
+  --surface-2: #1f2937;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --border: #273449;
+  --primary: #38bdf8;
+  --primary-2: #0ea5e9;
+}
+
 .page-container {
   margin-top: 56px;
   padding: 16px 20px;   /* 좌우 여백 살짝만 */

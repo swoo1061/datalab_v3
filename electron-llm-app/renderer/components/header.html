@@ -5,6 +5,7 @@
     <strong class="brand-title" onclick="goDashboard()">Datalab90</strong>
     <span class="divider">|</span>
     <span class="page-title" id="pageTitle">내부 시스템</span>
+    <button class="back-btn" onclick="window.history.back()" aria-label="뒤로가기">back</button>
   </div>
 
   <!-- 가운데: 전체 검색 -->
@@ -40,10 +41,21 @@
 
         <hr />
 
+        <div class="profile-section">
+          <div class="section-title">테마</div>
+          <div class="theme-options">
+            <button class="theme-btn" data-theme="classic">Classic</button>
+            <button class="theme-btn" data-theme="soft">Soft</button>
+            <button class="theme-btn" data-theme="midnight">Midnight</button>
+          </div>
+        </div>
+
+        <hr />
+
         <div class="profile-menu">
           <div class="menu-item" data-action="profile">기본 정보</div>
           <div class="menu-item" data-action="attendance">출퇴근 기록</div>
-          <div class="menu-item" data-action="my-dashboard">내 대시보드</div>
+          <div class="menu-item" data-action="my_dashboard">나의 대시보드</div>
         </div>
 
         <hr />

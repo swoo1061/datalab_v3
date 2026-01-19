@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from apps.data.models import ClinicGuide
 from apps.data.models_worklog import DailyWorkLog
 from apps.data.serializers_worklog import DailyWorkLogSerializer
+from apps.data.views_api import CsrfExemptSessionAuthentication
 
 
 def _parse_date(s: str):
@@ -26,6 +27,7 @@ class ClinicDailyWorkLogViewSet(viewsets.ModelViewSet):
     /api/clinics/<clinic_id>/worklogs/<id>/
     """
     serializer_class = DailyWorkLogSerializer
+    authentication_classes = [CsrfExemptSessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):

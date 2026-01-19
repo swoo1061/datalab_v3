@@ -9,7 +9,6 @@ let currentClinicId = null;
 let currentMonth = getThisMonth();   // YYYY-MM
 let currentType = "opinion";         // opinion | review
 let currentPlatform = "all";         // all | naver | ...
-let currentAssignee = "all";         // all | user_id
 let currentQuery = "";
 
 // ================================
@@ -67,7 +66,8 @@ async function initClinicPage() {
   bindSearch();
 
   await loadClinicInfo();
-  await loadAssignees();   // ⭐ 추가
+
+  initAiIntakeForm();
   await loadPosts();
 }
 
@@ -89,44 +89,6 @@ async function loadClinicInfo() {
     metaEl.innerText = `${c.location || ""} · ${c.hours || ""}`.trim();
   }
 }
-
-// ================================
-// 담당자 필터
-// ================================
-async function loadAssignees() {
-  const root = document.getElementById("assigneePills");
-  if (!root) return;
-
-  const res = await fetch(
-    `${API_BASE}/api/data/clinics/${currentClinicId}/assignees/`,
-    { credentials: "include" }
-  );
-  const list = await res.json();
-
-  root.innerHTML = `
-    <button class="pill active" data-assignee="all"
-            onclick="setAssignee('all')">전체</button>
-    ${list.map(a => `
-      <button class="pill"
-              data-assignee="${a.id}"
-              onclick="setAssignee('${a.id}')">
-        ${a.name}
-      </button>
-    `).join("")}
-  `;
-}
-
-function setAssignee(userId) {
-  currentAssignee = userId;
-
-  document.querySelectorAll("#assigneePills .pill").forEach(el => {
-    el.classList.toggle("active", el.dataset.assignee === userId);
-  });
-
-  loadPosts();
-}
-
-window.setAssignee = setAssignee;
 
 // ================================
 // 플랫폼 / 타입 / 검색
@@ -177,25 +139,129 @@ function bindSearch() {
 }
 
 function initMonthSelect() {
-  const sel = document.getElementById("monthSelect");
+  const sel = document.getElementById("monthFilter");
   if (!sel) return;
-
-  const now = new Date();
-  const months = [];
-
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-  }
-
-  sel.innerHTML = months.map(m =>
-    `<option value="${m}" ${m === currentMonth ? "selected" : ""}>${m}</option>`
-  ).join("");
-
+  sel.value = currentMonth;
   sel.onchange = () => {
     currentMonth = sel.value;
     loadPosts();
   };
+}
+
+function initAiIntakeForm() {
+  const urlInput = document.getElementById("aiIntakeUrl");
+  const titleInput = document.getElementById("aiIntakeTitle");
+  const platformSelect = document.getElementById("aiIntakePlatform");
+  const submitBtn = document.getElementById("aiIntakeSubmit");
+  const reviewBtn = document.getElementById("aiIntakeReviewBtn");
+  const statusEl = document.getElementById("aiIntakeStatus");
+  const photoInput = document.getElementById("aiIntakePhotos");
+  const photoHint = document.getElementById("aiIntakePhotoHint");
+  const reviewMenu = document.querySelector(".ai-review-menu");
+
+  if (!urlInput || !platformSelect || !submitBtn) return;
+
+  if (!platformSelect.options.length) {
+    platformSelect.innerHTML = `
+      <option value="">플랫폼 선택</option>
+      ${PLATFORM_PILLS.filter(p => p.key !== "all")
+        .map(p => `<option value="${p.key}">${p.label}</option>`)
+        .join("")}
+    `;
+  }
+
+  submitBtn.onclick = async () => {
+    const url = urlInput.value.trim();
+    const platform = platformSelect.value;
+    const title = (titleInput?.value || "").trim();
+
+    if (!url || !platform) {
+      if (statusEl) statusEl.textContent = "URL과 플랫폼을 입력하세요.";
+      return;
+    }
+
+    const form = new FormData();
+    form.append("url", url);
+    form.append("platform", platform);
+    form.append("title", title);
+    form.append("auto_classify", "true");
+    if (photoInput?.files?.length) {
+      Array.from(photoInput.files).forEach((file) => {
+        form.append("photos", file);
+      });
+    }
+
+    if (statusEl) statusEl.textContent = "처리 중...";
+    submitBtn.disabled = true;
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/data/clinics/${currentClinicId}/posts/`,
+        {
+          method: "POST",
+          credentials: "include",
+          body: form,
+        }
+      );
+
+      if (!res.ok) {
+        if (statusEl) statusEl.textContent = "저장 실패";
+        return;
+      }
+
+      if (statusEl) statusEl.textContent = "저장 완료";
+      urlInput.value = "";
+      if (titleInput) titleInput.value = "";
+      if (photoInput) photoInput.value = "";
+      if (photoHint) photoHint.textContent = "선택된 파일 없음";
+      await loadPosts();
+    } catch (e) {
+      console.error("ai intake error", e);
+      if (statusEl) statusEl.textContent = "저장 실패";
+    } finally {
+      submitBtn.disabled = false;
+    }
+  };
+
+  if (reviewBtn) {
+    reviewBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (reviewMenu) reviewMenu.classList.toggle("open");
+    };
+  }
+
+  if (reviewMenu) {
+    reviewMenu.querySelectorAll(".menu-item").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const type = btn.dataset.type;
+        reviewMenu.classList.remove("open");
+        if (type === "gangnam") {
+          window.location.href = `gangnam_review.html?clinic_id=${currentClinicId}`;
+          return;
+        }
+        if (type === "babytok") {
+          window.location.href = `review.html?clinic_id=${currentClinicId}&platform=babytok`;
+          return;
+        }
+        if (type === "yeoshin") {
+          window.location.href = `review.html?clinic_id=${currentClinicId}&platform=yeoshin`;
+          return;
+        }
+        window.location.href = `review.html?clinic_id=${currentClinicId}`;
+      });
+    });
+
+    document.addEventListener("click", () => {
+      reviewMenu.classList.remove("open");
+    });
+  }
+
+  if (photoInput && photoHint) {
+    photoInput.addEventListener("change", () => {
+      const count = photoInput.files ? photoInput.files.length : 0;
+      photoHint.textContent = count ? `${count}개 파일 선택됨` : "선택된 파일 없음";
+    });
+  }
 }
 
 // ================================
@@ -212,10 +278,6 @@ async function loadPosts() {
     platform: currentPlatform,
     month: currentMonth,
   });
-
-  if (currentAssignee !== "all") {
-    params.set("assignee", currentAssignee);
-  }
 
   if (currentQuery) {
     params.set("q", currentQuery);
@@ -239,10 +301,69 @@ async function loadPosts() {
       </div>
       <div class="post-num">${p.views}</div>
       <div class="post-num">${p.comments}</div>
+      <div>
+        <input class="post-input message-input" type="number" min="0" value="${p.message_count ?? 0}" data-post-id="${p.id}" />
+      </div>
       <div class="post-status">${p.status}</div>
       <div class="post-updated">${fmtDateTime(p.updated_at)}</div>
     </div>
   `).join("");
+
+  bindMessageInputs();
+}
+
+function bindMessageInputs() {
+  document.querySelectorAll(".message-input").forEach((input) => {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        input.blur();
+      }
+    });
+    input.addEventListener("blur", async () => {
+      const postId = input.dataset.postId;
+      const value = Number(input.value || 0);
+      if (!postId) return;
+      await updatePostMessageCount(postId, value);
+    });
+  });
+}
+
+async function updatePostMessageCount(postId, messageCount) {
+  const url = `${API_BASE}/api/data/clinics/${currentClinicId}/posts/${postId}/`;
+  try {
+    await fetch(url, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message_count: messageCount }),
+    });
+  } catch (e) {
+    console.error("message count update failed", e);
+  }
+}
+
+function getPostDate(post) {
+  const raw = post.published_at || post.updated_at || "";
+  if (!raw) return "";
+  return raw.slice(0, 10);
+}
+
+async function fetchPostsByMonth(type) {
+  const params = new URLSearchParams({
+    type,
+    platform: "all",
+    month: currentMonth,
+  });
+
+  const url = `${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${params}`;
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.results || [];
+}
+
+function reloadClinicPage() {
+  loadPosts();
 }
 
 // ================================

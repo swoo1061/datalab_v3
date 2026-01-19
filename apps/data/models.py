@@ -1015,6 +1015,10 @@ class ClinicPost(models.Model):
         ("opinion", "여론"),
         ("review", "후기"),
     ]
+    REVIEW_SUBTYPE_CHOICES = [
+        ("text", "텍스트 후기"),
+        ("photo", "사진 후기"),
+    ]
 
     PLATFORM_CHOICES = [
         ("all", "전체"),
@@ -1051,11 +1055,19 @@ class ClinicPost(models.Model):
 
     views = models.IntegerField(default=0)
     comments = models.IntegerField(default=0)
+    message_count = models.IntegerField(default=0)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="normal", db_index=True)
 
     published_at = models.DateTimeField(null=True, blank=True)  # 글 작성일(있으면)
     last_crawled_at = models.DateTimeField(null=True, blank=True)  # 마지막 수집 시간
+    review_subtype = models.CharField(
+        max_length=20,
+        choices=REVIEW_SUBTYPE_CHOICES,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -1067,6 +1079,22 @@ class ClinicPost(models.Model):
 
     def __str__(self):
         return f"[{self.get_type_display()}] {self.title}"
+
+
+class ClinicPostPhoto(models.Model):
+    post = models.ForeignKey(
+        ClinicPost,
+        on_delete=models.CASCADE,
+        related_name="photos",
+    )
+    image = models.ImageField(upload_to="clinic_post_photos/%Y/%m/%d")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Photo {self.pk} for post {self.post_id}"
 
 class ClinicAssignee(models.Model):
     clinic = models.ForeignKey(

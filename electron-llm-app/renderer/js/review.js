@@ -63,8 +63,25 @@ async function loadClinics() {
     state.clinicName =
       clinicSelect.options[clinicSelect.selectedIndex]?.text || null;
 
+    if (state.clinicId) {
+      try {
+        state.clinicGuide = await window.api.getClinicGuide(state.clinicId);
+      } catch (e) {
+        console.error("❌ clinic guide load error:", e);
+        state.clinicGuide = null;
+      }
+    } else {
+      state.clinicGuide = null;
+    }
+
     updatePreview();
   };
+
+  const queryClinicId = new URLSearchParams(window.location.search).get("clinic_id");
+  if (queryClinicId) {
+    clinicSelect.value = queryClinicId;
+    clinicSelect.onchange();
+  }
 }
 
 /* ---------- models ---------- */
@@ -224,6 +241,17 @@ async function generateReview() {
 }
 
 /* ---------- modal ---------- */
+function flashCopy(btn) {
+  if (!btn) return;
+  const original = btn.dataset.originalText || btn.innerText;
+  btn.dataset.originalText = original;
+  btn.innerText = "복사됨!";
+  if (btn._copyTimer) clearTimeout(btn._copyTimer);
+  btn._copyTimer = setTimeout(() => {
+    btn.innerText = original;
+  }, 1200);
+}
+
 function openModal() {
   document.body.style.overflow = "hidden";
   reviewModal.classList.remove("hidden");
@@ -284,6 +312,12 @@ function startInteractionWatchdog() {
 
 /* ---------- init ---------- */
 window.addEventListener("DOMContentLoaded", async () => {
+  document.getElementById("copyModalBtn")?.addEventListener("click", () => {
+    const text = modalReview?.innerText || "";
+    navigator.clipboard.writeText(text);
+    flashCopy(document.getElementById("copyModalBtn"));
+  });
+
   setupSingleGroup("reviewType", "reviewType");
   setupSingleGroup("reviewTiming", "reviewTiming");
   setupMultiGroup("keywordGroup");

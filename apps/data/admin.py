@@ -5,7 +5,7 @@ from django.contrib import admin
 from .models import (
     Campaign, Review, ImageAsset,
     Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile
-, ClinicDoctor, ClinicPrice
+, ClinicDoctor, ClinicPrice, ClinicPost, ClinicPostPhoto
 )
 
 
@@ -135,6 +135,22 @@ class ClinicPriceInline(admin.TabularInline):
                 pass
 
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class ClinicPostPhotoInline(admin.TabularInline):
+    model = ClinicPostPhoto
+    extra = 0
+    fields = ("image", "created_at")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(ClinicPost)
+class ClinicPostAdmin(admin.ModelAdmin):
+    list_display = ["id", "clinic", "type", "platform", "title", "views", "comments", "message_count", "updated_at"]
+    list_filter = ["type", "platform", "clinic", "status"]
+    search_fields = ["title", "url"]
+    readonly_fields = ["created_at", "updated_at"]
+    inlines = [ClinicPostPhotoInline]
 
 @admin.register(ClinicGuide)
 class ClinicGuideAdmin(admin.ModelAdmin):

@@ -37,7 +37,7 @@ async function loadLLMModels() {
     (models || []).forEach((m, i) => {
       const opt = document.createElement("option");
       opt.value = m.key;
-      opt.textContent = `${m.label ?? m.name ?? m.key} (${m.vendor ?? "vendor"})`;
+      opt.textContent = `${m.label ?? m.name ?? m.key}`;
 
       if (m.recommended || i === 0) {
         opt.selected = true;
@@ -117,8 +117,18 @@ async function generateGangnamReview() {
   try {
     const data = await window.api.generateGangnamReview(payload);
 
-    const raw = (data?.result_review || "").toString();
-    autoSelectTagsByReview(raw);
+    const raw = (data?.result_review || data?.review_text || data?.raw_text || "").toString();
+    const tagText = [
+      data?.before_worry,
+      data?.result_review,
+      data?.bad_reason,
+      data?.additional,
+      payload?.good_points_hint,
+      payload?.bad_points_hint,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    autoSelectTagsByReview(tagText || raw);
 
     const tags = {
       select_reasons: getSelectedTags("tags_reason"),
@@ -132,7 +142,8 @@ async function generateGangnamReview() {
 
   } catch (e) {
     console.error("❌ generateGangnamReview error:", e);
-    alert("강남언니 후기 생성 실패 (서버/네트워크)");
+    const msg = e?.data?.error || e?.message || "강남언니 후기 생성 실패 (서버/네트워크)";
+    alert(msg);
     closeReviewResultModal();
     clearModalOverlays();
   } finally {
@@ -163,13 +174,14 @@ $("generateBtn")?.addEventListener("click", generateGangnamReview);
    MODAL DATA
 ===================================================== */
 function buildModalResultFromServer(rawText, tags, serverData) {
+  const safeRaw = rawText || serverData?.result_review || serverData?.review_text || "";
   return {
-    raw_text: rawText,
+    raw_text: safeRaw,
     surgery_date: serverData?.procedure_date || "-",
     created_at: serverData?.write_date || "-",
-    before_reason: serverData?.before_worry || rawText,
+    before_reason: serverData?.before_worry || "",
     select_reasons: tags.select_reasons,
-    after_review: serverData?.result_review || rawText,
+    after_review: serverData?.result_review || serverData?.review_text || safeRaw,
     good_points: tags.good_points,
     bad_points: tags.bad_points,
     bad_reason: serverData?.bad_reason || "",
@@ -181,49 +193,29 @@ function buildModalResultFromServer(rawText, tags, serverData) {
 /* =====================================================
    RENDER
 ===================================================== */
-const copyMap = {};
-
-function renderTextSection({ index, title, text }) {
-  copyMap[index] = text;
-  return `
-    <div class="review-section">
-      <div class="section-header">
-        <h4>${index}. ${title}</h4>
-        <button data-copy="${index}">복사</button>
-      </div>
-      <div class="section-body">${text || ""}</div>
-    </div>
-  `;
+function updateCharCount(sectionId, text) {
+  const section = document.querySelector(`[data-section="${sectionId}"]`);
+  if (!section) return;
+  const countEl = section.querySelector(".char-count");
+  if (!countEl) return;
+  const len = text ? text.length : 0;
+  countEl.textContent = `${len}자`;
 }
 
-function renderTagSection({ index, title, tags }) {
-  const list = Array.isArray(tags) ? tags : [];
-  copyMap[index] = list.join(", ");
-  return `
-    <div class="review-section">
-      <div class="section-header">
-        <h4>${index}. ${title}</h4>
-        <button data-copy="${index}">복사</button>
-      </div>
-      <div class="tag-list">
-        ${list.map(t => `<span class="tag">${t}</span>`).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderRatingSection(score) {
-  return `
-    <div class="review-section">
-      <h4>7. 전체 경험 총점</h4>
-      <div class="rating">${"★".repeat(score)} (${score}점)</div>
-    </div>
-  `;
+function renderStars(rating) {
+  const score = Number(rating || 0);
+  const fullStars = Math.floor(score);
+  const halfStar = score % 1 >= 0.5;
+  let stars = "★".repeat(fullStars);
+  if (halfStar) stars += "½";
+  stars += "☆".repeat(5 - Math.ceil(score));
+  return `${stars} (${score || 0}점)`;
 }
 
 function openReviewResultModal(result) {
-  $("surgeryDate").innerText = result.surgery_date;
-  $("createdDate").innerText = result.created_at;
+  $("display_procedure_date").innerText = result.surgery_date;
+  $("display_write_date").innerText = result.created_at;
+  if ($("dateInfo")) $("dateInfo").style.display = "flex";
 
   const ta = $("reviewResultText");
   ta.value = result.raw_text;
@@ -231,15 +223,16 @@ function openReviewResultModal(result) {
   ta.readOnly = false;
   ta.style.pointerEvents = "auto";
 
-  $("reviewSections").innerHTML = [
-    renderTextSection({ index: 1, title: "시술 전 고민", text: result.before_reason }),
-    renderTagSection({ index: 2, title: "선택 이유", tags: result.select_reasons }),
-    renderTextSection({ index: 3, title: "후기", text: result.after_review }),
-    renderTagSection({ index: 4, title: "좋았던 점", tags: result.good_points }),
-    renderTagSection({ index: 5, title: "아쉬운 점", tags: result.bad_points }),
-    renderRatingSection(result.rating),
-    renderTextSection({ index: 8, title: "추가 의견", text: result.extra_comment }),
-  ].join("");
+  $("result_before_worry").textContent = result.before_reason || "";
+  $("result_result_review").textContent = result.after_review || "";
+  $("result_bad_reason").textContent = result.bad_reason || "";
+  $("result_additional").textContent = result.extra_comment || "";
+  $("result_rating").innerText = renderStars(result.rating);
+
+  updateCharCount("before_worry", result.before_reason || "");
+  updateCharCount("result_review", result.after_review || "");
+  updateCharCount("bad_reason", result.bad_reason || "");
+  updateCharCount("additional", result.extra_comment || "");
 
   $("reviewModal").classList.remove("hidden");
   ta.focus();
@@ -294,17 +287,89 @@ function startInteractionWatchdog() {
 /* =====================================================
    EVENTS (document 캡처 제거)
 ===================================================== */
-document.addEventListener("click", (e) => {
-  if (e.target.closest("#reviewModal")) return;
+function flashCopy(btn) {
+  if (!btn) return;
+  const original = btn.dataset.originalText || btn.innerText;
+  btn.dataset.originalText = original;
+  btn.innerText = "복사됨!";
+  if (btn._copyTimer) clearTimeout(btn._copyTimer);
+  btn._copyTimer = setTimeout(() => {
+    btn.innerText = original;
+  }, 1200);
+}
 
-  const copyBtn = e.target.closest("[data-copy]");
-  if (copyBtn) {
-    navigator.clipboard.writeText(copyMap[copyBtn.dataset.copy] || "");
+function copySection(sectionId, btn) {
+  const content = $(`result_${sectionId}`)?.textContent || "";
+  navigator.clipboard.writeText(content);
+  flashCopy(btn);
+}
+
+function copyTags(type, btn) {
+  const container = $(`tags_${type}`);
+  if (!container) return;
+  const selectedTags = [];
+  container.querySelectorAll(".tag-chip.selected").forEach((chip) => {
+    selectedTags.push(chip.dataset.tag);
+  });
+  navigator.clipboard.writeText(selectedTags.join(", "));
+  flashCopy(btn);
+}
+
+function copyAll(btn) {
+  const getSelectedTags = (containerId) => {
+    const tags = [];
+    document.querySelectorAll(`#${containerId} .tag-chip.selected`).forEach((chip) => {
+      tags.push(chip.dataset.tag);
+    });
+    return tags.join(", ") || "없음";
+  };
+
+  const fullText = `[시술 전 고민과 시술을 결정한 계기]
+${$("result_before_worry")?.textContent || ""}
+
+[이 병원 및 이벤트를 선택한 이유]
+${getSelectedTags("tags_reason")}
+
+[시술 결과 후기]
+${$("result_result_review")?.textContent || ""}
+
+[좋았던 점]
+${getSelectedTags("tags_good")}
+
+[아쉬운 점]
+${getSelectedTags("tags_bad")}
+
+[아쉬운 점을 선택한 이유]
+${$("result_bad_reason")?.textContent || ""}
+
+[전체 경험 총점]
+${$("result_rating")?.textContent || ""}
+
+  [추가 의견]
+  ${$("result_additional")?.textContent || ""}
+  `;
+
+  navigator.clipboard.writeText(fullText);
+  flashCopy(btn);
+}
+
+document.addEventListener("click", (e) => {
+  const sectionBtn = e.target.closest("[data-copy-section]");
+  if (sectionBtn) {
+    copySection(sectionBtn.dataset.copySection, sectionBtn);
+    return;
+  }
+
+  const tagsBtn = e.target.closest("[data-copy-tags]");
+  if (tagsBtn) {
+    copyTags(tagsBtn.dataset.copyTags, tagsBtn);
+    return;
   }
 });
 
 $("closeReviewModal")?.addEventListener("click", closeReviewResultModal);
 $("confirmReviewBtn")?.addEventListener("click", closeReviewResultModal);
+$("copyAllBtn")?.addEventListener("click", (e) => copyAll(e.currentTarget));
 document
   .querySelector("#reviewModal .modal-backdrop")
   ?.addEventListener("click", closeReviewResultModal);
@@ -312,26 +377,146 @@ document
 /* =====================================================
    TAG DATA & AUTO SELECT
 ===================================================== */
-const REASON_TAGS = ["합리적 가격","높은 평점","후기 내용","의사 전문성","병원 인지도"];
-const GOOD_TAGS = ["결과 만족","빠른 회복","통증 적음","애프터케어"];
-const BAD_TAGS = ["통증 있음","회복 느림","아쉬움"];
+const REASON_TAGS = [
+  "합리적 가격",
+  "높은 평점",
+  "후기 내용",
+  "의사 전문성",
+  "병원 인지도",
+  "병원 위치",
+  "재방문",
+  "지인 추천",
+  "병원 시설",
+  "최신 기기",
+  "앱결제",
+  "포인트 사용",
+  "기타",
+];
+const GOOD_TAGS = [
+  "빠른 효과",
+  "결과 만족",
+  "부작용 없음",
+  "적은 통증",
+  "흉터 없음",
+  "빠른 회복",
+  "일상 생활 가능",
+  "꼼꼼한 시술",
+  "애프터케어",
+  "기타",
+  "없어요",
+];
+const BAD_TAGS = [
+  "효과 없음",
+  "결과 불만족",
+  "부작용 있음",
+  "시술 중 통증",
+  "시술 후 통증",
+  "흉터 남음",
+  "더딘 회복",
+  "일상 복귀 시간 필요",
+  "성의 없는 시술",
+  "애프터케어 부족",
+  "기타",
+  "없어요",
+];
 
 const TAG_RULES = {
-  reason: { "합리적 가격": ["가격"] },
-  good: { "결과 만족": ["만족"] },
-  bad: { "통증 있음": ["아팠"] },
+  reason: {
+    "합리적 가격": ["가격", "비용", "가성비"],
+    "높은 평점": ["평점", "후기", "리뷰"],
+    "후기 내용": ["후기", "리뷰", "평가"],
+    "의사 전문성": ["의사", "원장", "전문", "실력"],
+    "병원 인지도": ["유명", "인지도", "평판"],
+    "병원 위치": ["위치", "교통", "거리", "근처"],
+    "재방문": ["재방문", "다시", "또"],
+    "지인 추천": ["추천", "지인", "친구", "소개"],
+    "병원 시설": ["시설", "깨끗", "환경"],
+    "최신 기기": ["기기", "장비", "최신"],
+    "앱결제": ["앱결제", "앱 결제", "결제"],
+    "포인트 사용": ["포인트", "적립"],
+  },
+  good: {
+    "빠른 효과": ["빠른", "효과", "즉시"],
+    "결과 만족": ["만족", "좋았", "만족도"],
+    "부작용 없음": ["부작용 없", "문제 없", "이상 없"],
+    "적은 통증": ["통증 적", "안 아", "덜 아"],
+    "흉터 없음": ["흉터 없", "자국 없"],
+    "빠른 회복": ["회복 빠", "금방", "빠르게"],
+    "일상 생활 가능": ["일상", "생활 가능", "바로"],
+    "꼼꼼한 시술": ["꼼꼼", "세심", "디테일"],
+    "애프터케어": ["애프터", "케어", "사후"],
+  },
+  bad: {
+    "효과 없음": ["효과 없", "변화 없"],
+    "결과 불만족": ["불만족", "아쉽", "별로"],
+    "부작용 있음": ["부작용 있", "문제 있", "이상 있"],
+    "시술 중 통증": ["시술 중", "중에 아", "통증"],
+    "시술 후 통증": ["시술 후", "끝나고 아", "통증"],
+    "흉터 남음": ["흉터", "자국"],
+    "더딘 회복": ["회복 느", "오래", "더디"],
+    "일상 복귀 시간 필요": ["일상 복귀", "복귀", "시간 필요"],
+    "성의 없는 시술": ["성의", "대충", "불친절"],
+    "애프터케어 부족": ["애프터", "케어 부족", "사후"],
+  },
 };
 
-function autoSelectTagsByReview(text) {
-  Object.entries(TAG_RULES).forEach(([type, rules]) => {
-    Object.entries(rules).forEach(([tag, keywords]) => {
-      if (keywords.some(k => text.includes(k))) {
-        document
-          .querySelector(`#tags_${type} .tag-chip[data-tag="${tag}"]`)
-          ?.classList.add("selected");
-      }
-    });
+function clearSelectedTags(containerId) {
+  document.querySelectorAll(`#${containerId} .tag-chip`).forEach((chip) => {
+    chip.classList.remove("selected");
   });
+}
+
+function selectTagsFromText(containerId, tags, rules, text, maxCount) {
+  const normalized = (text || "").replace(/\s+/g, "").toLowerCase();
+  let count = 0;
+  tags.forEach((tag) => {
+    if (count >= maxCount) return;
+    const keywords = rules?.[tag] || [tag];
+    const hit = keywords.some((k) =>
+      normalized.includes(String(k).replace(/\s+/g, "").toLowerCase())
+    );
+    if (hit) {
+      document
+        .querySelector(`#${containerId} .tag-chip[data-tag="${tag}"]`)
+        ?.classList.add("selected");
+      count += 1;
+    }
+  });
+  return count;
+}
+
+function autoSelectTagsByReview(text) {
+  clearSelectedTags("tags_reason");
+  clearSelectedTags("tags_good");
+  clearSelectedTags("tags_bad");
+
+  const reasonCount = selectTagsFromText(
+    "tags_reason",
+    REASON_TAGS,
+    TAG_RULES.reason,
+    text,
+    3
+  );
+  const goodCount = selectTagsFromText(
+    "tags_good",
+    GOOD_TAGS,
+    TAG_RULES.good,
+    text,
+    3
+  );
+  const badCount = selectTagsFromText(
+    "tags_bad",
+    BAD_TAGS,
+    TAG_RULES.bad,
+    text,
+    3
+  );
+
+  if (badCount === 0) {
+    document
+      .querySelector(`#tags_bad .tag-chip[data-tag="없어요"]`)
+      ?.classList.add("selected");
+  }
 }
 
 function renderTags(containerId, tags) {
@@ -348,6 +533,13 @@ function renderTags(containerId, tags) {
   });
 }
 
+function syncTemperatureUI() {
+  const range = $("temperature");
+  const value = $("tempValue");
+  if (!range || !value) return;
+  value.innerText = Number(range.value || 0.85).toFixed(2);
+}
+
 /* =====================================================
    INIT
 ===================================================== */
@@ -356,4 +548,6 @@ window.addEventListener("DOMContentLoaded", () => {
   renderTags("tags_reason", REASON_TAGS);
   renderTags("tags_good", GOOD_TAGS);
   renderTags("tags_bad", BAD_TAGS);
+  syncTemperatureUI();
+  $("temperature")?.addEventListener("input", syncTemperatureUI);
 });

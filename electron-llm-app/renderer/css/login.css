@@ -21,6 +21,16 @@
   margin: -14px -8px 6px;
 }
 
+.login-drag-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  background: linear-gradient(180deg, rgba(229, 231, 235, 0.9), rgba(248, 250, 252, 0));
+  -webkit-app-region: drag;
+}
+
 .login-header-time {
   display: flex;
   flex-direction: column;

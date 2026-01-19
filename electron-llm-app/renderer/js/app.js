@@ -45,6 +45,8 @@ function releaseBlockingLayers() {
     "app-sidebar-slot",
     "modal-panel",
     "modal-content",
+    "modal",
+    "modal-backdrop",
     "profile-popup",
     "profile-info-modal",
   ]);

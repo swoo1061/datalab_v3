@@ -186,6 +186,8 @@ function renderPriceTable(data, key) {
     return p.doctor_code === key;
   });
 
+  setDoctorHeader(data, key, filtered.length);
+
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
@@ -203,6 +205,21 @@ function renderPriceTable(data, key) {
     `;
     tbody.appendChild(tr);
   });
+}
+
+function setDoctorHeader(data, key, count) {
+  const titleEl = document.getElementById("doctorTitle");
+  const countEl = document.getElementById("priceCount");
+  const doctors = Array.isArray(data.doctors) ? data.doctors : [];
+  let label = "공통 수가";
+
+  if (key !== "common") {
+    const found = doctors.find(d => (d.code || d.name) === key);
+    label = found?.name || key;
+  }
+
+  if (titleEl) titleEl.textContent = label;
+  if (countEl) countEl.textContent = `${count}개 항목`;
 }
 
 /* ================================

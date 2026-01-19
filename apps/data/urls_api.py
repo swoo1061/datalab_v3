@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views_api
-from .views_api import FavoriteClinicView, ClinicPostListCreateView, ClinicAssigneeListView
+from .views_api import FavoriteClinicView, ClinicPostListCreateView, ClinicPostDetailView, ClinicAssigneeListView
 from apps.data.views_worklog_api import ClinicDailyWorkLogViewSet 
 
 worklog_list = ClinicDailyWorkLogViewSet.as_view({
@@ -18,6 +18,7 @@ worklog_summary = ClinicDailyWorkLogViewSet.as_view({
 
 urlpatterns = [
     path("clinics/", views_api.clinic_list_api),
+    path("clinics/<int:clinic_id>/", views_api.clinic_detail_api),
     path("clinics/<int:clinic_id>/doctors/", views_api.clinic_detail_api),
     path("llm/models/", views_api.llm_model_list_api),
     path("favorites/", FavoriteClinicView.as_view()),
@@ -26,5 +27,6 @@ urlpatterns = [
     path("clinics/<int:clinic_id>/worklogs/summary/", worklog_summary),
     path("clinics/<int:clinic_id>/worklogs/<int:pk>/", worklog_detail),
     path("clinics/<int:clinic_id>/posts/", ClinicPostListCreateView.as_view()),
+    path("clinics/<int:clinic_id>/posts/<int:post_id>/", ClinicPostDetailView.as_view()),
     path("clinics/<int:clinic_id>/assignees/", ClinicAssigneeListView.as_view()),
 ]

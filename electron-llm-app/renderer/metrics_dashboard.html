@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | 지표 대시보드</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/metrics_dashboard.css" />
+</head>
+<body>
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope metrics-detail">
+      <section class="page-canvas">
+        <header class="page-head detail-head">
+          <div class="head-left">
+            <h1 class="h1">지표 대시보드</h1>
+            <p class="sub">병원별 월간 지표 · 전월 비교 · 다음 달 예측</p>
+          </div>
+          <div class="head-right">
+            <div class="pill">Program Mode</div>
+            <div class="pill ghost">Analytics Core</div>
+          </div>
+        </header>
+
+        <section class="detail-filter card">
+          <div class="filter-grid">
+            <div class="filter-field span-2">
+              <label>구분</label>
+              <div class="type-pills" id="detailTypePills">
+                <button class="type-pill active" data-type="all">전체</button>
+                <button class="type-pill" data-type="opinion">여론</button>
+                <button class="type-pill" data-type="review">후기</button>
+              </div>
+            </div>
+            <div class="filter-field pretty-select">
+              <label>병원</label>
+              <select id="detailClinicSelect" class="select"></select>
+            </div>
+            <div class="filter-field pretty-select">
+              <label>월</label>
+              <input type="month" id="detailMonth" class="month-input" />
+            </div>
+          </div>
+        </section>
+
+        <section class="summary-grid">
+          <div class="summary-card">
+            <div class="summary-label">총 게시글</div>
+            <div class="summary-value" id="summaryPosts">0</div>
+            <div class="summary-meta" id="summaryPostsDelta">0</div>
+          </div>
+          <div class="summary-card mini">
+            <div class="summary-label">여론 게시글</div>
+            <div class="summary-value" id="summaryOpinionPosts">0</div>
+            <div class="summary-meta" id="summaryOpinionPostsDelta">0</div>
+          </div>
+          <div class="summary-card mini">
+            <div class="summary-label">후기 게시글</div>
+            <div class="summary-value" id="summaryReviewPosts">0</div>
+            <div class="summary-meta" id="summaryReviewPostsDelta">0</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">총 댓글</div>
+            <div class="summary-value" id="summaryComments">0</div>
+            <div class="summary-meta" id="summaryCommentsDelta">0</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">총 조회수</div>
+            <div class="summary-value" id="summaryViews">0</div>
+            <div class="summary-meta" id="summaryViewsDelta">0</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">총 쪽지</div>
+            <div class="summary-value" id="summaryMessages">0</div>
+            <div class="summary-meta" id="summaryMessagesDelta">0</div>
+          </div>
+        </section>
+
+        <section class="detail-panels">
+          <div class="panel card">
+            <div class="card-hd">월간 흐름</div>
+            <div class="card-bd">
+              <div class="spark-grid" id="trendBars"></div>
+            </div>
+          </div>
+
+          <div class="panel card">
+            <div class="card-hd">전월 비교</div>
+            <div class="card-bd">
+              <div class="compare-list" id="compareList"></div>
+            </div>
+          </div>
+
+          <div class="panel card">
+            <div class="card-hd">다음 달 예측</div>
+            <div class="card-bd">
+              <div class="forecast-grid">
+                <div class="forecast-card">
+                  <div>게시글</div>
+                  <strong id="forecastPosts">0</strong>
+                </div>
+                <div class="forecast-card">
+                  <div>댓글</div>
+                  <strong id="forecastComments">0</strong>
+                </div>
+                <div class="forecast-card">
+                  <div>조회수</div>
+                  <strong id="forecastViews">0</strong>
+                </div>
+                <div class="forecast-card">
+                  <div>쪽지</div>
+                  <strong id="forecastMessages">0</strong>
+                </div>
+              </div>
+              <p class="forecast-note">최근 2개월 증감 기반 단순 예측</p>
+            </div>
+          </div>
+        </section>
+
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/header.js"></script>
+<script src="js/metrics_dashboard.js"></script>
+<script>
+  (async () => {
+    await loadLayout();
+    await loadHeader("지표 대시보드");
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | 게시글 관리</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/posts_dashboard.css" />
+</head>
+<body>
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope posts-dashboard">
+      <section class="page-canvas">
+        <header class="page-head">
+          <div>
+            <h1 class="h1">게시글 대시보드</h1>
+            <p class="sub">여론/후기 게시글을 병원별로 통합 관리합니다.</p>
+          </div>
+        </header>
+
+        <section class="post-toolbar card">
+          <div class="toolbar-left">
+            <select id="postClinicSelect" class="select"></select>
+            <input type="month" id="postMonth" class="month-input" />
+            <input id="postSearch" class="input" placeholder="제목 검색 (Enter)" />
+          </div>
+          <div class="toolbar-right">
+            <button class="toolbar-btn" id="toggleFiltersBtn">필터 열기</button>
+            <div class="summary-chip">
+              <span>여론</span>
+              <strong id="opinionCount">0</strong>
+            </div>
+            <div class="summary-chip">
+              <span>후기</span>
+              <strong id="reviewCount">0</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="post-filters-panel card hidden" id="postFiltersPanel">
+          <div class="filter-grid">
+            <div class="filter-field">
+              <label>구분</label>
+              <div class="type-pills" id="postTypePills">
+                <button class="type-pill active" data-type="all">전체</button>
+                <button class="type-pill" data-type="opinion">여론</button>
+                <button class="type-pill" data-type="review">후기</button>
+              </div>
+            </div>
+            <div class="filter-field">
+              <label>플랫폼</label>
+              <div class="platform-pills" id="postPlatformPills"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="post-table card">
+          <div class="card-hd">게시글 리스트</div>
+          <div class="card-bd">
+            <div class="table-head">
+              <span>구분</span>
+              <span>플랫폼</span>
+              <span>제목</span>
+              <span>URL</span>
+              <span>작업자</span>
+              <span>댓글</span>
+              <span>조회</span>
+              <span>쪽지</span>
+              <span>날짜</span>
+            </div>
+            <div id="postList" class="table-body"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/header.js"></script>
+<script src="js/posts_dashboard.js"></script>
+<script>
+  (async () => {
+    await loadLayout();
+    await loadHeader("게시글 관리");
+  })();
+</script>
+</body>
+</html>

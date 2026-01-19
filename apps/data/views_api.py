@@ -2,9 +2,13 @@ from django.http import JsonResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
+from django.utils import timezone
+import json
+import re
 
 from apps.ml.services.llm.registry import LLM_MODELS
-from apps.data.models import ClinicGuide, ClinicDoctor, ClinicPrice, ClinicPost
+from apps.ml.services.llm_service import generate_review_with_prompt
+from apps.data.models import ClinicGuide, ClinicDoctor, ClinicPrice, ClinicPost, ClinicPostPhoto
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -131,6 +135,74 @@ def normalize_consultants(consultants):
 
     return []
 
+
+def _extract_json_payload(text):
+    if not text:
+        return None
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return None
+
+
+def _fallback_classify_post(title, platform):
+    title = (title or "").lower()
+    review_keywords = ["후기", "리뷰", "수술후기", "상담후기"]
+    review_platforms = {"gangnam", "gn_jp", "babytok", "yeoshin", "seongyesa"}
+
+    is_review = any(k in title for k in review_keywords) or platform in review_platforms
+    post_type = "review" if is_review else "opinion"
+
+    if post_type == "review":
+        photo_keywords = ["사진", "포토", "셀카", "before", "after"]
+        review_subtype = "photo" if any(k in title for k in photo_keywords) else "text"
+    else:
+        review_subtype = None
+
+    return post_type, review_subtype
+
+
+def classify_post_type_and_subtype(title, platform, url, model="gpt-5-mini"):
+    prompt = f"""
+아래 게시글 메타데이터를 보고 분류하세요.
+반드시 JSON만 출력합니다.
+
+필드:
+- type: "opinion" 또는 "review"
+- review_subtype: type이 review일 때 "text" 또는 "photo", 그 외 null
+
+메타:
+platform: {platform}
+title: {title or ""}
+url: {url or ""}
+
+JSON 예시:
+{{"type":"review","review_subtype":"text"}}
+"""
+    try:
+        raw = generate_review_with_prompt(
+            prompt=prompt,
+            model=model,
+            max_tokens=120,
+            temperature=0.0,
+        )
+        data = _extract_json_payload(raw)
+        if isinstance(data, dict):
+            post_type = data.get("type")
+            review_subtype = data.get("review_subtype")
+            if post_type in ["opinion", "review"]:
+                if post_type == "review" and review_subtype not in ["text", "photo"]:
+                    review_subtype = "text"
+                if post_type == "opinion":
+                    review_subtype = None
+                return post_type, review_subtype
+    except Exception as e:
+        print("auto classify failed:", e)
+
+    return _fallback_classify_post(title, platform)
 @require_GET
 def llm_model_list_api(request):
     return JsonResponse(
@@ -214,7 +286,7 @@ class ClinicPostListCreateView(APIView):
         if q:
             qs = qs.filter(title__icontains=q)
 
-        data = ClinicPostSerializer(qs[:300], many=True).data
+        data = ClinicPostSerializer(qs[:300], many=True, context={"request": request}).data
         return Response({"count": qs.count(), "results": data}, status=status.HTTP_200_OK)
 
     def post(self, request, clinic_id):
@@ -238,9 +310,7 @@ class ClinicPostListCreateView(APIView):
 
         post_type = payload.get("type")
         platform = payload.get("platform")
-
-        if post_type not in ["opinion", "review"]:
-            return Response({"message": "type must be opinion|review"}, status=status.HTTP_400_BAD_REQUEST)
+        auto_classify = bool(payload.get("auto_classify"))
 
         if not platform:
             return Response({"message": "platform required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -248,21 +318,50 @@ class ClinicPostListCreateView(APIView):
         title = (payload.get("title") or "").strip()
         url = (payload.get("url") or "").strip()
 
-        if not title or not url:
-            return Response({"message": "title and url required"}, status=status.HTTP_400_BAD_REQUEST)
+        if not url:
+            return Response({"message": "url required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not title:
+            title = "미제목"
+
+        review_subtype = payload.get("review_subtype")
+        model = payload.get("model") or "gpt-5-mini"
+
+        if auto_classify or post_type not in ["opinion", "review"]:
+            post_type, review_subtype = classify_post_type_and_subtype(
+                title=title,
+                platform=platform,
+                url=url,
+                model=model,
+            )
+
+        if post_type not in ["opinion", "review"]:
+            return Response({"message": "type must be opinion|review"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if post_type == "review" and review_subtype not in ["text", "photo"]:
+            _, review_subtype = _fallback_classify_post(title, platform)
+
+        assignee_id = payload.get("assignee") or request.user.id
 
         obj = ClinicPost.objects.create(
             clinic=clinic,
             type=post_type,
+            review_subtype=review_subtype if post_type == "review" else None,
             platform=platform,
             title=title,
             url=url,
             views=int(payload.get("views") or 0),
             comments=int(payload.get("comments") or 0),
+            message_count=int(payload.get("message_count") or 0),
             status=payload.get("status") or "normal",
+            assignee_id=assignee_id,
+            published_at=payload.get("published_at") or timezone.now(),
         )
+        photos = request.FILES.getlist("photos")
+        for f in photos:
+            ClinicPostPhoto.objects.create(post=obj, image=f)
 
-        return Response(ClinicPostSerializer(obj).data, status=status.HTTP_201_CREATED)
+        return Response(ClinicPostSerializer(obj, context={"request": request}).data, status=status.HTTP_201_CREATED)
     
 class ClinicAssigneeListView(APIView):
     authentication_classes = [CsrfExemptSessionAuthentication]
@@ -286,3 +385,32 @@ class ClinicAssigneeListView(APIView):
         ]
 
         return Response(data)
+
+
+class ClinicPostDetailView(APIView):
+    authentication_classes = [CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, clinic_id, post_id):
+        clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+        post = get_object_or_404(ClinicPost, id=post_id, clinic=clinic)
+
+        payload = request.data or {}
+        updated = False
+
+        if "message_count" in payload:
+            post.message_count = int(payload.get("message_count") or 0)
+            updated = True
+
+        if "views" in payload:
+            post.views = int(payload.get("views") or 0)
+            updated = True
+
+        if "comments" in payload:
+            post.comments = int(payload.get("comments") or 0)
+            updated = True
+
+        if updated:
+            post.save(update_fields=["message_count", "views", "comments", "updated_at"])
+
+        return Response(ClinicPostSerializer(post, context={"request": request}).data, status=status.HTTP_200_OK)

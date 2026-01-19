@@ -134,7 +134,7 @@ contextBridge.exposeInMainWorld("api", {
     }),
 
   generateGangnamReview: (payload) =>
-    requestJson("/api/ml/gangnam/review/", {
+    requestJson("/api/ml/gangnam_review/", {
       method: "POST",
       body: JSON.stringify(payload),
     }),

@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/header.css" />
   <link rel="stylesheet" href="css/dashboard.css" />
+  <link rel="stylesheet" href="css/schedule.css" />
 </head>
 <body>
 
@@ -28,7 +29,34 @@
             <p class="sub">개인공간</p>
             </header>
 
-            <section id="myClinicGrid" class="clinic-grid"></section>
+            <div class="dashboard-panels">
+              <section class="dashboard-panel card">
+                <div class="card-hd">개인 주간 스케줄</div>
+                <div class="card-bd">
+                  
+                  <div class="week-panel">
+                    <div class="week-head">
+                      <div class="week-title">주간 작업 목록</div>
+                      <div class="week-controls">
+                        <button class="btn" id="weekPrevBtn">이번 주</button>
+                        <span id="weekLabel" class="week-label"></span>
+                        <button class="btn" id="weekNextBtn">다음 주</button>
+                      </div>
+                    </div>
+                    <div class="card-bd">
+                      <div id="myScheduleList" class="schedule-list"></div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="dashboard-panel card">
+                <div class="card-hd">담당 병원</div>
+                <div class="card-bd">
+                  <section id="myClinicGrid" class="clinic-grid"></section>
+                </div>
+              </section>
+            </div>
 
         </section>
         </main>

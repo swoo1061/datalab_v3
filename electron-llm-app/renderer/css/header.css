@@ -58,6 +58,20 @@
 
 .header-scope .divider { color: #9ca3af; }
 
+.header-scope .back-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: #ffffff;
+  font-size: 12px;
+  color: #374151;
+}
+
+.header-scope .back-btn:hover {
+  background: var(--surface-2, #f3f4f6);
+}
+
 .header-scope .user-area { position: relative; }
 
 .header-scope .user-chip {
@@ -105,6 +119,38 @@
   flex-direction: column;
   gap: 4px;
   margin: 8px 0;
+}
+
+.profile-section {
+  margin: 6px 0;
+}
+
+.profile-section .section-title {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.theme-options {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.theme-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: #fff;
+  font-size: 11px;
+  color: #374151;
+}
+
+.theme-btn.active {
+  background: var(--primary, #6366f1);
+  color: #fff;
+  border-color: transparent;
 }
 
 .header-scope .menu-item {
@@ -276,7 +322,7 @@
 }
 
 .global-search input {
-  width: 100%;
+  width: 55%;
   height: 34px;
   padding: 0 14px;
   border-radius: 10px;
@@ -284,6 +330,7 @@
   background: #f9fafb;
   font-size: 13px;
   outline: none;
+  margin-right: auto;
 
   transition: border-color 0.15s ease, background 0.15s ease;
 }

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | AI 리뷰 사용 가이드</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/ai_review_guide.css" />
+</head>
+<body>
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope guide-page">
+      <section class="guide-hero">
+        <div>
+          <h1 class="guide-title">AI 리뷰 사용 가이드</h1>
+          <p class="guide-subtitle">병원/리뷰 유형을 정하고, 핵심 포인트만 입력하면 자동으로 결과가 생성됩니다.</p>
+        </div>
+        <a class="btn btn-primary" href="review.html">AI 리뷰 생성으로 이동</a>
+      </section>
+
+      <section class="guide-grid">
+        <article class="card guide-card">
+          <div class="card-hd">빠른 시작</div>
+          <div class="card-bd">
+            <ol class="guide-steps">
+              <li>
+                <span class="step-badge">1</span>
+                <div>
+                  <strong>병원 선택</strong>
+                  <p>클리닉을 먼저 선택하면 프롬프트가 안정적으로 생성됩니다.</p>
+                </div>
+              </li>
+              <li>
+                <span class="step-badge">2</span>
+                <div>
+                  <strong>리뷰 유형/시점 설정</strong>
+                  <p>리뷰 성격과 시점을 골라서 톤을 고정하세요.</p>
+                </div>
+              </li>
+              <li>
+                <span class="step-badge">3</span>
+                <div>
+                  <strong>키워드/페르소나 입력 후 생성</strong>
+                  <p>핵심 키워드와 페르소나만 넣고 생성 버튼을 누르면 완료.</p>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </article>
+
+        <article class="card guide-card">
+          <div class="card-hd">입력 가이드</div>
+          <div class="card-bd">
+            <div class="guide-kv">
+              <div class="kv-row">
+                <span class="kv-label">병원</span>
+                <span class="kv-value">필수. 병원 선택이 없으면 결과 품질이 떨어질 수 있어요.</span>
+              </div>
+              <div class="kv-row">
+                <span class="kv-label">리뷰 유형</span>
+                <span class="kv-value">고민/질문, 상담 후기, 경과 후기 등 목적에 맞게 선택.</span>
+              </div>
+              <div class="kv-row">
+                <span class="kv-label">후기 시점</span>
+                <span class="kv-value">시술 전/직후/1주/1개월/3개월로 톤을 조절.</span>
+              </div>
+              <div class="kv-row">
+                <span class="kv-label">강조 키워드</span>
+                <span class="kv-value">회복, 통증, 비용 등 포인트를 2~4개 정도.</span>
+              </div>
+              <div class="kv-row">
+                <span class="kv-label">페르소나</span>
+                <span class="kv-value">쉼표로 구분. 예: 20대 여성, 첫 시술, 자연스러움 중시.</span>
+              </div>
+              <div class="kv-row">
+                <span class="kv-label">AI 모델</span>
+                <span class="kv-value">추천 모델 우선. 빠른 결과면 경량 모델 선택.</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="guide-grid">
+        <article class="card guide-card">
+          <div class="card-hd">출력 확인</div>
+          <div class="card-bd">
+            <ul class="guide-list">
+              <li>미리보기에서 선택 조건과 페르소나가 정상 반영됐는지 확인합니다.</li>
+              <li>결과 모달에서 복사 후 필요 부분만 편집하세요.</li>
+              <li>과장된 표현은 제거하고 실제 후기 톤을 유지합니다.</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="card guide-card">
+          <div class="card-hd">자주 하는 실수</div>
+          <div class="card-bd">
+            <ul class="guide-list">
+              <li>키워드를 너무 많이 선택하면 문장이 산만해집니다.</li>
+              <li>페르소나 입력이 없으면 톤이 일반적으로 생성됩니다.</li>
+              <li>리뷰 유형/시점이 비어 있으면 결과가 뭉개질 수 있습니다.</li>
+            </ul>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/header.js"></script>
+<script>
+  (async () => {
+    await loadLayout();
+    await loadHeader("AI 리뷰 사용 가이드");
+  })();
+</script>
+</body>
+</html>

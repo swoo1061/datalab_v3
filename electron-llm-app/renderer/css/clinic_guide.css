@@ -1,141 +1,164 @@
-.clinic-page .topbar {
+.clinic-guide-dense .guide-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
 }
 
-.clinic-page .h1 {
+.clinic-guide-dense .h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: 19px;
   letter-spacing: -0.02em;
 }
 
-.clinic-page .sub {
-  margin: 6px 0 0;
-  font-size: 13px;
+.clinic-guide-dense .sub {
+  margin: 4px 0 0;
+  font-size: 12px;
   color: var(--muted);
 }
 
-.clinic-page .actions {
+.clinic-guide-dense .header-actions {
   display: flex;
-  gap: 10px;
   align-items: center;
+  gap: 8px;
 }
 
-.clinic-page .summary {
-  margin-top: 16px;
-}
-
-.clinic-page .title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.clinic-page .value {
-  margin-top: 6px;
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.clinic-page .meta {
-  margin-top: 14px;
-  grid-template-columns: repeat(1, 4fr);
-}
-
-.clinic-page .meta .label {
+.clinic-guide-dense .field-label {
   font-size: 12px;
+  color: var(--muted);
 }
 
-.clinic-page .meta-value {
-  margin-top: 6px;
-  font-size: 13px;
+.clinic-guide-dense .guide-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.clinic-guide-dense .summary-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+
+.clinic-guide-dense .summary-item.summary-wide {
+  grid-column: span 2;
+}
+
+.clinic-guide-dense .meta-value {
+  margin-top: 4px;
+  font-size: 12px;
   color: #374151;
 }
 
-.clinic-page .bullets {
-  margin: 0;
-  padding-left: 18px;
+.clinic-guide-dense .guide-main {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 10px;
+}
+
+.clinic-guide-dense .doctor-panel,
+.clinic-guide-dense .price-panel,
+.clinic-guide-dense .support-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.clinic-guide-dense .panel-hd {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
   font-size: 13px;
-  color: #374151;
-  line-height: 1.6;
 }
 
-.clinic-page .main {
-  margin-top: 14px;
-  grid-template-columns: 280px 1fr;
+.clinic-guide-dense .panel-bd {
+  padding: 10px 12px;
 }
 
-.clinic-page .nav .nav-list {
-  padding: 8px;
+.clinic-guide-dense .doctor-panel .nav-list {
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-height: 460px;
+  overflow: auto;
 }
 
-.clinic-page .nav-item {
+.clinic-guide-dense .nav-item {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px 10px;
-  border-radius: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
   cursor: pointer;
   border: 1px solid transparent;
   background: #fff;
-  font-size: 13px;
+  font-size: 12px;
   color: #374151;
 }
 
-.clinic-page .nav-item:hover {
+.clinic-guide-dense .nav-item:hover {
   background: #f3f4f6;
 }
 
-.clinic-page .nav-item.active {
+.clinic-guide-dense .nav-item.active {
   background: #eef2ff;
   border-color: #c7d2fe;
   color: var(--primary);
   font-weight: 700;
 }
 
-.clinic-page .content-hd {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.clinic-page .content-title {
+.clinic-guide-dense .content-title {
   margin-top: 4px;
   font-weight: 800;
+  font-size: 14px;
 }
 
-.clinic-page #priceTable th:last-child,
-.clinic-page #priceTable td:last-child {
-  text-align: right;
+.clinic-guide-dense .content-meta {
+  font-size: 11px;
+  color: var(--muted);
 }
 
-.clinic-page .price {
-  font-weight: 700;
-}
-
-.clinic-page .need-consult {
-  color: #9ca3af;
-  font-weight: 700;
-}
-
-.clinic-page .bottom {
-  margin-top: 14px;
+.clinic-guide-dense .guide-support {
+  margin-top: 10px;
+  display: grid;
   grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
-.clinic-page .pill {
+.clinic-guide-dense .pill {
   align-items: center;
-  height: 26px;
-  padding: 0 10px;
-  font-size: 12px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
   color: #374151;
   margin: 0 6px 6px 0;
 }
 
+@media (max-width: 1100px) {
+  .clinic-guide-dense .guide-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 
+  .clinic-guide-dense .guide-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clinic-guide-dense .summary-item.summary-wide {
+    grid-column: span 2;
+  }
+
+  .clinic-guide-dense .guide-main {
+    grid-template-columns: 1fr;
+  }
+
+  .clinic-guide-dense .guide-support {
+    grid-template-columns: 1fr;
+  }
+}
