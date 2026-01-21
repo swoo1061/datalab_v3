@@ -1,6 +1,14 @@
 from django.urls import path
 from . import views_api
-from .views_api import FavoriteClinicView, ClinicPostListCreateView, ClinicPostDetailView, ClinicAssigneeListView
+from .views_api import (
+    FavoriteClinicView,
+    ClinicPostListCreateView,
+    ClinicPostDetailView,
+    ClinicAssigneeListView,
+    CalendarMemoListCreateView,
+    CalendarMemoDetailView,
+    NotificationListView,
+)
 from apps.data.views_worklog_api import ClinicDailyWorkLogViewSet 
 
 worklog_list = ClinicDailyWorkLogViewSet.as_view({
@@ -29,4 +37,7 @@ urlpatterns = [
     path("clinics/<int:clinic_id>/posts/", ClinicPostListCreateView.as_view()),
     path("clinics/<int:clinic_id>/posts/<int:post_id>/", ClinicPostDetailView.as_view()),
     path("clinics/<int:clinic_id>/assignees/", ClinicAssigneeListView.as_view()),
+    path("calendar-memos/", CalendarMemoListCreateView.as_view()),
+    path("calendar-memos/<int:memo_id>/", CalendarMemoDetailView.as_view()),
+    path("notifications/", NotificationListView.as_view()),
 ]

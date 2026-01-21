@@ -1,3 +1,12 @@
+window.API_BASE = window.API_BASE || window?.config?.apiBase || "http://127.0.0.1:8000";
+
+async function buildAuthHeaders() {
+  const headers = {};
+  const sessionKey = await window.session?.getKey?.();
+  if (sessionKey) headers["X-Sessionid"] = sessionKey;
+  return headers;
+}
+
 function getMonthMeta(yearMonth) {
   const [y, m] = yearMonth.split("-").map(Number);
   const first = new Date(y, m - 1, 1);
@@ -41,6 +50,8 @@ function renderScheduleCalendar({
   items,
   yearMonth,
   emptyMessage = "표시할 일정이 없습니다.",
+  allowEmptyClick = false,
+  onDateSelect = null,
 }) {
   const calendar = document.getElementById(calendarId);
   const list = document.getElementById(listId);
@@ -60,7 +71,7 @@ function renderScheduleCalendar({
         return `<div class="calendar-cell muted"></div>`;
       }
       const count = grouped.get(cell.date)?.length || 0;
-      const clickable = count > 0 ? "clickable" : "";
+      const clickable = (allowEmptyClick || count > 0) ? "clickable" : "";
       return `
         <div class="calendar-cell ${clickable}" data-date="${cell.date}">
           <div class="calendar-day">${cell.day}</div>
@@ -77,6 +88,169 @@ function renderScheduleCalendar({
     </div>
   `;
 
+  const renderCompactItem = (item) => {
+    if (item.kind === "memo") {
+      return `
+        <div class="schedule-item compact">
+          <div class="schedule-top">
+            <div class="schedule-title">메모</div>
+          </div>
+          <div class="schedule-meta-grid">
+            <div class="meta-cell">
+              <span class="meta-label">날짜</span>
+              <span class="meta-value">${item.date || "-"}</span>
+            </div>
+            <div class="meta-cell">
+              <span class="meta-label">클리닉</span>
+              <span class="meta-value">${item.clinic || "전체"}</span>
+            </div>
+            ${item.remind_at ? `
+              <div class="meta-cell">
+                <span class="meta-label">알림</span>
+                <span class="meta-value">${item.remind_at}</span>
+              </div>
+            ` : ""}
+          </div>
+          ${item.memo ? `<div class="schedule-memo">${item.memo}</div>` : ""}
+        </div>
+      `;
+    }
+
+    const title = item.title_display || item.title || "-";
+    const link = item.url
+      ? `<a href="${item.url}" target="_blank" rel="noreferrer">${title}</a>`
+      : title;
+    const platformLabel = item.platform_label || item.platform;
+    const typeLabel = item.type === "review" ? "후기" : item.type === "opinion" ? "여론" : "";
+    const subtypeLabel = item.review_subtype === "photo"
+      ? "사진"
+      : item.review_subtype === "text"
+        ? "텍스트"
+        : "";
+    let reviewLabel = typeLabel
+      ? (subtypeLabel ? `${typeLabel}/${subtypeLabel}` : typeLabel)
+      : "";
+    if (!reviewLabel && item.title_display?.startsWith("[")) {
+      const match = item.title_display.match(/^\[([^\]]+)\]/);
+      if (match?.[1]) reviewLabel = match[1];
+    }
+    const views = Number.isFinite(item.views)
+      ? `<span class="metric-chip">조회 ${item.views}</span>`
+      : "";
+    const comments = Number.isFinite(item.comments)
+      ? `<span class="metric-chip">댓글 ${item.comments}</span>`
+      : "";
+    const messages = Number.isFinite(item.message_count)
+      ? `<span class="metric-chip">쪽지 ${item.message_count}</span>`
+      : "";
+    const messageInput = item.post_id && item.clinicId
+      ? `<label class="message-chip">쪽지 <input class="message-input" type="number" min="0" value="${item.message_count ?? 0}" data-post-id="${item.post_id}" data-clinic-id="${item.clinicId}" /></label>`
+      : "";
+    const editButton = item.post_id && item.clinicId
+      ? `<button class="schedule-edit" data-post-id="${item.post_id}" data-clinic-id="${item.clinicId}">수정</button>`
+      : "";
+    const actions = editButton || messageInput
+      ? `<div class="schedule-actions">${editButton}${messageInput}</div>`
+      : "";
+    const doctorValue = item.doctor_name || item.doctor || item.doctor_label || "-";
+    const metaCells = [
+      { label: "날짜", value: item.date || "-" },
+      { label: "클리닉", value: item.clinic || "" },
+      { label: "원장님", value: doctorValue },
+      { label: "ID", value: item.account || "" },
+      { label: "리뷰 구분", value: reviewLabel },
+      { label: "플랫폼", value: platformLabel || "" },
+      { label: "담당자", value: item.assignee || "" },
+      { label: "PW", value: item.account_password || "" },
+    ].filter((cell) => cell.value);
+    const metaGrid = metaCells
+      .map((cell) => `
+        <div class="meta-cell">
+          <span class="meta-label">${cell.label}</span>
+          <span class="meta-value">${cell.value}</span>
+        </div>
+      `)
+      .join("");
+    const metrics = [views, comments, messages].filter(Boolean).join("");
+
+    return `
+      <div class="schedule-item compact">
+        <div class="schedule-top">
+          <div class="schedule-title">${link}</div>
+          ${actions}
+        </div>
+        <div class="schedule-meta-grid">
+          ${metaGrid || `<div class="meta-empty">메타 정보 없음</div>`}
+        </div>
+        ${item.memo ? `<div class="schedule-memo">${item.memo}</div>` : ""}
+        ${(metrics || item.photos?.length) ? `
+          <div class="schedule-bottom">
+            ${metrics ? `<div class="schedule-metrics">${metrics}</div>` : ""}
+            ${item.photos?.length ? `
+              <div class="schedule-photos">
+                ${item.photos.slice(0, 4).map((url) => `<img src="${url}" alt="photo" />`).join("")}
+              </div>
+            ` : ""}
+          </div>
+        ` : ""}
+      </div>
+    `;
+  };
+
+  const renderDefaultItem = (item) => {
+    const title = item.title_display || item.title || "-";
+    const link = item.url
+      ? `<a href="${item.url}" target="_blank" rel="noreferrer">${title}</a>`
+      : title;
+    const account = item.account
+      ? `<span>카페 ID: ${item.account}</span>`
+      : "";
+    const accountPassword = item.account_password
+      ? `<span>PW: ${item.account_password}</span>`
+      : "";
+    const platformLabel = item.platform_label || item.platform;
+    const views = Number.isFinite(item.views)
+      ? `<span>조회 ${item.views}</span>`
+      : "";
+    const comments = Number.isFinite(item.comments)
+      ? `<span>댓글 ${item.comments}</span>`
+      : "";
+    const messages = Number.isFinite(item.message_count)
+      ? `<span>쪽지 ${item.message_count}</span>`
+      : "";
+    const messageInput = item.post_id && item.clinicId
+      ? `<input class="message-input" type="number" min="0" value="${item.message_count ?? 0}" data-post-id="${item.post_id}" data-clinic-id="${item.clinicId}" />`
+      : "";
+    const editButton = item.post_id && item.clinicId
+      ? `<button class="schedule-edit" data-post-id="${item.post_id}" data-clinic-id="${item.clinicId}">수정하기</button>`
+      : "";
+
+    return `
+      <div class="schedule-item">
+        <div class="schedule-title">${link}</div>
+        <div class="schedule-meta">
+          <span>${item.date || "-"}</span>
+          ${item.clinic ? `<span class="schedule-badge">${item.clinic}</span>` : ""}
+          ${platformLabel ? `<span>${platformLabel}</span>` : ""}
+          ${item.assignee ? `<span>${item.assignee}</span>` : ""}
+          ${account}
+          ${accountPassword}
+          ${views}
+          ${comments}
+          ${messages}
+          ${item.memo ? `<span class="schedule-memo">${item.memo}</span>` : ""}
+          ${editButton}
+        </div>
+        ${item.photos?.length ? `
+          <div class="schedule-photos">
+            ${item.photos.slice(0, 4).map((url) => `<img src="${url}" alt="photo" />`).join("")}
+          </div>
+        ` : ""}
+        ${messageInput ? `<div class="schedule-edit">쪽지 ${messageInput}</div>` : ""}
+      </div>
+    `;
+  };
+
   const renderList = (filterDate = null) => {
     const filtered = filterDate
       ? items.filter((i) => i.date === filterDate)
@@ -85,66 +259,35 @@ function renderScheduleCalendar({
       list.innerHTML = `<div class="muted">${emptyMessage}</div>`;
       return;
     }
+    const isCompact = list.dataset.variant === "compact";
     list.innerHTML = filtered
-      .map((item) => {
-        const title = item.title || "-";
-        const link = item.url
-          ? `<a href="${item.url}" target="_blank" rel="noreferrer">${title}</a>`
-          : title;
-        const clinicLink = item.clinicId
-          ? `<a href="clinic_page.html?clinic_id=${item.clinicId}" class="schedule-link">병원 페이지</a>`
-          : "";
-        const account = item.account
-          ? `<span>아이디: ${item.account}</span>`
-          : "";
-        const views = Number.isFinite(item.views)
-          ? `<span>조회 ${item.views}</span>`
-          : "";
-        const comments = Number.isFinite(item.comments)
-          ? `<span>댓글 ${item.comments}</span>`
-          : "";
-        const messages = Number.isFinite(item.message_count)
-          ? `<span>쪽지 ${item.message_count}</span>`
-          : "";
-        const messageInput = item.post_id && item.clinicId
-          ? `<input class="message-input" type="number" min="0" value="${item.message_count ?? 0}" data-post-id="${item.post_id}" data-clinic-id="${item.clinicId}" />`
-          : "";
-        return `
-          <div class="schedule-item">
-            <div class="schedule-title">${link}</div>
-            <div class="schedule-meta">
-              <span>${item.date || "-"}</span>
-              ${item.clinic ? `<span class="schedule-badge">${item.clinic}</span>` : ""}
-              ${item.platform ? `<span>${item.platform}</span>` : ""}
-              ${item.status ? `<span>${item.status}</span>` : ""}
-              ${item.assignee ? `<span>${item.assignee}</span>` : ""}
-              ${account}
-              ${views}
-              ${comments}
-              ${messages}
-              ${item.memo ? `<span class="schedule-memo">${item.memo}</span>` : ""}
-              ${clinicLink}
-            </div>
-            ${item.photos?.length ? `
-              <div class="schedule-photos">
-                ${item.photos.slice(0, 4).map((url) => `<img src="${url}" alt="photo" />`).join("")}
-              </div>
-            ` : ""}
-            ${messageInput ? `<div class="schedule-edit">쪽지 ${messageInput}</div>` : ""}
-          </div>
-        `;
-      })
+      .map((item) => (isCompact ? renderCompactItem(item) : renderDefaultItem(item)))
       .join("");
 
     bindMessageInputs(list);
+    bindEditButtons(list);
+    bindPhotoPreviews(list);
   };
 
-  renderList();
+  const activeDate = list.dataset.activeDate || null;
+  renderList(activeDate);
+
+  const openDetailPanel = () => {
+    const panelId = list.dataset.panel;
+    if (!panelId) return;
+    const panel = document.getElementById(panelId);
+    if (panel) panel.classList.add("open");
+  };
 
   calendar.querySelectorAll(".calendar-cell.clickable").forEach((cell) => {
     cell.addEventListener("click", () => {
       const targetDate = cell.dataset.date;
+      list.dataset.activeDate = targetDate;
       renderList(targetDate);
+      openDetailPanel();
+      if (typeof onDateSelect === "function") {
+        onDateSelect(targetDate);
+      }
     });
   });
 }
@@ -169,13 +312,75 @@ function bindMessageInputs(listEl) {
   });
 }
 
+function bindEditButtons(listEl) {
+  const buttons = listEl.querySelectorAll(".schedule-edit");
+  if (!buttons.length) return;
+
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const postId = btn.dataset.postId;
+      const clinicId = btn.dataset.clinicId;
+      if (!postId || !clinicId) return;
+      if (typeof window.openPostEditor === "function") {
+        window.openPostEditor({ postId, clinicId });
+      }
+    });
+  });
+}
+
+let photoPreviewReady = false;
+
+function initPhotoPreviewModal() {
+  if (photoPreviewReady) return;
+  const modal = document.getElementById("photoPreviewModal");
+  if (!modal) return;
+  modal.addEventListener("click", (e) => {
+    if (e.target?.dataset?.close) {
+      modal.classList.add("hidden");
+    }
+  });
+  const closeBtn = modal.querySelector(".photo-preview-close");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      modal.classList.add("hidden");
+    });
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      modal.classList.add("hidden");
+    }
+  });
+  photoPreviewReady = true;
+}
+
+function openPhotoPreview(src) {
+  const modal = document.getElementById("photoPreviewModal");
+  const image = document.getElementById("photoPreviewImage");
+  if (!modal || !image) return;
+  image.src = src;
+  modal.classList.remove("hidden");
+}
+
+function bindPhotoPreviews(listEl) {
+  initPhotoPreviewModal();
+  const imgs = listEl.querySelectorAll(".schedule-photos img");
+  if (!imgs.length) return;
+  imgs.forEach((img) => {
+    img.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openPhotoPreview(img.src);
+    });
+  });
+}
+
 async function updateMessageCount(clinicId, postId, messageCount) {
-  const url = `http://127.0.0.1:8000/api/data/clinics/${clinicId}/posts/${postId}/`;
+  const url = `${window.API_BASE}/api/data/clinics/${clinicId}/posts/${postId}/`;
   try {
+    const headers = await buildAuthHeaders();
     await fetch(url, {
       method: "PATCH",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({ message_count: messageCount }),
     });
   } catch (e) {

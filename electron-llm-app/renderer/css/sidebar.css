@@ -22,7 +22,7 @@
 }
 
 /* Brand */
-.sidebar .brand {
+.sidebar {
   padding: 10px 10px 12px;
   border-bottom: 1px solid var(--border);
 }
@@ -142,4 +142,22 @@
   border-top: 1px solid var(--border);
   font-size: 12px;
   color: var(--muted);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  padding: 10px 0px 0px;
+}
+
+.brand-logo {
+  height: 23px;        /* 헤더 높이에 맞게 */
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+  
+}
+
+.brand-logo:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
 }

@@ -6,6 +6,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db import transaction
 import json
+from django.contrib.auth import get_user_model
+from django.contrib.sessions.models import Session
+from django.utils import timezone
 
 from .models import UserProfile
 
@@ -16,6 +19,27 @@ from django.contrib.auth.models import User
 import json
 
 from .models import UserProfile
+
+
+def _get_user_from_session_header(request):
+    session_key = request.headers.get("X-Sessionid")
+    if not session_key:
+        return None
+    try:
+        session = Session.objects.get(
+            session_key=session_key,
+            expire_date__gte=timezone.now()
+        )
+    except Session.DoesNotExist:
+        return None
+    user_id = session.get_decoded().get("_auth_user_id")
+    if not user_id:
+        return None
+    UserModel = get_user_model()
+    try:
+        return UserModel.objects.get(pk=user_id)
+    except UserModel.DoesNotExist:
+        return None
 
 
 @csrf_exempt
@@ -71,6 +95,10 @@ def login_api(request):
 @csrf_exempt
 def me_api(request):
     user = request.user
+    if not user.is_authenticated:
+        header_user = _get_user_from_session_header(request)
+        if header_user:
+            user = header_user
 
     # 🔥 redirect 절대 발생 금지
     if not user.is_authenticated:

@@ -25,41 +25,191 @@
           <p class="sub">병원별 작업 캘린더를 한 화면에서 관리합니다.</p>
         </header>
 
-        <section class="calendar-filter card">
-          <div class="filter-grid">
-            <div class="filter-field">
-              <label>병원</label>
-              <select id="calendarClinicSelect" class="select"></select>
-            </div>
-            <div class="filter-field">
-              <label>월</label>
-              <input type="month" id="calendarMonth" class="month-input" />
-            </div>
-          </div>
-          <div class="filter-actions">
-            <button class="btn primary" id="calendarRefreshBtn">조회</button>
-          </div>
-        </section>
-
-        <section class="calendar-panel card">
-          <div class="card-hd">병원별 월 캘린더</div>
-          <div class="card-bd">
+        
+     
+        <div class="card-bd">
+          <div class="schedule-board compact">
             <div class="schedule-grid">
               <div class="schedule-card">
-                <div class="card-hd">월 캘린더</div>
+                <div class="card-hd calendar-card-hd">
+                  <div class="calendar-card-left">
+                    <div class="card-title" id="calendarBoardTitle">작업 캘린더</div>
+                    <button class="btn toggle active" id="calendarWorkToggle">작업 캘린더</button>
+                    <button class="btn toggle" id="calendarMemoToggle">메모 캘린더</button>
+                  </div>
+                  <div class="calendar-filter inline right">
+                    <div class="filter-grid">
+                      <div class="filter-field">
+                        <!-- <label>병원</label> -->
+                        <select id="calendarClinicSelect" class="select"></select>
+                      </div>
+                      <div class="filter-field">
+                        <!-- <label>월</label> -->
+                        <input type="month" id="calendarMonth" class="month-input" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div class="card-bd" id="calendarBoard"></div>
               </div>
-              <div class="schedule-card">
-                <div class="card-hd">선택일 상세</div>
-                <div class="card-bd">
-                  <div id="calendarList" class="schedule-list"></div>
-                </div>
               </div>
             </div>
           </div>
-        </section>
+      
       </section>
     </main>
+  </div>
+</div>
+
+<div id="calendarDetailPanel" class="calendar-detail-panel">
+  <div class="panel-resizer" aria-hidden="true"></div>
+  <div class="calendar-detail-header">
+    <div>
+      <strong id="calendarDetailTitle">선택일 상세</strong>
+      <div class="detail-sub" id="calendarDetailSub">선택한 날짜의 작업을 확인합니다.</div>
+    </div>
+    <button class="btn" id="calendarDetailClose">닫기</button>
+  </div>
+  <div class="calendar-detail-body">
+    <div class="calendar-memo-panel hidden" id="calendarMemoPanel">
+      <div class="memo-list-panel">
+        <div class="memo-list-head">
+          <div class="memo-title">
+            <span class="memo-kicker">메모 캘린더</span>
+            <strong>메모 리스트</strong>
+          </div>
+          <div class="memo-actions">
+            <span class="memo-badge" id="calendarMemoDate">-</span>
+            <span class="memo-badge outline">담당자 <strong id="calendarMemoAuthor">-</strong></span>
+            <button class="btn primary" id="calendarMemoOpen">메모 작성</button>
+          </div>
+        </div>
+        <div class="memo-list-sub">선택한 날짜 기준</div>
+        <div id="calendarMemoList" class="memo-list"></div>
+      </div>
+    </div>
+    <div id="calendarDetailList" class="schedule-list" data-panel="calendarDetailPanel" data-variant="compact"></div>
+  </div>
+</div>
+
+<div id="calendarEditModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">게시글 수정</div>
+        <div class="modal-sub">필요한 항목을 수정하거나 삭제할 수 있습니다.</div>
+      </div>
+      <button class="modal-close" data-close="true">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid">
+        <div class="ai-field">
+          <label>날짜</label>
+          <input id="calendarEditDate" class="input" type="date" />
+        </div>
+        <div class="ai-field">
+          <label>구분</label>
+          <select id="calendarEditType" class="select">
+            <option value="opinion">여론</option>
+            <option value="review">후기</option>
+          </select>
+        </div>
+        <div class="ai-field">
+          <label>후기 유형</label>
+          <select id="calendarEditSubtype" class="select">
+            <option value="text">텍스트</option>
+            <option value="photo">사진</option>
+          </select>
+        </div>
+        <div class="ai-field">
+          <label>플랫폼</label>
+          <select id="calendarEditPlatform" class="select"></select>
+        </div>
+        <div class="ai-field span-2">
+          <label>제목</label>
+          <input id="calendarEditTitle" class="input" />
+        </div>
+        <div class="ai-field span-2">
+          <label>URL</label>
+          <input id="calendarEditUrl" class="input" />
+        </div>
+        <div class="ai-field">
+          <label>조회</label>
+          <input id="calendarEditViews" class="input" type="number" min="0" />
+        </div>
+        <div class="ai-field">
+          <label>댓글</label>
+          <input id="calendarEditComments" class="input" type="number" min="0" />
+        </div>
+        <div class="ai-field">
+          <label>쪽지</label>
+          <input id="calendarEditMessages" class="input" type="number" min="0" />
+        </div>
+        <div class="ai-field">
+          <label>작업자</label>
+          <select id="calendarEditAssignee" class="select"></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="calendarEditDelete">삭제</button>
+      <button class="btn" data-close="true">취소</button>
+      <button class="btn primary" id="calendarEditSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<div id="photoPreviewModal" class="photo-preview-modal hidden">
+  <div class="photo-preview-backdrop" data-close="true"></div>
+  <div class="photo-preview-card">
+    <!-- <button class="photo-preview-close" data-close="true" aria-label="닫기">✖️</button> -->
+    <img id="photoPreviewImage" alt="preview" />
+  </div>
+</div>
+
+<div id="calendarMemoModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">메모 작성</div>
+        <div class="modal-sub">선택한 날짜에 메모를 추가합니다.</div>
+      </div>
+      <button class="modal-close" data-close="true">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid">
+        <div class="ai-field span-2">
+          <label>내용</label>
+          <textarea id="calendarMemoContent" class="input" placeholder="메모를 입력하세요"></textarea>
+        </div>
+        <div class="ai-field">
+          <label>병원</label>
+          <select id="calendarMemoClinicSelect" class="select"></select>
+        </div>
+        <div class="ai-field">
+          <label>플랫폼</label>
+          <select id="calendarMemoPlatform" class="select"></select>
+        </div>
+        <div class="ai-field">
+          <label>알림 시간</label>
+          <input id="calendarMemoRemind" class="input" type="datetime-local" />
+        </div>
+        <div class="ai-field">
+          <label>ID</label>
+          <input id="calendarMemoAccount" class="input" />
+        </div>
+        <div class="ai-field">
+          <label>PW</label>
+          <input id="calendarMemoPassword" class="input" type="password" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-close="true">취소</button>
+      <button class="btn primary" id="calendarMemoSave">저장</button>
+    </div>
   </div>
 </div>
 

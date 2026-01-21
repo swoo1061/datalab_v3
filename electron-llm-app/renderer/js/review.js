@@ -193,6 +193,8 @@ async function generateReview() {
     btn.disabled = true;
     btn.innerText = "리뷰 생성 중...";
   }
+  const loading = document.getElementById("globalLoading");
+  if (loading) loading.classList.remove("hidden");
   forceInteractive();
   startInteractionWatchdog();
   modalReview.innerText = "";
@@ -229,6 +231,7 @@ async function generateReview() {
     clearModalOverlays();
   } finally {
     reviewLoading.classList.add("hidden");
+    if (loading) loading.classList.add("hidden");
     if (btn) {
       btn.disabled = false;
       btn.innerText = "리뷰 생성";

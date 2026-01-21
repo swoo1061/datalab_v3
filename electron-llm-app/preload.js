@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = (process.env.DATALAB_API_BASE || process.env.API_BASE || "http://127.0.0.1:8000").replace(/\/$/, "");
 let sessionKey = null;
 
 async function ensureSessionKey() {
@@ -157,11 +157,16 @@ contextBridge.exposeInMainWorld("api", {
     }),
 });
 
+contextBridge.exposeInMainWorld("config", {
+  apiBase: API_BASE,
+});
+
 contextBridge.exposeInMainWorld("nav", {
   go: (page) => ipcRenderer.invoke("go", page),
 });
 
 contextBridge.exposeInMainWorld("session", {
+  getKey: () => ipcRenderer.invoke("get-session-key"),
   clear: async () => {
     const { session } = require("electron").remote || require("electron");
     await session.defaultSession.clearStorageData();

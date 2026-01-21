@@ -183,6 +183,13 @@
   gap: 12px;
 }
 
+.detail-deep {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
 .panel.card {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -193,6 +200,203 @@
 .panel .card-hd {
   border-bottom: 1px solid var(--line);
   color: #1f2937;
+}
+
+.deep-card .card-bd {
+  padding: 12px 16px 18px;
+}
+
+.deep-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.card-sub {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.chip-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #0ea5e9;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.chip.ghost {
+  background: transparent;
+  border-color: rgba(148, 163, 184, 0.4);
+  color: #64748b;
+}
+
+.deep-chart {
+  position: relative;
+  border-radius: 16px;
+  padding: 18px 16px 34px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.18), transparent 45%),
+    radial-gradient(circle at 85% 10%, rgba(129, 140, 248, 0.2), transparent 50%),
+    linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+}
+
+.deep-chart::after {
+  content: "";
+  position: absolute;
+  inset: 16px 16px 24px;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+  background-size: 40px 32px;
+  pointer-events: none;
+}
+
+#deepTrendSvg {
+  width: 100%;
+  height: 200px;
+  position: relative;
+  z-index: 1;
+}
+
+#deepTrendLine {
+  stroke: #0ea5e9;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 8px 18px rgba(14, 165, 233, 0.25));
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 520;
+  stroke-dashoffset: 520;
+  animation: dashIn 1.2s ease forwards;
+}
+
+#deepTrendArea {
+  stroke: none;
+  opacity: 0;
+  animation: fadeIn 1.1s ease 0.2s forwards;
+}
+
+#deepTrendDots circle {
+  fill: #6366f1;
+  stroke: #ffffff;
+  stroke-width: 2;
+  r: 5;
+}
+
+.deep-labels {
+  position: absolute;
+  bottom: 10px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #94a3b8;
+  z-index: 2;
+}
+
+.deep-side .card-bd {
+  padding: 14px 14px 18px;
+}
+
+.mix-block + .mix-block {
+  margin-top: 16px;
+}
+
+.mix-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.mix-list {
+  display: grid;
+  gap: 8px;
+}
+
+.mix-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #475569;
+}
+
+.mix-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.mix-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.mix-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #6366f1);
+}
+
+.mix-bars {
+  display: grid;
+  gap: 10px;
+}
+
+.mix-bar {
+  display: grid;
+  grid-template-columns: 64px 1fr 56px;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #475569;
+}
+
+.mix-bar .mix-track {
+  height: 10px;
+}
+
+.mix-bar .mix-fill {
+  background: linear-gradient(90deg, #fb7185, #f97316);
+}
+
+@keyframes dashIn {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
 }
 
 .spark-grid {
@@ -284,6 +488,10 @@
   }
 
   .detail-panels {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-deep {
     grid-template-columns: 1fr;
   }
 

@@ -86,6 +86,8 @@ async function generateGangnamReview() {
     btn.disabled = true;
     btn.innerText = "리뷰 생성 중입니다…";
   }
+  const loading = $("globalLoading");
+  if (loading) loading.classList.remove("hidden");
   setFormEnabled(true);
   forceInteractive();
   startInteractionWatchdog();
@@ -152,6 +154,7 @@ async function generateGangnamReview() {
       btn.innerText = "후기 생성하기";
     }
     setFormEnabled(true);
+    if (loading) loading.classList.add("hidden");
 
     // 🔥 실패/성공 상관없이 항상 입력 가능
     const ta = $("reviewResultText");

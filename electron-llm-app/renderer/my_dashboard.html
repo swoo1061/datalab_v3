@@ -9,7 +9,9 @@
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/header.css" />
   <link rel="stylesheet" href="css/dashboard.css" />
+  <link rel="stylesheet" href="css/my_dashboard.css" />
   <link rel="stylesheet" href="css/schedule.css" />
+  <link rel="stylesheet" href="css/calendar_dashboard.css" />
 </head>
 <body>
 
@@ -31,35 +33,50 @@
 
             <div class="dashboard-panels">
               <section class="dashboard-panel card">
-                <div class="card-hd">개인 주간 스케줄</div>
-                <div class="card-bd">
-                  
-                  <div class="week-panel">
-                    <div class="week-head">
-                      <div class="week-title">주간 작업 목록</div>
-                      <div class="week-controls">
-                        <button class="btn" id="weekPrevBtn">이번 주</button>
-                        <span id="weekLabel" class="week-label"></span>
-                        <button class="btn" id="weekNextBtn">다음 주</button>
-                      </div>
-                    </div>
-                    <div class="card-bd">
-                      <div id="myScheduleList" class="schedule-list"></div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section class="dashboard-panel card">
                 <div class="card-hd">담당 병원</div>
                 <div class="card-bd">
                   <section id="myClinicGrid" class="clinic-grid"></section>
                 </div>
               </section>
             </div>
+            <div class="week-panel">
+              <div class="week-head">
+                <div class="week-title">주간 작업 목록</div>
+                <div class="week-controls">
+                  <button class="btn" id="weekPrevBtn">이번 주</button>
+                  <span id="weekLabel" class="week-label"></span>
+                  <button class="btn" id="weekNextBtn">다음 주</button>
+                </div>
+              </div>
+              <div class="card-bd">
+                <div id="myWeekCalendar" class="week-calendar compact"></div>
+              </div>
+            </div>
 
         </section>
         </main>
+  </div>
+</div>
+
+<div id="myWeekDetailPanel" class="calendar-detail-panel week-detail-panel">
+  <div class="panel-resizer" aria-hidden="true"></div>
+  <div class="week-detail-header">
+    <div>
+      <strong>선택일 상세</strong>
+      <div class="detail-sub">선택한 날짜의 작업을 확인합니다.</div>
+    </div>
+    <button class="btn" id="myWeekDetailClose">닫기</button>
+  </div>
+  <div class="week-detail-body">
+    <div id="myWeekDetailList" class="schedule-list" data-panel="myWeekDetailPanel" data-variant="compact"></div>
+  </div>
+</div>
+
+<div id="photoPreviewModal" class="photo-preview-modal hidden">
+  <div class="photo-preview-backdrop" data-close="true"></div>
+  <div class="photo-preview-card">
+    <!-- <button class="photo-preview-close" data-close="true" aria-label="닫기">✖️</button> -->
+    <img id="photoPreviewImage" alt="preview" />
   </div>
 </div>
 

@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = (process.env.DATALAB_API_BASE || process.env.API_BASE || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 module.exports = {
   /* =====================

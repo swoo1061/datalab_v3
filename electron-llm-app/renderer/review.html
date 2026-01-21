@@ -16,6 +16,13 @@
 <body>
 
 <div class="app-root">
+  <div id="globalLoading" class="global-loading hidden" aria-live="polite">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <div class="loading-text">리뷰 생성 중입니다…</div>
+      <div class="loading-sub">잠시만 기다려주세요</div>
+    </div>
+  </div>
   <div class="app-sidebar-slot" id="appSidebar"></div>
   <div class="app-header-slot" id="appHeader"></div>
 
@@ -120,32 +127,7 @@
           </div>
         </div>
 
-        <!-- 우측 미리보기 -->
-        <div class="card review-right">
-          <div class="card-hd">미리보기</div>
-          <div class="card-bd">
-
-            
-            <!-- 선택 요약 -->
-            <ul class="summary" id="summary"></ul>
-            
-            <!-- 🔥 페르소나 요약 (프롬프트 위) -->
-            <div class="persona-preview">
-              <strong>👤 페르소나</strong>
-              <div id="personaPreview" class="persona-tags"></div>
-            </div>
-
-            <!-- 프롬프트 -->
-            <div class="preview">
-              <h4>🧠 프롬프트 미리보기</h4>
-
-              <div id="previewMeta" class="preview-meta"></div>
-
-              <pre id="promptPreview" class="prompt-box"></pre>
-            </div>
-
-          </div>
-        </div>
+        
 
       </section>
 
@@ -167,7 +149,25 @@
     </div>
 
     <!-- 🔥 반드시 modal-body -->
-    <div class="modal-body">
+        <div class="modal-body">
+      <details class="modal-preview" open>
+        <summary>미리보기</summary>
+        <div class="preview-wrap">
+          <ul class="summary" id="summary"></ul>
+          <div class="preview">
+            <strong>프롬프트 미리보기</strong>
+            <div id="previewMeta" class="preview-meta"></div>
+          </div>
+          
+          <div class="persona-preview">
+            <strong>페르소나</strong>
+            <div id="personaPreview" class="persona-tags"></div>
+            <pre id="promptPreview" class="prompt-box"></pre>
+          </div>
+
+        </div>
+      </details>
+
       <div id="reviewLoading" class="review-loading hidden">
         AI가 리뷰를 작성 중입니다…
       </div>

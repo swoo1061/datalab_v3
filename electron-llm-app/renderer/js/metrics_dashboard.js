@@ -1,6 +1,6 @@
 console.log("metrics_dashboard.js loaded");
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = window?.config?.apiBase || "http://127.0.0.1:8000";
 let currentType = "all";
 
 function monthKey(date) {
@@ -149,6 +149,92 @@ function renderForecast(current, prev) {
   setText("forecastMessages", next.messages);
 }
 
+function buildAreaPath(values, width, height, pad) {
+  if (!values.length) return "";
+  const max = Math.max(...values, 1);
+  const step = (width - pad * 2) / (values.length - 1 || 1);
+  const points = values.map((v, i) => {
+    const x = pad + step * i;
+    const y = height - pad - (v / max) * (height - pad * 2);
+    return { x, y };
+  });
+  const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+  const area = `${line} L${points[points.length - 1].x},${height - pad} L${points[0].x},${height - pad} Z`;
+  return { line, area, points };
+}
+
+function renderDeepTrend(trend) {
+  const svg = document.getElementById("deepTrendSvg");
+  const line = document.getElementById("deepTrendLine");
+  const area = document.getElementById("deepTrendArea");
+  const dots = document.getElementById("deepTrendDots");
+  const labels = document.getElementById("deepTrendLabels");
+  if (!svg || !line || !area || !dots || !labels) return;
+
+  const values = trend.map((t) => t.score);
+  const width = 600;
+  const height = 220;
+  const pad = 18;
+  const paths = buildAreaPath(values, width, height, pad);
+  if (!paths) return;
+
+  line.setAttribute("d", paths.line);
+  area.setAttribute("d", paths.area);
+  dots.innerHTML = paths.points.map((p) => `<circle cx="${p.x}" cy="${p.y}" r="5"></circle>`).join("");
+  labels.innerHTML = trend.map((t) => `<span>${t.label}</span>`).join("");
+}
+
+function renderPlatformMix(posts) {
+  const root = document.getElementById("platformMix");
+  if (!root) return;
+  const total = posts.length || 1;
+  const colorSet = ["#38bdf8", "#6366f1", "#22c55e", "#f97316", "#f43f5e"];
+  const counts = {};
+  posts.forEach((p) => {
+    const key = p.platform_label || p.platform || "기타";
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  const items = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  if (!items.length) {
+    root.innerHTML = `<div class="muted">데이터가 없습니다.</div>`;
+    return;
+  }
+  root.innerHTML = items.map(([label, count], idx) => {
+    const percent = Math.round((count / total) * 100);
+    const color = colorSet[idx % colorSet.length];
+    return `
+      <div class="mix-item">
+        <span class="mix-dot" style="background:${color}"></span>
+        <div class="mix-track"><div class="mix-fill" style="width:${percent}%;background:${color}"></div></div>
+        <span>${label} ${percent}%</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderReactionMix(posts) {
+  const root = document.getElementById("reactionMix");
+  if (!root) return;
+  const values = [
+    { label: "조회", value: sumMetric(posts, "views") },
+    { label: "댓글", value: sumMetric(posts, "comments") },
+    { label: "쪽지", value: sumMetric(posts, "message_count") },
+  ];
+  const max = Math.max(...values.map((v) => v.value), 1);
+  root.innerHTML = values.map((item) => {
+    const percent = Math.round((item.value / max) * 100);
+    return `
+      <div class="mix-bar">
+        <span>${item.label}</span>
+        <div class="mix-track"><div class="mix-fill" style="width:${percent}%"></div></div>
+        <span>${formatNumber(item.value)}</span>
+      </div>
+    `;
+  }).join("");
+}
+
 
 async function loadDetail() {
   const clinicSelect = document.getElementById("detailClinicSelect");
@@ -227,6 +313,9 @@ async function loadDetail() {
   renderCompare(current, prev, split, currentType);
   renderForecast(current, prev);
   renderTrend(trend);
+  renderDeepTrend(trend);
+  renderPlatformMix(currentPosts);
+  renderReactionMix(currentPosts);
 }
 
 function bindTypePills() {

@@ -1,3 +1,4 @@
+const API_BASE = window?.config?.apiBase || "http://127.0.0.1:8000";
 let position = null;
 
 // 🔥 DOM 로드 후 실행 (중요)
@@ -41,7 +42,7 @@ async function signup() {
   }
 
   try {
-    const res = await fetch("http://127.0.0.1:8000/api/accounts/signup/", {
+    const res = await fetch(`${API_BASE}/api/accounts/signup/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

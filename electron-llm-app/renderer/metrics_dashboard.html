@@ -125,6 +125,59 @@
           </div>
         </section>
 
+        <section class="detail-deep">
+          <div class="panel card deep-card">
+            <div class="card-hd deep-head">
+              <div>
+                <div class="card-title">상세 흐름</div>
+                <div class="card-sub">최근 6개월 반응 지표를 곡선으로 표시</div>
+              </div>
+              <div class="chip-row">
+                <span class="chip">Engagement</span>
+                <span class="chip ghost">Trendline</span>
+              </div>
+            </div>
+            <div class="card-bd">
+              <div class="deep-chart">
+                <svg id="deepTrendSvg" viewBox="0 0 600 220" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="deepAreaGrad" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.45" />
+                      <stop offset="100%" stop-color="#6366f1" stop-opacity="0.05" />
+                    </linearGradient>
+                  </defs>
+                  <path id="deepTrendArea" d="" fill="url(#deepAreaGrad)"></path>
+                  <path id="deepTrendLine" d="" fill="none"></path>
+                  <g id="deepTrendDots"></g>
+                </svg>
+                <div class="deep-labels" id="deepTrendLabels"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel card deep-side">
+            <div class="card-hd deep-head">
+              <div>
+                <div class="card-title">채널/반응 상세</div>
+                <div class="card-sub">플랫폼 분포와 반응 구성을 확인</div>
+              </div>
+              <div class="chip-row">
+                <span class="chip ghost">Breakdown</span>
+              </div>
+            </div>
+            <div class="card-bd">
+              <div class="mix-block">
+                <div class="mix-title">플랫폼 분포</div>
+                <div class="mix-list" id="platformMix"></div>
+              </div>
+              <div class="mix-block">
+                <div class="mix-title">반응 구성</div>
+                <div class="mix-bars" id="reactionMix"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </section>
     </main>
   </div>

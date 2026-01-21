@@ -165,6 +165,20 @@
   color: var(--muted);
 }
 
+.schedule-edit {
+  border: 1px solid #cbd5f5;
+  background: #eef2ff;
+  color: #3730a3;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.schedule-edit:hover {
+  background: #e0e7ff;
+}
+
 .schedule-photos {
   margin-top: 8px;
   display: flex;

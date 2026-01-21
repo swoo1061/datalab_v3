@@ -1026,6 +1026,7 @@ class ClinicPost(models.Model):
         ("gn_jp", "JP강남언니"),
         ("gangnam", "강남언니"),
         ("babytok", "바비톡"),
+        ("todaktok", "토닥톡"),
         ("yeoshin", "여신티켓"),
         ("seongyesa", "성예사"),
         ("dadamo", "대다모"),
@@ -1053,6 +1054,10 @@ class ClinicPost(models.Model):
     title = models.CharField(max_length=255)
     url = models.URLField(max_length=1000)
 
+    account = models.CharField(max_length=100, blank=True, default="")
+    account_password = models.CharField(max_length=100, blank=True, default="")
+    memo = models.TextField(blank=True, default="")
+
     views = models.IntegerField(default=0)
     comments = models.IntegerField(default=0)
     message_count = models.IntegerField(default=0)
@@ -1068,6 +1073,7 @@ class ClinicPost(models.Model):
         blank=True,
         db_index=True,
     )
+    doctor_name = models.CharField(max_length=50, blank=True, default="", verbose_name="담당 원장명")
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -1095,6 +1101,37 @@ class ClinicPostPhoto(models.Model):
 
     def __str__(self):
         return f"Photo {self.pk} for post {self.post_id}"
+
+
+class CalendarMemo(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="calendar_memos",
+    )
+    clinic = models.ForeignKey(
+        "ClinicGuide",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="calendar_memos",
+    )
+    date = models.DateField()
+    content = models.TextField(blank=True, default="")
+    platform = models.CharField(max_length=30, blank=True, default="")
+    account = models.CharField(max_length=100, blank=True, default="")
+    account_password = models.CharField(max_length=100, blank=True, default="")
+    remind_at = models.DateTimeField(null=True, blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        clinic_name = self.clinic.name if self.clinic else "전체"
+        return f"{clinic_name} {self.date} memo"
 
 class ClinicAssignee(models.Model):
     clinic = models.ForeignKey(

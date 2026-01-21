@@ -3,26 +3,52 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 from django.utils import timezone
+from django.utils.dateparse import parse_date, parse_datetime
+from datetime import date, datetime, time
+from django.contrib.auth import get_user_model
+from django.contrib.sessions.models import Session
 import json
 import re
 
 from apps.ml.services.llm.registry import LLM_MODELS
 from apps.ml.services.llm_service import generate_review_with_prompt
-from apps.data.models import ClinicGuide, ClinicDoctor, ClinicPrice, ClinicPost, ClinicPostPhoto
+from apps.data.models import ClinicGuide, ClinicDoctor, ClinicPrice, ClinicPost, ClinicPostPhoto, CalendarMemo
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework import status
-from rest_framework.authentication import SessionAuthentication
+from rest_framework.authentication import SessionAuthentication, BaseAuthentication
 
 from .models import FavoriteClinic, ClinicAssignee
-from .serializers import FavoriteClinicSerializer, ClinicPostSerializer
+from .serializers import FavoriteClinicSerializer, ClinicPostSerializer, CalendarMemoSerializer
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
     def enforce_csrf(self, request):
         return  # CSRF 체크 완전히 비활성화
+
+class HeaderSessionAuthentication(BaseAuthentication):
+    def authenticate(self, request):
+        session_key = request.headers.get("X-Sessionid")
+        if not session_key:
+            return None
+        try:
+            session = Session.objects.get(
+                session_key=session_key,
+                expire_date__gte=timezone.now()
+            )
+        except Session.DoesNotExist:
+            return None
+        user_id = session.get_decoded().get("_auth_user_id")
+        if not user_id:
+            return None
+        User = get_user_model()
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return None
+        return (user, None)
 
 @csrf_exempt
 @require_GET
@@ -148,10 +174,52 @@ def _extract_json_payload(text):
         return None
 
 
+def _parse_assignee_param(raw_value):
+    if not raw_value or raw_value == "all":
+        return None, None
+    if raw_value == "me" or raw_value.startswith("me:"):
+        return "me", None
+    if raw_value.isdigit():
+        return "id", int(raw_value)
+    return "invalid", None
+
+
+def _parse_bool(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return False
+
+
+def _parse_datetime_value(raw):
+    if not raw:
+        return None
+    if isinstance(raw, datetime):
+        parsed = raw
+    elif isinstance(raw, str):
+        parsed = parse_datetime(raw)
+        if parsed is None:
+            try:
+                parsed = datetime.combine(date.fromisoformat(raw), time.min)
+            except ValueError:
+                return None
+    else:
+        return None
+
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed)
+    return parsed
+
+
 def _fallback_classify_post(title, platform):
     title = (title or "").lower()
     review_keywords = ["후기", "리뷰", "수술후기", "상담후기"]
-    review_platforms = {"gangnam", "gn_jp", "babytok", "yeoshin", "seongyesa"}
+    review_platforms = {"gangnam", "gn_jp", "babytok", "todaktok", "yeoshin", "seongyesa"}
 
     is_review = any(k in title for k in review_keywords) or platform in review_platforms
     post_type = "review" if is_review else "opinion"
@@ -215,7 +283,7 @@ def llm_model_list_api(request):
 
 
 class FavoriteClinicView(APIView):
-    authentication_classes = [CsrfExemptSessionAuthentication]
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -243,8 +311,8 @@ class FavoriteClinicView(APIView):
         return Response({"ok": True}, status=status.HTTP_200_OK)
     
 class ClinicPostListCreateView(APIView):
-    authentication_classes = [CsrfExemptSessionAuthentication]
-    permission_classes = [IsAuthenticated]
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get(self, request, clinic_id):
         """
@@ -260,11 +328,15 @@ class ClinicPostListCreateView(APIView):
 
         qs = ClinicPost.objects.filter(clinic=clinic)
     
-        if assignee and assignee != "all":
-            if assignee == "me":
-                qs = qs.filter(assignee=request.user)
-            else:
-                qs = qs.filter(assignee_id=int(assignee))
+        assignee_mode, assignee_id = _parse_assignee_param(assignee)
+        if assignee_mode == "invalid":
+            return Response({"message": "invalid assignee"}, status=status.HTTP_400_BAD_REQUEST)
+        if assignee_mode == "me":
+            if not request.user or not request.user.is_authenticated:
+                return Response({"message": "authentication required for assignee=me"}, status=status.HTTP_401_UNAUTHORIZED)
+            qs = qs.filter(assignee=request.user)
+        elif assignee_mode == "id":
+            qs = qs.filter(assignee_id=assignee_id)
 
         if month:
             try:
@@ -305,18 +377,22 @@ class ClinicPostListCreateView(APIView):
         """
         clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
 
-        payload = request.data or {}
+        payload = request.data.copy() if hasattr(request.data, "copy") else (request.data or {})
         payload["clinic"] = clinic.id  # serializer에서 바로 쓰진 않지만 체크용
 
         post_type = payload.get("type")
         platform = payload.get("platform")
-        auto_classify = bool(payload.get("auto_classify"))
+        auto_classify = _parse_bool(payload.get("auto_classify"))
 
         if not platform:
             return Response({"message": "platform required"}, status=status.HTTP_400_BAD_REQUEST)
 
         title = (payload.get("title") or "").strip()
         url = (payload.get("url") or "").strip()
+        account = (payload.get("account") or "").strip()
+        account_password = (payload.get("account_password") or "").strip()
+        memo = (payload.get("memo") or "").strip()
+        doctor_name = (payload.get("doctor_name") or "").strip()
 
         if not url:
             return Response({"message": "url required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -350,6 +426,10 @@ class ClinicPostListCreateView(APIView):
             platform=platform,
             title=title,
             url=url,
+            account=account,
+            account_password=account_password,
+            memo=memo,
+            doctor_name=doctor_name,
             views=int(payload.get("views") or 0),
             comments=int(payload.get("comments") or 0),
             message_count=int(payload.get("message_count") or 0),
@@ -364,7 +444,7 @@ class ClinicPostListCreateView(APIView):
         return Response(ClinicPostSerializer(obj, context={"request": request}).data, status=status.HTTP_201_CREATED)
     
 class ClinicAssigneeListView(APIView):
-    authentication_classes = [CsrfExemptSessionAuthentication]
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, clinic_id):
@@ -388,7 +468,7 @@ class ClinicAssigneeListView(APIView):
 
 
 class ClinicPostDetailView(APIView):
-    authentication_classes = [CsrfExemptSessionAuthentication]
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     def patch(self, request, clinic_id, post_id):
@@ -396,21 +476,249 @@ class ClinicPostDetailView(APIView):
         post = get_object_or_404(ClinicPost, id=post_id, clinic=clinic)
 
         payload = request.data or {}
-        updated = False
+        updated_fields = []
 
         if "message_count" in payload:
             post.message_count = int(payload.get("message_count") or 0)
-            updated = True
+            updated_fields.append("message_count")
 
         if "views" in payload:
             post.views = int(payload.get("views") or 0)
-            updated = True
+            updated_fields.append("views")
 
         if "comments" in payload:
             post.comments = int(payload.get("comments") or 0)
-            updated = True
+            updated_fields.append("comments")
 
-        if updated:
-            post.save(update_fields=["message_count", "views", "comments", "updated_at"])
+        if "title" in payload:
+            post.title = (payload.get("title") or "").strip()
+            updated_fields.append("title")
+
+        if "url" in payload:
+            post.url = (payload.get("url") or "").strip()
+            updated_fields.append("url")
+
+        if "account" in payload:
+            post.account = (payload.get("account") or "").strip()
+            updated_fields.append("account")
+
+        if "account_password" in payload:
+            post.account_password = (payload.get("account_password") or "").strip()
+            updated_fields.append("account_password")
+
+        if "memo" in payload:
+            post.memo = (payload.get("memo") or "").strip()
+            updated_fields.append("memo")
+
+        if "doctor_name" in payload:
+            post.doctor_name = (payload.get("doctor_name") or "").strip()
+            updated_fields.append("doctor_name")
+
+        if "platform" in payload:
+            post.platform = payload.get("platform")
+            updated_fields.append("platform")
+
+        if "type" in payload:
+            post_type = payload.get("type")
+            if post_type in ["opinion", "review"]:
+                post.type = post_type
+                updated_fields.append("type")
+
+        if "review_subtype" in payload or post.type == "review":
+            review_subtype = payload.get("review_subtype") or post.review_subtype
+            if post.type == "opinion":
+                if post.review_subtype is not None:
+                    post.review_subtype = None
+                    updated_fields.append("review_subtype")
+            else:
+                if review_subtype not in ["text", "photo"]:
+                    _, review_subtype = _fallback_classify_post(post.title, post.platform)
+                if post.review_subtype != review_subtype:
+                    post.review_subtype = review_subtype
+                    updated_fields.append("review_subtype")
+
+        if "assignee" in payload:
+            assignee_value = payload.get("assignee")
+            if assignee_value in [None, ""]:
+                post.assignee_id = None
+            else:
+                post.assignee_id = int(assignee_value)
+            updated_fields.append("assignee_id")
+
+        if "published_at" in payload:
+            raw = payload.get("published_at")
+            parsed = None
+            if isinstance(raw, str) and len(raw) == 10:
+                try:
+                    parsed = datetime.combine(date.fromisoformat(raw), time.min)
+                except ValueError:
+                    parsed = None
+            elif isinstance(raw, datetime):
+                parsed = raw
+            if parsed:
+                if timezone.is_naive(parsed):
+                    parsed = timezone.make_aware(parsed)
+                post.published_at = parsed
+                updated_fields.append("published_at")
+
+        if updated_fields:
+            post.save(update_fields=[*set(updated_fields), "updated_at"])
 
         return Response(ClinicPostSerializer(post, context={"request": request}).data, status=status.HTTP_200_OK)
+
+    def delete(self, request, clinic_id, post_id):
+        clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+        post = get_object_or_404(ClinicPost, id=post_id, clinic=clinic)
+        post.delete()
+        return Response({"ok": True}, status=status.HTTP_200_OK)
+
+
+class CalendarMemoListCreateView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = CalendarMemo.objects.filter(user=request.user)
+
+        clinic_id = request.GET.get("clinic_id")
+        if clinic_id:
+            qs = qs.filter(clinic_id=clinic_id)
+
+        date_str = request.GET.get("date")
+        month_str = request.GET.get("month")
+        if date_str:
+            parsed = parse_date(date_str)
+            if parsed:
+                qs = qs.filter(date=parsed)
+        elif month_str:
+            try:
+                year, m = map(int, month_str.split("-"))
+                qs = qs.filter(date__year=year, date__month=m)
+            except ValueError:
+                pass
+
+        unread_only = _parse_bool(request.GET.get("unread"))
+        if unread_only:
+            qs = qs.filter(is_read=False)
+
+        data = CalendarMemoSerializer(qs, many=True).data
+        return Response({"count": qs.count(), "results": data}, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        payload = request.data or {}
+        date_str = payload.get("date")
+        parsed_date = parse_date(date_str) if date_str else None
+        if not parsed_date:
+            return Response({"message": "date required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        content = (payload.get("content") or "").strip()
+        if not content:
+            return Response({"message": "content required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        clinic = None
+        clinic_id = payload.get("clinic_id")
+        if clinic_id:
+            clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+
+        remind_at = _parse_datetime_value(payload.get("remind_at"))
+        platform = (payload.get("platform") or "").strip()
+        account = (payload.get("account") or "").strip()
+        account_password = (payload.get("account_password") or "").strip()
+
+        memo = CalendarMemo.objects.create(
+            user=request.user,
+            clinic=clinic,
+            date=parsed_date,
+            content=content,
+            platform=platform,
+            account=account,
+            account_password=account_password,
+            remind_at=remind_at,
+            is_read=False,
+        )
+
+        return Response(CalendarMemoSerializer(memo).data, status=status.HTTP_201_CREATED)
+
+
+class CalendarMemoDetailView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, memo_id):
+        memo = get_object_or_404(CalendarMemo, id=memo_id, user=request.user)
+        payload = request.data or {}
+        updated_fields = []
+
+        if "content" in payload:
+            memo.content = (payload.get("content") or "").strip()
+            updated_fields.append("content")
+
+        if "date" in payload:
+            parsed = parse_date(payload.get("date") or "")
+            if parsed:
+                memo.date = parsed
+                updated_fields.append("date")
+
+        if "clinic_id" in payload:
+            clinic_id = payload.get("clinic_id")
+            if not clinic_id:
+                memo.clinic = None
+            else:
+                memo.clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+            updated_fields.append("clinic")
+
+        if "remind_at" in payload:
+            remind_raw = payload.get("remind_at")
+            memo.remind_at = _parse_datetime_value(remind_raw) if remind_raw else None
+            updated_fields.append("remind_at")
+
+        if "platform" in payload:
+            memo.platform = (payload.get("platform") or "").strip()
+            updated_fields.append("platform")
+
+        if "account" in payload:
+            memo.account = (payload.get("account") or "").strip()
+            updated_fields.append("account")
+
+        if "account_password" in payload:
+            memo.account_password = (payload.get("account_password") or "").strip()
+            updated_fields.append("account_password")
+
+        if "is_read" in payload:
+            memo.is_read = _parse_bool(payload.get("is_read"))
+            updated_fields.append("is_read")
+
+        if updated_fields:
+            memo.save(update_fields=[*set(updated_fields), "updated_at"])
+
+        return Response(CalendarMemoSerializer(memo).data, status=status.HTTP_200_OK)
+
+    def delete(self, request, memo_id):
+        memo = get_object_or_404(CalendarMemo, id=memo_id, user=request.user)
+        memo.delete()
+        return Response({"ok": True}, status=status.HTTP_200_OK)
+
+
+class NotificationListView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        limit_raw = request.GET.get("limit") or "20"
+        try:
+            limit = max(1, min(100, int(limit_raw)))
+        except ValueError:
+            limit = 20
+
+        now = timezone.now()
+        qs = (
+            CalendarMemo.objects
+            .filter(user=request.user, remind_at__isnull=False, remind_at__lte=now)
+            .order_by("-remind_at")
+        )
+        unread_count = qs.filter(is_read=False).count()
+        data = CalendarMemoSerializer(qs[:limit], many=True).data
+        return Response(
+            {"count": qs.count(), "unread_count": unread_count, "results": data},
+            status=status.HTTP_200_OK,
+        )

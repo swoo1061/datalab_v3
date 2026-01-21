@@ -100,7 +100,7 @@ function filterClinicsByQuery(q) {
 // (기존) 글로벌 검색 인덱스 - 유지
 const globalSearchIndex = {
   pages: [
-    { key: "대시보드", page: "dashboard" },
+    { key: "업체 대시보드", page: "dashboard" },
     { key: "리뷰", page: "review" },
     { key: "리뷰 생성", page: "review" },
     { key: "병원 가이드", page: "clinic_guide" },

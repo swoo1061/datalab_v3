@@ -26,108 +26,221 @@
       <div class="context-left">
         <h1 class="h1" id="clinicTitle">병원명</h1>
       </div>
-
-      <div class="context-kpi">
-        <div class="kpi">
-          <span class="kpi-label">게시글</span>
-          <span class="kpi-value" id="kpiPosts">-</span>
-        </div>
-        <div class="kpi">
-          <span class="kpi-label">후기</span>
-          <span class="kpi-value" id="kpiReviews">-</span>
-        </div>
-        <div class="kpi">
-          <span class="kpi-label">이슈</span>
-          <span class="kpi-value danger" id="kpiIssues">-</span>
-        </div>
-      </div>
     </header>
 
-    <!-- 2. 필터/본문 레이아웃 -->
+    <!-- 2. 본문 레이아웃 -->
     <div class="clinic-body">
-      <section class="filter-bar card">
-        <div class="filter-grid">
-          <div class="filter-field">
-            <label>월</label>
-            <input type="month" id="monthFilter" class="month-input" />
-          </div>
-
-          <div class="filter-field">
-            <label>구분</label>
-            <div class="seg-tabs">
-              <button class="seg-tab active" data-type="opinion"
-                onclick="setPostType('opinion')">여론</button>
-              <button class="seg-tab" data-type="review"
-                onclick="setPostType('review')">후기</button>
-            </div>
-          </div>
-
-          <div class="filter-field span-2">
-            <label>플랫폼</label>
-            <div class="pill-row" id="platformPills"></div>
-          </div>
-
-        </div>
-
-        <div class="filter-actions">
-          <button class="btn primary" onclick="reloadClinicPage()">조회</button>
-        </div>
-      </section>
-
       <section class="result-panel">
         <div class="result-grid">
-        <div class="result-left">
-        <div class="ai-intake card">
-          <div class="card-hd">데일리 업무 일지 (AI 자동 접수)</div>
-          <div class="card-bd">
-            <div class="ai-intake-grid">
-              <div class="ai-field span-2">
-                <label>URL</label>
-                <input id="aiIntakeUrl" class="input" placeholder="게시글 URL" />
-              </div>
-              <div class="ai-field">
-                <label>플랫폼</label>
-                <select id="aiIntakePlatform" class="select"></select>
-              </div>
-              <div class="ai-field">
-                <label>제목 (선택)</label>
-                <input id="aiIntakeTitle" class="input" placeholder="자동 분류 정확도 향상" />
-              </div>
-              <div class="ai-field span-2">
-                <label>사진 첨부</label>
-                <input id="aiIntakePhotos" class="input" type="file" multiple />
-                <div class="ai-file-hint" id="aiIntakePhotoHint">선택된 파일 없음</div>
-              </div>
-            </div>
-
-            <div class="ai-intake-actions">
-              <button id="aiIntakeSubmit" class="btn primary">AI 처리 후 저장</button>
-              <div class="ai-review-dropdown">
-                <button id="aiIntakeReviewBtn" class="btn">리뷰 작성</button>
-                <div class="ai-review-menu">
-                  <button class="menu-item theme-ai" data-type="ai">AI 리뷰작성</button>
-                  <button class="menu-item theme-gangnam" data-type="gangnam">강남언니</button>
-                  <button class="menu-item theme-babytok" data-type="babytok">바비톡</button>
-                  <button class="menu-item theme-yeoshin" data-type="yeoshin">여신티켓</button>
+          <div class="result-left">
+            <div class="ai-intake card">
+              <div class="card-hd intake-head">
+                <div>
+                  <div class="card-title">데일리 업무 일지</div>
+                  <div class="card-sub">URL 기반 자동 분류로 빠르게 기록합니다.</div>
                 </div>
               </div>
-              <span id="aiIntakeStatus" class="worklog-status"></span>
+              <div class="card-bd">
+                <div class="ai-intake-grid">
+                  <div class="ai-field">
+                    <label>구분</label>
+                    <div class="seg-tabs ai-type-pills" id="aiIntakeTypePills">
+                      <button class="seg-tab active" data-type="opinion">여론</button>
+                      <button class="seg-tab" data-type="review">후기</button>
+                    </div>
+                  </div>
+                  <div class="ai-field span-2">
+                    <label>URL</label>
+                    <input id="aiIntakeUrl" class="input" placeholder="게시글 URL" />
+                  </div>
+                  <div class="ai-field span-2">
+                    <label>제목 (선택)</label>
+                    <input id="aiIntakeTitle" class="input" placeholder="자동 분류 정확도 향상" />
+                  </div>
+                  <div class="ai-field">
+                    <label>작성 ID</label>
+                    <input id="aiIntakeAccount" class="input" placeholder="예: naver_cafe_id" />
+                  </div>
+                  <div class="ai-field">
+                    <label>비밀번호</label>
+                    <input id="aiIntakeAccountPassword" class="input" placeholder="카페 비밀번호" />
+                  </div>
+                  <div class="ai-field">
+                    <label>PS</label>
+                    <input id="aiIntakeMemo" class="input" placeholder="추가 메모" />
+                  </div>
+                  <div class="ai-field">
+                    <label>원장님 (선택)</label>
+                    <input id="aiIntakeDoctor" class="input" placeholder="담당 원장님" />
+                  </div>
+                  <div class="ai-field">
+                    <label>플랫폼</label>
+                    <select id="aiIntakePlatform" class="select"></select>
+                    <div class="ai-field-hint" id="aiIntakePlatformHint">URL 기준 자동 선택됨 (수정 가능)</div>
+                  </div>
+                  <div class="ai-field span-2">
+                    <label>사진 첨부</label>
+                    <div class="file-input">
+                      <input id="aiIntakePhotos" class="file-native" type="file" accept="image/*" multiple />
+                      <label class="file-btn" for="aiIntakePhotos">파일 선택</label>
+                      <div class="file-name" id="aiIntakePhotoHint">선택된 파일 없음</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="ai-intake-actions">
+                  <button id="aiIntakeSubmit" class="btn primary">AI 처리 후 저장</button>
+                  <div class="ai-review-dropdown">
+                    <button id="aiIntakeReviewBtn" class="btn">리뷰 작성</button>
+                    <div class="ai-review-menu">
+                      <button class="menu-item theme-ai" data-type="ai">AI 리뷰작성</button>
+                      <button class="menu-item theme-gangnam" data-type="gangnam">강남언니</button>
+                      <button class="menu-item theme-babytok" data-type="babytok">바비톡</button>
+                      <button class="menu-item theme-todaktok" data-type="todaktok">토닥톡</button>
+                      <button class="menu-item theme-yeoshin" data-type="yeoshin">여신티켓</button>
+                    </div>
+                  </div>
+                  <span id="aiIntakeStatus" class="worklog-status"></span>
+                </div>
+                <p class="ai-intake-hint">댓글/조회수는 크롤링 연동 시 자동 반영됩니다.</p>
+              </div>
             </div>
-            <p class="ai-intake-hint">댓글/조회수는 크롤링 연동 시 자동 반영됩니다.</p>
           </div>
         </div>
-
-        </div>
-
-        <div class="post-list card" id="postList">
-          <div class="muted" style="padding:14px;">불러오는 중...</div>
-        </div>
-        </div>
       </section>
-
     </div>
   </section>
 </main>
+  </div>
+</div>
+
+<div id="aiConfirmModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">저장 전 확인</div>
+        <div class="modal-sub">자동 감지된 값 포함, 필요한 항목을 수정하세요.</div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="ai-confirm-summary" id="aiConfirmSummary">
+        <div class="summary-row">
+          <span class="summary-label">구분</span>
+          <span class="summary-value" id="aiConfirmTypeText">-</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">후기 유형</span>
+          <span class="summary-value" id="aiConfirmSubtypeText">-</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">플랫폼</span>
+          <span class="summary-value" id="aiConfirmPlatformText">-</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">URL</span>
+          <span class="summary-value" id="aiConfirmUrlText">-</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">제목</span>
+          <span class="summary-value" id="aiConfirmTitleText">-</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">작성 ID</span>
+          <span class="summary-value" id="aiConfirmAccountText">-</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">비밀번호</span>
+          <span class="summary-value" id="aiConfirmAccountPasswordText">-</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">PS</span>
+          <span class="summary-value" id="aiConfirmMemoText">-</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">원장님</span>
+          <span class="summary-value" id="aiConfirmDoctorText">-</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">게시일</span>
+          <span class="summary-value" id="aiConfirmDateText">-</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">사진</span>
+          <span class="summary-value" id="aiConfirmPhotoText">-</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">미리보기</span>
+          <span class="summary-value">
+            <div class="photo-preview" id="aiConfirmPhotoPreview"></div>
+          </span>
+        </div>
+      </div>
+
+      <div class="modal-grid hidden" id="aiConfirmEdit">
+        <div class="ai-field">
+          <label>구분</label>
+          <div class="seg-tabs ai-type-pills" id="aiConfirmTypePills">
+            <button class="seg-tab active" data-type="opinion">여론</button>
+            <button class="seg-tab" data-type="review">후기</button>
+          </div>
+        </div>
+        <div class="ai-field">
+          <label>플랫폼</label>
+          <select id="aiConfirmPlatform" class="select"></select>
+        </div>
+        <div class="ai-field span-2">
+          <label>URL</label>
+          <input id="aiConfirmUrl" class="input" />
+        </div>
+        <div class="ai-field span-2">
+          <label>제목</label>
+          <input id="aiConfirmTitle" class="input" />
+        </div>
+        <div class="ai-field">
+          <label>작성 ID</label>
+          <input id="aiConfirmAccount" class="input" />
+        </div>
+        <div class="ai-field">
+          <label>비밀번호</label>
+          <input id="aiConfirmAccountPassword" class="input" />
+        </div>
+        <div class="ai-field">
+          <label>PS</label>
+          <input id="aiConfirmMemo" class="input" />
+        </div>
+        <div class="ai-field">
+          <label>원장님</label>
+          <input id="aiConfirmDoctor" class="input" />
+        </div>
+        <div class="ai-field span-2">
+          <label>사진 첨부</label>
+          <div class="file-input">
+            <input id="aiConfirmPhotos" class="file-native" type="file" accept="image/*" multiple />
+            <label class="file-btn" for="aiConfirmPhotos">파일 선택</label>
+            <div class="file-name" id="aiConfirmPhotoHint">선택된 파일 없음</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="aiConfirmCancel" data-close="true">취소</button>
+      <button class="btn" id="aiConfirmEditBtn">수정하기</button>
+      <button class="btn primary" id="aiConfirmSave">확인 후 저장</button>
+    </div>
+  </div>
+</div>
+
+<div id="photoPreviewModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card photo-modal">
+    <div class="modal-head">
+      <div class="modal-title">사진 미리보기</div>
+      <button class="modal-close" data-close="true">닫기</button>
+    </div>
+    <div class="modal-body">
+      <img id="photoPreviewImage" class="photo-modal-img" alt="preview" />
+    </div>
   </div>
 </div>
 

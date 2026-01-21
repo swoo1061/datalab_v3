@@ -26,6 +26,34 @@
   <div class="clock-time" id="liveClock">--:--:--</div>
 </div>
 
+    <div class="header-notify">
+      <button class="notify-btn" id="notifyButton" aria-label="알림">
+        <span class="notify-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path>
+          </svg>
+        </span>
+        <span class="notify-badge hidden" id="notifyBadge">0</span>
+      </button>
+      <div class="notify-dropdown hidden" id="notifyDropdown">
+        <div class="notify-head">알림</div>
+        <div class="notify-list" id="notifyList"></div>
+        <div class="notify-empty hidden" id="notifyEmpty">새 알림 없음</div>
+        <div class="notify-detail hidden" id="notifyDetail">
+          <div class="notify-detail-head">
+            <button class="notify-back" id="notifyBack">목록</button>
+            <strong id="notifyDetailTitle">메모</strong>
+          </div>
+          <div class="notify-detail-meta" id="notifyDetailMeta"></div>
+          <div class="notify-detail-content" id="notifyDetailContent"></div>
+          <div class="notify-detail-actions">
+            <button class="notify-open" id="notifyDetailOpen">메모 상세로</button>
+            <button class="notify-delete" id="notifyDetailDelete">삭제</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="user-area">
       <!-- ✅ 이름만 클릭 -->
       <div class="user-chip" id="userChip">

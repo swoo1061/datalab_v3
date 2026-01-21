@@ -67,6 +67,7 @@ function selectReviewOption(event, type, clinicId) {
   if (type === "ai") return goReviewWithClinic(clinicId);
   if (type === "gangnam") return goGangnamReviewWithClinic(clinicId);
   if (type === "babytok") return goPlatformReviewWithClinic(clinicId, "babytok");
+  if (type === "todaktok") return goPlatformReviewWithClinic(clinicId, "todaktok");
   if (type === "yeoshin") return goPlatformReviewWithClinic(clinicId, "yeoshin");
 }
 
@@ -82,7 +83,11 @@ function goClinicPage(event, clinicId) {
 
 function goPostsDashboard(event, clinicId) {
   event?.stopPropagation();
-  navigate(`posts_dashboard?clinic_id=${encodeURIComponent(clinicId)}`);
+  const query = `clinic_id=${encodeURIComponent(clinicId)}`;
+  if (window.nav?.go) {
+    window.nav.go(`posts_dashboard?${query}`).catch(() => {});
+  }
+  window.location.href = `posts_dashboard.html?${query}`;
 }
 
 function getContractKey(clinicId) {
@@ -180,12 +185,13 @@ function renderClinics(list, gridId = "clinicGrid") {
           <button class="menu-item theme-ai" onclick="selectReviewOption(event, 'ai', ${c.id})">AI 리뷰작성</button>
           <button class="menu-item theme-gangnam" onclick="selectReviewOption(event, 'gangnam', ${c.id})">강남언니</button>
           <button class="menu-item theme-babytok" onclick="selectReviewOption(event, 'babytok', ${c.id})">바비톡</button>
+          <button class="menu-item theme-todaktok" onclick="selectReviewOption(event, 'todaktok', ${c.id})">토닥톡</button>
           <button class="menu-item theme-yeoshin" onclick="selectReviewOption(event, 'yeoshin', ${c.id})">여신티켓</button>
         </div>
         <button class="btn sm" onclick="toggleMoreMenu(event)">더보기</button>
         <div class="more-menu">
-          <button class="menu-item" onclick="goClinicGuide(event, ${c.id})">${stripClinicSuffix(c.name)} 가이드</button>
-          <button class="menu-item" onclick="goPostsDashboard(event, ${c.id})">게시글 관리</button>
+          <button class="menu-item" data-action="guide" data-clinic-id="${c.id}">${stripClinicSuffix(c.name)} 가이드</button>
+          <button class="menu-item" data-action="posts" data-clinic-id="${c.id}">게시글 대시보드</button>
           <div class="menu-row">
             <span>계약일</span>
             <input class="contract-input" type="date" data-clinic-id="${c.id}" />
@@ -198,6 +204,7 @@ function renderClinics(list, gridId = "clinicGrid") {
   });
 
   bindContractInputs();
+  bindMoreMenuActions();
 }
 
 function bindContractInputs() {
@@ -212,5 +219,23 @@ function bindContractInputs() {
   });
 }
 
+function bindMoreMenuActions() {
+  document.querySelectorAll(".more-menu .menu-item").forEach((btn) => {
+    const action = btn.dataset.action;
+    const clinicId = btn.dataset.clinicId;
+    if (!action || !clinicId) return;
+    btn.addEventListener("click", (event) => {
+      if (action === "guide") {
+        goClinicGuide(event, clinicId);
+        return;
+      }
+      if (action === "posts") {
+        goPostsDashboard(event, clinicId);
+      }
+    });
+  });
+}
+
 // 전역 노출
 window.renderClinics = renderClinics;
+window.goPostsDashboard = goPostsDashboard;

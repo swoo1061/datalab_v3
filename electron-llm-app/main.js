@@ -6,16 +6,48 @@ const {
   globalShortcut,
   session,
 } = require("electron");
+const fs = require("fs");
 const path = require("path");
 
 let win;
 let sessionKey = null;
+
+function loadApiBaseFromEnvFile() {
+  if (process.env.DATALAB_API_BASE || process.env.API_BASE) return;
+  const candidates = [
+    path.join(__dirname, ".env"),
+    path.join(__dirname, "..", ".env"),
+  ];
+  for (const filePath of candidates) {
+    if (!fs.existsSync(filePath)) continue;
+    const content = fs.readFileSync(filePath, "utf8");
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+      const idx = line.indexOf("=");
+      if (idx === -1) continue;
+      const key = line.slice(0, idx).trim();
+      if (key !== "DATALAB_API_BASE" && key !== "API_BASE") continue;
+      let value = line.slice(idx + 1).trim();
+      if (
+        (value.startsWith("\"") && value.endsWith("\"")) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      if (value) process.env.DATALAB_API_BASE = value;
+      return;
+    }
+  }
+}
 
 // Allow SameSite=None cookies without HTTPS in Electron (dev/local only).
 app.commandLine.appendSwitch(
   "disable-features",
   "SameSiteByDefaultCookies,CookiesWithoutSameSiteMustBeSecure"
 );
+
+loadApiBaseFromEnvFile();
 
 function createWindow() {
   Menu.setApplicationMenu(null);

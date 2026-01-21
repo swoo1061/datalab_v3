@@ -1,6 +1,6 @@
 console.log("clinic_page.js loaded");
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = window?.config?.apiBase || "http://127.0.0.1:8000";
 
 // ================================
 // 상태
@@ -20,10 +20,21 @@ const PLATFORM_PILLS = [
   { key: "gn_jp", label: "JP강남언니" },
   { key: "gangnam", label: "강남언니" },
   { key: "babytok", label: "바비톡" },
+  { key: "todaktok", label: "토닥톡" },
   { key: "yeoshin", label: "여신티켓" },
   { key: "seongyesa", label: "성예사" },
   { key: "dadamo", label: "대다모" },
 ];
+
+// ================================
+// 인증 헤더
+// ================================
+async function buildAuthHeaders() {
+  const headers = {};
+  const sessionKey = await window.session?.getKey?.();
+  if (sessionKey) headers["X-Sessionid"] = sessionKey;
+  return headers;
+}
 
 // ================================
 // 유틸
@@ -61,14 +72,10 @@ async function initClinicPage() {
     return;
   }
 
-  renderPlatformPills();
-  initMonthSelect();
-  bindSearch();
-
   await loadClinicInfo();
 
   initAiIntakeForm();
-  await loadPosts();
+  bindPostsDashboardLink();
 }
 
 // ================================
@@ -151,7 +158,13 @@ function initMonthSelect() {
 function initAiIntakeForm() {
   const urlInput = document.getElementById("aiIntakeUrl");
   const titleInput = document.getElementById("aiIntakeTitle");
+  const accountInput = document.getElementById("aiIntakeAccount");
+  const accountPasswordInput = document.getElementById("aiIntakeAccountPassword");
+  const memoInput = document.getElementById("aiIntakeMemo");
+  const doctorInput = document.getElementById("aiIntakeDoctor");
   const platformSelect = document.getElementById("aiIntakePlatform");
+  const platformHint = document.getElementById("aiIntakePlatformHint");
+  const typePills = document.getElementById("aiIntakeTypePills");
   const submitBtn = document.getElementById("aiIntakeSubmit");
   const reviewBtn = document.getElementById("aiIntakeReviewBtn");
   const statusEl = document.getElementById("aiIntakeStatus");
@@ -159,7 +172,70 @@ function initAiIntakeForm() {
   const photoHint = document.getElementById("aiIntakePhotoHint");
   const reviewMenu = document.querySelector(".ai-review-menu");
 
+  const confirmModal = document.getElementById("aiConfirmModal");
+  const confirmUrl = document.getElementById("aiConfirmUrl");
+  const confirmTitle = document.getElementById("aiConfirmTitle");
+  const confirmAccount = document.getElementById("aiConfirmAccount");
+  const confirmAccountPassword = document.getElementById("aiConfirmAccountPassword");
+  const confirmMemo = document.getElementById("aiConfirmMemo");
+  const confirmDoctor = document.getElementById("aiConfirmDoctor");
+  const confirmPlatform = document.getElementById("aiConfirmPlatform");
+  const confirmTypePills = document.getElementById("aiConfirmTypePills");
+  const confirmPhotos = document.getElementById("aiConfirmPhotos");
+  const confirmPhotoHint = document.getElementById("aiConfirmPhotoHint");
+  const confirmSummary = document.getElementById("aiConfirmSummary");
+  const confirmEdit = document.getElementById("aiConfirmEdit");
+  const confirmEditBtn = document.getElementById("aiConfirmEditBtn");
+  const confirmTypeText = document.getElementById("aiConfirmTypeText");
+  const confirmSubtypeText = document.getElementById("aiConfirmSubtypeText");
+  const confirmPlatformText = document.getElementById("aiConfirmPlatformText");
+  const confirmUrlText = document.getElementById("aiConfirmUrlText");
+  const confirmTitleText = document.getElementById("aiConfirmTitleText");
+  const confirmAccountText = document.getElementById("aiConfirmAccountText");
+  const confirmAccountPasswordText = document.getElementById("aiConfirmAccountPasswordText");
+  const confirmMemoText = document.getElementById("aiConfirmMemoText");
+  const confirmDoctorText = document.getElementById("aiConfirmDoctorText");
+  const confirmDateText = document.getElementById("aiConfirmDateText");
+  const confirmPhotoText = document.getElementById("aiConfirmPhotoText");
+  const confirmPhotoPreview = document.getElementById("aiConfirmPhotoPreview");
+  const photoPreviewModal = document.getElementById("photoPreviewModal");
+  const photoPreviewImage = document.getElementById("photoPreviewImage");
+  const confirmSave = document.getElementById("aiConfirmSave");
+  const confirmCancel = document.getElementById("aiConfirmCancel");
+
   if (!urlInput || !platformSelect || !submitBtn) return;
+
+  let currentIntakeType = "opinion";
+  let platformManual = false;
+
+  const detectPlatformFromUrl = (url) => {
+    const raw = String(url || "").toLowerCase();
+    if (!raw) return null;
+    const candidates = [
+      { key: "naver", label: "네이버", match: ["naver.com", "blog.naver.com", "m.blog.naver.com", "cafe.naver.com"] },
+      { key: "gangnam", label: "강남언니", match: ["abr.ge", "gangnamunni.com", "gangnamunni", "gangnam"] },
+      { key: "gn_jp", label: "JP강남언니", match: ["gnun.link", "gangnamunni.jp", "gn.jp", "gangnam-jp"] },
+      { key: "babytok", label: "바비톡", match: ["web.babitalk.com", "babitalk.com", "babytok.com", "babytok"] },
+      { key: "todaktok", label: "토닥톡", match: ["todaktok.com", "todaktok"] },
+      { key: "yeoshin", label: "여신티켓", match: ["yeoshin.co.kr", "yeoshin.com", "yeoshin", "yeoshin-ticket"] },
+      { key: "seongyesa", label: "성예사", match: ["sungyesa.com", "seongyesa.com", "seongyesa"] },
+      { key: "dadamo", label: "대다모", match: ["daedamo.com", "dadamo.com", "dadamo"] },
+    ];
+    const hit = candidates.find((c) => c.match.some((m) => raw.includes(m)));
+    return hit ? { key: hit.key, label: hit.label } : null;
+  };
+
+  const syncPlatformAuto = () => {
+    const info = detectPlatformFromUrl(urlInput.value);
+    if (!platformManual || !platformSelect.value) {
+      platformSelect.value = info ? info.key : "";
+    }
+    if (platformHint) {
+      platformHint.textContent = info
+        ? `자동 선택 (${info.label})`
+        : "자동 선택 실패 (직접 선택)";
+    }
+  };
 
   if (!platformSelect.options.length) {
     platformSelect.innerHTML = `
@@ -170,57 +246,242 @@ function initAiIntakeForm() {
     `;
   }
 
-  submitBtn.onclick = async () => {
-    const url = urlInput.value.trim();
-    const platform = platformSelect.value;
-    const title = (titleInput?.value || "").trim();
+  if (typePills) {
+    typePills.querySelectorAll(".seg-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        currentIntakeType = btn.dataset.type || "opinion";
+        typePills.querySelectorAll(".seg-tab").forEach((b) => b.classList.toggle("active", b === btn));
+      });
+    });
+  }
 
-    if (!url || !platform) {
-      if (statusEl) statusEl.textContent = "URL과 플랫폼을 입력하세요.";
-      return;
+  if (platformSelect) {
+    platformSelect.addEventListener("change", () => {
+      platformManual = true;
+    });
+  }
+
+  urlInput.addEventListener("input", syncPlatformAuto);
+
+  const closeConfirmModal = () => {
+    if (confirmModal) confirmModal.classList.add("hidden");
+  };
+
+  const toggleConfirmEdit = (editing) => {
+    if (confirmSummary) confirmSummary.classList.toggle("hidden", editing);
+    if (confirmEdit) confirmEdit.classList.toggle("hidden", !editing);
+    if (confirmEditBtn) confirmEditBtn.classList.toggle("hidden", editing);
+  };
+
+  const openConfirmModal = () => {
+    if (!confirmModal) return;
+    if (confirmPlatform && !confirmPlatform.options.length) {
+      confirmPlatform.innerHTML = platformSelect.innerHTML;
     }
-
-    const form = new FormData();
-    form.append("url", url);
-    form.append("platform", platform);
-    form.append("title", title);
-    form.append("auto_classify", "true");
-    if (photoInput?.files?.length) {
-      Array.from(photoInput.files).forEach((file) => {
-        form.append("photos", file);
+    if (confirmUrl) confirmUrl.value = urlInput.value.trim();
+    if (confirmTitle) confirmTitle.value = (titleInput?.value || "").trim();
+    if (confirmAccount) confirmAccount.value = (accountInput?.value || "").trim();
+    if (confirmAccountPassword) confirmAccountPassword.value = (accountPasswordInput?.value || "").trim();
+    if (confirmMemo) confirmMemo.value = (memoInput?.value || "").trim();
+    if (confirmDoctor) confirmDoctor.value = (doctorInput?.value || "").trim();
+    if (confirmPlatform) confirmPlatform.value = platformSelect.value;
+    if (confirmTypePills) {
+      confirmTypePills.querySelectorAll(".seg-tab").forEach((b) => {
+        b.classList.toggle("active", b.dataset.type === currentIntakeType);
       });
     }
+    if (confirmPhotoHint) {
+      const count = photoInput?.files?.length || 0;
+      confirmPhotoHint.textContent = count ? `${count}개 파일 선택됨` : "선택된 파일 없음";
+    }
+    if (confirmTypeText) {
+      confirmTypeText.textContent = currentIntakeType === "review" ? "후기" : "여론";
+    }
+    if (confirmSubtypeText) {
+      const photoCount = photoInput?.files?.length || 0;
+      if (currentIntakeType === "review") {
+        confirmSubtypeText.textContent = photoCount ? "사진 후기" : "텍스트 후기";
+      } else {
+        confirmSubtypeText.textContent = "텍스트 여론";
+      }
+    }
+    if (confirmPlatformText) {
+      const label = platformSelect?.selectedOptions?.[0]?.textContent || "-";
+      confirmPlatformText.textContent = label;
+    }
+    if (confirmUrlText) confirmUrlText.textContent = confirmUrl?.value || "-";
+    if (confirmTitleText) confirmTitleText.textContent = confirmTitle?.value || "-";
+    if (confirmAccountText) confirmAccountText.textContent = confirmAccount?.value || "-";
+    if (confirmAccountPasswordText) confirmAccountPasswordText.textContent = confirmAccountPassword?.value || "-";
+    if (confirmMemoText) confirmMemoText.textContent = confirmMemo?.value || "-";
+    if (confirmDoctorText) confirmDoctorText.textContent = confirmDoctor?.value || "-";
+    if (confirmDateText) {
+      const now = new Date();
+      confirmDateText.textContent = now.toLocaleDateString("ko-KR");
+    }
+    if (confirmPhotoText) {
+      const count = photoInput?.files?.length || 0;
+      confirmPhotoText.textContent = count ? `${count}개` : "없음";
+    }
+    if (confirmPhotoPreview) {
+      const files = photoInput?.files ? Array.from(photoInput.files) : [];
+      if (!files.length) {
+        confirmPhotoPreview.innerHTML = "<span class='muted'>없음</span>";
+      } else {
+        confirmPhotoPreview.innerHTML = files
+          .slice(0, 4)
+          .map((file) => {
+            const url = URL.createObjectURL(file);
+            return `<img src="${url}" alt="preview" data-preview="${url}" />`;
+          })
+          .join("");
+        confirmPhotoPreview.querySelectorAll("img").forEach((img) => {
+          img.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (!photoPreviewModal || !photoPreviewImage) return;
+            photoPreviewImage.src = img.dataset.preview || img.src;
+            photoPreviewModal.classList.remove("hidden");
+          });
+        });
+      }
+    }
+    toggleConfirmEdit(false);
+    confirmModal.classList.remove("hidden");
+  };
 
-    if (statusEl) statusEl.textContent = "처리 중...";
-    submitBtn.disabled = true;
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/data/clinics/${currentClinicId}/posts/`,
-        {
-          method: "POST",
-          credentials: "include",
-          body: form,
-        }
-      );
+  const bindConfirmTypePills = () => {
+    if (!confirmTypePills) return;
+    confirmTypePills.querySelectorAll(".seg-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        confirmTypePills.querySelectorAll(".seg-tab").forEach((b) => b.classList.toggle("active", b === btn));
+      });
+    });
+  };
 
-      if (!res.ok) {
-        if (statusEl) statusEl.textContent = "저장 실패";
+  bindConfirmTypePills();
+
+  if (confirmModal) {
+    confirmModal.addEventListener("click", (e) => {
+      const target = e.target;
+      if (target?.dataset?.close) {
+        closeConfirmModal();
+      }
+    });
+  }
+
+  if (photoPreviewModal) {
+    photoPreviewModal.addEventListener("click", (e) => {
+      const target = e.target;
+      if (target?.dataset?.close) {
+        photoPreviewModal.classList.add("hidden");
+      }
+    });
+  }
+
+  if (confirmEditBtn) {
+    confirmEditBtn.addEventListener("click", () => toggleConfirmEdit(true));
+  }
+
+  if (confirmPhotos && confirmPhotoHint) {
+    confirmPhotos.addEventListener("change", () => {
+      const count = confirmPhotos.files ? confirmPhotos.files.length : 0;
+      confirmPhotoHint.textContent = count ? `${count}개 파일 선택됨` : "선택된 파일 없음";
+    });
+  }
+
+  submitBtn.onclick = () => {
+    const url = urlInput.value.trim();
+    if (!url) {
+      if (statusEl) statusEl.textContent = "URL을 입력하세요.";
+      return;
+    }
+    syncPlatformAuto();
+    openConfirmModal();
+  };
+
+  if (confirmSave) {
+    confirmSave.onclick = async () => {
+      const url = confirmUrl?.value.trim() || "";
+      const title = (confirmTitle?.value || "").trim();
+      const account = (confirmAccount?.value || "").trim();
+      const accountPassword = (confirmAccountPassword?.value || "").trim();
+      const memo = (confirmMemo?.value || "").trim();
+      const doctor = (confirmDoctor?.value || "").trim();
+      const platform = confirmPlatform?.value || "";
+      const type = confirmTypePills?.querySelector(".seg-tab.active")?.dataset?.type || currentIntakeType;
+
+      if (!url) {
+        if (statusEl) statusEl.textContent = "URL을 입력하세요.";
+        return;
+      }
+      if (!platform) {
+        if (statusEl) statusEl.textContent = "플랫폼을 선택하세요.";
         return;
       }
 
-      if (statusEl) statusEl.textContent = "저장 완료";
-      urlInput.value = "";
-      if (titleInput) titleInput.value = "";
-      if (photoInput) photoInput.value = "";
-      if (photoHint) photoHint.textContent = "선택된 파일 없음";
-      await loadPosts();
-    } catch (e) {
-      console.error("ai intake error", e);
-      if (statusEl) statusEl.textContent = "저장 실패";
-    } finally {
-      submitBtn.disabled = false;
-    }
-  };
+      const form = new FormData();
+      form.append("url", url);
+      form.append("platform", platform);
+      form.append("title", title);
+      if (doctor) form.append("doctor_name", doctor);
+      if (account) form.append("account", account);
+      if (accountPassword) form.append("account_password", accountPassword);
+      if (memo) form.append("memo", memo);
+      form.append("type", type);
+
+      const modalFiles = confirmPhotos?.files?.length ? confirmPhotos.files : null;
+      const sourceFiles = modalFiles || photoInput?.files;
+      if (sourceFiles?.length) {
+        Array.from(sourceFiles).forEach((file) => {
+          form.append("photos", file);
+        });
+      }
+
+      if (statusEl) statusEl.textContent = "처리 중...";
+      confirmSave.disabled = true;
+      submitBtn.disabled = true;
+      try {
+        const headers = await buildAuthHeaders();
+        const res = await fetch(
+          `${API_BASE}/api/data/clinics/${currentClinicId}/posts/`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers,
+            body: form,
+          }
+        );
+
+        if (!res.ok) {
+          if (statusEl) statusEl.textContent = "저장 실패";
+          return;
+        }
+
+        if (statusEl) statusEl.textContent = "저장 완료";
+        urlInput.value = "";
+        if (titleInput) titleInput.value = "";
+        if (accountInput) accountInput.value = "";
+        if (accountPasswordInput) accountPasswordInput.value = "";
+        if (memoInput) memoInput.value = "";
+        if (doctorInput) doctorInput.value = "";
+        if (photoInput) photoInput.value = "";
+        if (confirmPhotos) confirmPhotos.value = "";
+        if (photoHint) photoHint.textContent = "선택된 파일 없음";
+        if (confirmPhotoHint) confirmPhotoHint.textContent = "선택된 파일 없음";
+        if (confirmPhotoPreview) confirmPhotoPreview.innerHTML = "";
+        platformSelect.value = "";
+        platformManual = false;
+        closeConfirmModal();
+        await loadPosts();
+      } catch (e) {
+        console.error("ai intake error", e);
+        if (statusEl) statusEl.textContent = "저장 실패";
+      } finally {
+        confirmSave.disabled = false;
+        submitBtn.disabled = false;
+      }
+    };
+  }
 
   if (reviewBtn) {
     reviewBtn.onclick = (e) => {
@@ -241,6 +502,10 @@ function initAiIntakeForm() {
         }
         if (type === "babytok") {
           window.location.href = `review.html?clinic_id=${currentClinicId}&platform=babytok`;
+          return;
+        }
+        if (type === "todaktok") {
+          window.location.href = `review.html?clinic_id=${currentClinicId}&platform=todaktok`;
           return;
         }
         if (type === "yeoshin") {
@@ -264,6 +529,14 @@ function initAiIntakeForm() {
   }
 }
 
+function bindPostsDashboardLink() {
+  const btn = document.getElementById("goPostsDashboard");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    window.nav.go(`posts_dashboard?clinic_id=${currentClinicId}`);
+  });
+}
+
 // ================================
 // 게시글 로드
 // ================================
@@ -285,7 +558,8 @@ async function loadPosts() {
 
   const url = `${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${params}`;
 
-  const res = await fetch(url, { credentials: "include" });
+  const headers = await buildAuthHeaders();
+  const res = await fetch(url, { credentials: "include", headers });
   const data = await res.json();
 
   if (!data.results || data.results.length === 0) {
@@ -331,10 +605,11 @@ function bindMessageInputs() {
 async function updatePostMessageCount(postId, messageCount) {
   const url = `${API_BASE}/api/data/clinics/${currentClinicId}/posts/${postId}/`;
   try {
+    const headers = await buildAuthHeaders();
     await fetch(url, {
       method: "PATCH",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({ message_count: messageCount }),
     });
   } catch (e) {
@@ -356,7 +631,8 @@ async function fetchPostsByMonth(type) {
   });
 
   const url = `${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${params}`;
-  const res = await fetch(url, { credentials: "include" });
+  const headers = await buildAuthHeaders();
+  const res = await fetch(url, { credentials: "include", headers });
   if (!res.ok) return [];
   const data = await res.json();
   return data.results || [];
