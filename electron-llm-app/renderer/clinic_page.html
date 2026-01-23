@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="css/clinic_page.css" />
   <link rel="stylesheet" href="css/schedule.css" />
 </head>
-<body>
+<body class="theme-vivid">
 
 <div class="app-root">
   <div class="app-sidebar-slot" id="appSidebar"></div>
@@ -54,23 +54,19 @@
                     <input id="aiIntakeUrl" class="input" placeholder="게시글 URL" />
                   </div>
                   <div class="ai-field span-2">
-                    <label>제목 (선택)</label>
-                    <input id="aiIntakeTitle" class="input" placeholder="자동 분류 정확도 향상" />
+                    <label>제목</label>
+                    <input id="aiIntakeTitle" class="input" />
                   </div>
                   <div class="ai-field">
-                    <label>작성 ID</label>
+                    <label>플랫폼 ID</label>
                     <input id="aiIntakeAccount" class="input" placeholder="예: naver_cafe_id" />
                   </div>
                   <div class="ai-field">
-                    <label>비밀번호</label>
+                    <label>플랫폼 PW</label>
                     <input id="aiIntakeAccountPassword" class="input" placeholder="카페 비밀번호" />
                   </div>
                   <div class="ai-field">
-                    <label>PS</label>
-                    <input id="aiIntakeMemo" class="input" placeholder="추가 메모" />
-                  </div>
-                  <div class="ai-field">
-                    <label>원장님 (선택)</label>
+                    <label>원장님</label>
                     <input id="aiIntakeDoctor" class="input" placeholder="담당 원장님" />
                   </div>
                   <div class="ai-field">
@@ -184,6 +180,10 @@
             <button class="seg-tab active" data-type="opinion">여론</button>
             <button class="seg-tab" data-type="review">후기</button>
           </div>
+        </div>
+        <div class="ai-field">
+          <label>후기 유형</label>
+          <select id="aiConfirmSubtype" class="select"></select>
         </div>
         <div class="ai-field">
           <label>플랫폼</label>

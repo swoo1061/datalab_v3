@@ -14,7 +14,7 @@ const PLATFORM_PILLS = [
 ];
 
 let currentClinicId = null;
-let currentType = "all";
+let currentType = "opinion";
 let currentPlatform = "all";
 let currentMonth = "";
 let currentQuery = "";
@@ -23,6 +23,14 @@ let currentPosts = [];
 let editingPostId = null;
 let editingAll = false;
 let selectedPostIds = new Set();
+
+const askConfirm = async (message) => {
+  if (typeof window.appConfirm === "function") {
+    return window.appConfirm(message);
+  }
+  return confirm(message);
+};
+
 
 
 function escapeHtml(str) {
@@ -33,6 +41,7 @@ function escapeHtml(str) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
 
 async function buildAuthHeaders() {
   const headers = {};
@@ -55,6 +64,28 @@ function monthKey() {
   return currentMonth;
 }
 
+function formatMonthLabel(value) {
+  if (!value) return "-";
+  const [y, m] = value.split("-").map(Number);
+  if (!y || !m) return value;
+  return `${y}년 ${m}월`;
+}
+
+function shiftMonth(value, delta) {
+  const [y, m] = value.split("-").map(Number);
+  if (!y || !m) return value;
+  const next = new Date(y, m - 1 + delta, 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function setMonth(value) {
+  currentMonth = value;
+  const monthInput = document.getElementById("postMonth");
+  const monthLabel = document.getElementById("postMonthLabel");
+  if (monthInput) monthInput.value = value;
+  if (monthLabel) monthLabel.textContent = formatMonthLabel(value);
+}
+
 async function fetchClinics() {
   try {
     if (window.api?.getClinics) {
@@ -66,20 +97,25 @@ async function fetchClinics() {
   return [];
 }
 
-async function fetchPosts(type) {
+async function fetchPosts(type, { month } = {}) {
   const params = new URLSearchParams({
     type,
     platform: currentPlatform,
-    month: monthKey(),
   });
+  const monthValue = month === undefined ? monthKey() : month;
+  if (monthValue) params.set("month", monthValue);
   if (currentQuery) params.set("q", currentQuery);
   const url = `${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${params}`;
   const headers = await buildAuthHeaders();
   const res = await fetch(url, { credentials: "include", headers });
-  if (!res.ok) return [];
+  if (!res.ok) return { results: [], count: 0 };
   const data = await res.json();
-  return data.results || [];
+  return {
+    results: data.results || [],
+    count: data.count ?? (data.results ? data.results.length : 0),
+  };
 }
+
 
 function renderPlatformPills() {
   const root = document.getElementById("postPlatformPills");
@@ -102,6 +138,8 @@ function renderPlatformPills() {
 function bindTypePills() {
   const root = document.getElementById("postTypePills");
   if (!root) return;
+  const activeBtn = root.querySelector(".type-pill.active");
+  if (activeBtn) currentType = activeBtn.dataset.type || "opinion";
   root.querySelectorAll(".type-pill").forEach((btn) => {
     btn.addEventListener("click", () => {
       currentType = btn.dataset.type || "all";
@@ -111,26 +149,81 @@ function bindTypePills() {
   });
 }
 
+function enableDragScroll(container) {
+  if (!container) return;
+  let isDown = false;
+  let startX = 0;
+  let startY = 0;
+  let scrollLeft = 0;
+  let scrollTop = 0;
+
+  const isInteractive = (target) =>
+    target.closest("a, button, input, select, textarea, label");
+
+  container.classList.add("drag-scroll");
+    container.addEventListener("mousedown", (e) => {
+      if (document.body.classList.contains("editing-posts")) return;
+      if (e.button !== 0) return;
+      if (isInteractive(e.target)) return;
+      isDown = true;
+    startX = e.pageX;
+    startY = e.pageY;
+    scrollLeft = container.scrollLeft;
+    scrollTop = container.scrollTop;
+      container.classList.add("dragging");
+      document.body.classList.add("drag-scroll-active");
+    });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!isDown) return;
+    const dx = e.pageX - startX;
+    const dy = e.pageY - startY;
+    container.scrollLeft = scrollLeft - dx;
+    container.scrollTop = scrollTop - dy;
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (!isDown) return;
+    isDown = false;
+    container.classList.remove("dragging");
+    document.body.classList.remove("drag-scroll-active");
+  });
+}
+
 async function loadPosts() {
   if (!currentClinicId) return;
   const list = document.getElementById("postList");
   const opinionCountEl = document.getElementById("opinionCount");
   const reviewCountEl = document.getElementById("reviewCount");
+  const opinionTotalEl = document.getElementById("opinionTotalCount");
+  const reviewTotalEl = document.getElementById("reviewTotalCount");
   if (list) list.innerHTML = `<div class="table-muted">불러오는 중...</div>`;
   selectedPostIds = new Set();
 
   let posts = [];
-  const [opinions, reviews] = await Promise.all([fetchPosts("opinion"), fetchPosts("review")]);
-  if (currentType === "opinion") posts = opinions;
-  else if (currentType === "review") posts = reviews;
-  else posts = [...opinions, ...reviews];
+  const [
+    { results: opinionResults, count: opinionMonthCount },
+    { results: reviewResults, count: reviewMonthCount },
+    { count: opinionTotalCount },
+    { count: reviewTotalCount },
+  ] = await Promise.all([
+    fetchPosts("opinion"),
+    fetchPosts("review"),
+    fetchPosts("opinion", { month: null }),
+    fetchPosts("review", { month: null }),
+  ]);
+  if (currentType === "opinion") posts = opinionResults;
+  else if (currentType === "review") posts = reviewResults;
+  else posts = [...opinionResults, ...reviewResults];
 
   posts.sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
   postsCache = new Map(posts.map((p) => [String(p.id), p]));
   currentPosts = posts;
 
-  if (opinionCountEl) opinionCountEl.textContent = opinions.length;
-  if (reviewCountEl) reviewCountEl.textContent = reviews.length;
+  if (opinionCountEl) opinionCountEl.textContent = opinionMonthCount;
+  if (reviewCountEl) reviewCountEl.textContent = reviewMonthCount;
+  if (opinionTotalEl) opinionTotalEl.textContent = opinionTotalCount;
+  if (reviewTotalEl) reviewTotalEl.textContent = reviewTotalCount;
   if (editingAll) toggleHeaderEditActions(true);
   renderPostList();
 }
@@ -142,6 +235,21 @@ function renderPostList() {
     list.innerHTML = `<div class="table-muted">표시할 게시글이 없습니다.</div>`;
     return;
   }
+  const table = list.closest(".post-table");
+  const isEditing = editingAll || Boolean(editingPostId);
+  document.body.classList.toggle("editing-posts", isEditing);
+  if (table) {
+    table.classList.toggle("card-view", !isEditing);
+    table.classList.toggle("editing-view", isEditing);
+  }
+  list.classList.toggle("card-view", !isEditing);
+  list.classList.toggle("editing-view", isEditing);
+  list.classList.toggle("edit-only", isEditing);
+  if (isEditing) {
+    document.body.classList.remove("drag-scroll-active");
+    document.body.classList.remove("resizing-panel");
+    document.querySelectorAll(".dragging").forEach((el) => el.classList.remove("dragging"));
+  }
 
   list.innerHTML = currentPosts.map((p) => (
     editingAll || String(p.id) === String(editingPostId)
@@ -150,6 +258,7 @@ function renderPostList() {
   )).join("");
 
   bindRowActions();
+  bindPhotoButtons();
   bindSelectionActions();
   if (editingAll) {
     bindTypeSelects();
@@ -158,26 +267,41 @@ function renderPostList() {
 }
 
 function renderViewRow(p) {
+  const dateLabel = (p.updated_at || "").slice(0, 10);
+  const typeLabel = p.type === "review" ? "후기" : "여론";
+  const platformLabel = p.platform_label || p.platform || "-";
+  const photoUrls = Array.isArray(p.photos)
+    ? p.photos.map((photo) => photo?.url || photo).filter(Boolean)
+    : [];
+  const photoAttr = photoUrls.length
+    ? `data-photos="${encodeURIComponent(JSON.stringify(photoUrls))}"`
+    : "";
+  const photoButton = photoUrls.length
+    ? `<button class="post-photo-btn" ${photoAttr}>사진</button>`
+    : "";
   return `
-    <div class="table-row" data-post-id="${p.id}">
-      <span class="cell-check"><input type="checkbox" class="row-select" data-post-id="${p.id}" /></span>
-      <span class="cell-meta">
-        <span class="meta-date">${(p.updated_at || "").slice(0, 10)}</span>
-        <span class="meta-type">${p.type === "review" ? "후기" : "여론"}</span>
-      </span>
-      <span class="cell-title">
-        <span class="title-text">
-          <a href="${p.url}" target="_blank" rel="noreferrer">${p.title}</a>
-        </span>
+    <div class="table-row card-row" data-post-id="${p.id}">
+      <div class="card-top">
+        <label class="card-check edit-only"><input type="checkbox" class="row-select" data-post-id="${p.id}" /></label>
+        <div class="card-meta">
+          <span class="meta-date">${dateLabel}</span>
+          <span class="meta-type">${typeLabel}</span>
+        </div>
+        <span class="card-platform">${platformLabel}</span>
+        ${photoButton}
+      </div>
+      <div class="card-title">
+        <a href="${p.url}" target="_blank" rel="noreferrer">${p.title}</a>
         <a class="url-link" href="${p.url}" target="_blank" rel="noreferrer">${p.url}</a>
-      </span>
-      <span class="cell-metrics">
+      </div>
+      <div class="card-metrics">
         <span class="metric-chip">조회 ${p.views ?? 0}</span>
         <span class="metric-chip">댓글 ${p.comments ?? 0}</span>
         <span class="metric-chip">쪽지 ${p.message_count ?? 0}</span>
-      </span>
-      <span class="cell-assignee">${p.assignee_name || "-"}</span>
-      <span class="cell-platform">${p.platform_label || p.platform}</span>
+      </div>
+      <div class="card-foot">
+        <span class="card-assignee"> ${p.assignee_name || "-"}</span>
+      </div>
     </div>
   `;
 }
@@ -190,7 +314,7 @@ function renderEditRow(p) {
 
   return `
     <div class="table-row editing" data-post-id="${p.id}">
-      <span class="cell-check"><input type="checkbox" class="row-select" data-post-id="${p.id}" /></span>
+      <span class="cell-check edit-only"><input type="checkbox" class="row-select" data-post-id="${p.id}" /></span>
       <span class="cell-meta">
         <input class="inline-input edit-date" type="date" value="${(p.published_at || p.updated_at || "").slice(0, 10)}" />
         <select class="inline-select edit-type">
@@ -200,14 +324,13 @@ function renderEditRow(p) {
         <select class="inline-select edit-subtype" style="${subtypeVisible ? "" : "display:none;"}">
           <option value="text" ${p.review_subtype === "text" ? "selected" : ""}>텍스트</option>
           <option value="photo" ${p.review_subtype === "photo" ? "selected" : ""}>사진</option>
+          <option value="consultation" ${p.review_subtype === "consultation" ? "selected" : ""}>상담</option>
         </select>
       </span>
       <span class="cell-title">
         <input class="inline-input edit-title" value="${escapeHtml(p.title || "")}" />
         <input class="inline-input edit-url" value="${escapeHtml(p.url || "")}" />
-        <span class="title-actions">
-          <button class="table-delete" data-post-id="${p.id}">삭제</button>
-        </span>
+
       </span>
       <span class="cell-metrics">
         <input class="inline-input edit-views" type="number" min="0" value="${p.views ?? 0}" />
@@ -229,23 +352,73 @@ function bindRowActions() {
   if (!list) return;
 
   list.querySelectorAll(".table-delete").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const postId = btn.dataset.postId;
-      if (!postId) return;
-      if (!confirm("게시글을 삭제할까요?")) return;
-      const headers = await buildAuthHeaders();
-      const res = await fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/${postId}/`, {
-        method: "DELETE",
-        credentials: "include",
-        headers,
+      btn.addEventListener("click", async () => {
+        const postId = btn.dataset.postId;
+        if (!postId) return;
+        if (!(await askConfirm("게시글을 삭제할까요?"))) {
+          window.resetInteractionState?.();
+          return;
+        }
+        const headers = await buildAuthHeaders();
+        const res = await fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/${postId}/`, {
+          method: "DELETE",
+          credentials: "include",
+          headers,
+        });
+        if (!res.ok) {
+          window.showAlert?.("삭제 실패");
+          window.resetInteractionState?.();
+          return;
+        }
+        editingPostId = null;
+        loadPosts();
+        window.resetInteractionState?.();
       });
-      if (!res.ok) {
-        alert("삭제 실패");
-        return;
-      }
-      editingPostId = null;
-      loadPosts();
     });
+  }
+
+function bindPhotoButtons() {
+  const list = document.getElementById("postList");
+  if (!list) return;
+  list.querySelectorAll(".post-photo-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const raw = btn.dataset.photos || "";
+      if (!raw) return;
+      try {
+        const urls = JSON.parse(decodeURIComponent(raw));
+        openPhotoModal(urls);
+      } catch (err) {
+        console.warn("photo parse failed", err);
+      }
+    });
+  });
+}
+
+function openPhotoModal(urls) {
+  const modal = document.getElementById("postPhotoModal");
+  const list = document.getElementById("postPhotoList");
+  if (!modal || !list) return;
+  const safeUrls = Array.isArray(urls) ? urls.filter(Boolean) : [];
+  if (!safeUrls.length) return;
+  const size = Math.max(120, Math.min(220, Math.floor(520 / safeUrls.length)));
+  list.style.setProperty("--photo-size", `${size}px`);
+  list.innerHTML = safeUrls.map((url) => `<img src="${url}" alt="photo" />`).join("");
+  modal.classList.remove("hidden");
+}
+
+function initPhotoModal() {
+  const modal = document.getElementById("postPhotoModal");
+  if (!modal) return;
+  modal.addEventListener("click", (e) => {
+    if (e.target?.dataset?.close) {
+      modal.classList.add("hidden");
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      modal.classList.add("hidden");
+    }
   });
 }
 
@@ -288,9 +461,11 @@ function toggleHeaderEditActions(editing) {
   const editBtn = document.getElementById("postEditAllBtn");
   const saveBtn = document.getElementById("postSaveAllBtn");
   const cancelBtn = document.getElementById("postCancelAllBtn");
+  const deleteBtn = document.getElementById("postDeleteSelectedBtn");
   if (editBtn) editBtn.classList.toggle("hidden", editing);
   if (saveBtn) saveBtn.classList.toggle("hidden", !editing);
   if (cancelBtn) cancelBtn.classList.toggle("hidden", !editing);
+  if (deleteBtn) deleteBtn.classList.toggle("hidden", !editing);
 }
 
 function bindTypeSelects() {
@@ -322,12 +497,17 @@ function bindSelectDefaults() {
 async function initPostsDashboard() {
   const clinicSelect = document.getElementById("postClinicSelect");
   const monthInput = document.getElementById("postMonth");
+  const monthPrev = document.getElementById("postMonthPrev");
+  const monthNext = document.getElementById("postMonthNext");
   const searchInput = document.getElementById("postSearch");
   const toggleFiltersBtn = document.getElementById("toggleFiltersBtn");
   const filtersPanel = document.getElementById("postFiltersPanel");
+  const tableBody = document.querySelector(".post-table .card-bd");
 
   renderPlatformPills();
   bindTypePills();
+  initPhotoModal();
+  enableDragScroll(tableBody);
 
   const clinics = await fetchClinics();
   const clinicIdFromQuery = new URLSearchParams(window.location.search).get("clinic_id");
@@ -341,9 +521,21 @@ async function initPostsDashboard() {
   }
 
   if (monthInput) {
-    monthInput.value = monthKey();
+    setMonth(monthKey());
     monthInput.addEventListener("change", () => {
-      currentMonth = monthInput.value;
+      setMonth(monthInput.value);
+      loadPosts();
+    });
+  }
+  if (monthPrev) {
+    monthPrev.addEventListener("click", () => {
+      setMonth(shiftMonth(monthKey(), -1));
+      loadPosts();
+    });
+  }
+  if (monthNext) {
+    monthNext.addEventListener("click", () => {
+      setMonth(shiftMonth(monthKey(), 1));
       loadPosts();
     });
   }
@@ -351,9 +543,15 @@ async function initPostsDashboard() {
   if (toggleFiltersBtn && filtersPanel) {
     toggleFiltersBtn.addEventListener("click", () => {
       filtersPanel.classList.toggle("hidden");
-      toggleFiltersBtn.textContent = filtersPanel.classList.contains("hidden")
-        ? "필터 열기"
-        : "필터 닫기";
+      toggleFiltersBtn.classList.toggle("active", !filtersPanel.classList.contains("hidden"));
+      if (!filtersPanel.classList.contains("hidden")) {
+        const btnRect = toggleFiltersBtn.getBoundingClientRect();
+        const parentRect = toggleFiltersBtn.parentElement?.getBoundingClientRect();
+        if (parentRect) {
+          const centerX = btnRect.left + btnRect.width / 2;
+          filtersPanel.style.left = `${centerX - parentRect.left}px`;
+        }
+      }
     });
   }
 
@@ -383,7 +581,10 @@ async function initPostsDashboard() {
 
   document.getElementById("postDeleteSelectedBtn")?.addEventListener("click", async () => {
     if (!selectedPostIds.size) return;
-    if (!confirm(`선택된 ${selectedPostIds.size}건을 삭제할까요?`)) return;
+    if (!(await askConfirm(`선택된 ${selectedPostIds.size}건을 삭제할까요?`))) {
+      window.resetInteractionState?.();
+      return;
+    }
     const headers = await buildAuthHeaders();
     const results = await Promise.all(
       [...selectedPostIds].map((postId) =>
@@ -394,13 +595,15 @@ async function initPostsDashboard() {
         })
       )
     );
-    if (results.some((res) => !res.ok)) {
-      alert("일부 삭제 실패");
-      return;
-    }
-    selectedPostIds = new Set();
-    loadPosts();
-  });
+      if (results.some((res) => !res.ok)) {
+        window.showAlert?.("일부 삭제 실패");
+        window.resetInteractionState?.();
+        return;
+      }
+      selectedPostIds = new Set();
+      loadPosts();
+      window.resetInteractionState?.();
+    });
 
   document.getElementById("postEditAllBtn")?.addEventListener("click", async () => {
     editingAll = true;
@@ -446,7 +649,7 @@ async function initPostsDashboard() {
       return res.ok;
     }));
     if (results.some((ok) => !ok)) {
-      alert("일부 저장 실패");
+      window.showAlert?.("일부 저장 실패");
       return;
     }
     editingAll = false;

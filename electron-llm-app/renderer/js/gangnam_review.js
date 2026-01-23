@@ -69,7 +69,7 @@ function getSelectedTags(containerId) {
 ===================================================== */
 async function generateGangnamReview() {
   if (!state.modelKey) {
-    alert("AI 모델을 선택하세요");
+    window.showAlert?.("AI 모델을 선택하세요");
     return;
   }
 
@@ -77,7 +77,7 @@ async function generateGangnamReview() {
   const procedureType = $("procedureType")?.value?.trim();
 
   if (!hospitalName || !procedureType) {
-    alert("병원명과 시술 종류는 필수입니다.");
+    window.showAlert?.("병원명과 시술 종류는 필수입니다.");
     return;
   }
 
@@ -145,7 +145,7 @@ async function generateGangnamReview() {
   } catch (e) {
     console.error("❌ generateGangnamReview error:", e);
     const msg = e?.data?.error || e?.message || "강남언니 후기 생성 실패 (서버/네트워크)";
-    alert(msg);
+    window.showAlert?.(msg);
     closeReviewResultModal();
     clearModalOverlays();
   } finally {

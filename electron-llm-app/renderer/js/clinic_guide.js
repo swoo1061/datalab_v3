@@ -1,6 +1,7 @@
 console.log("clinic_guide.js loaded");
 console.log("query =", window.location.search);
 
+
 /* ================================
    상태
 ================================ */
@@ -51,7 +52,7 @@ async function initClinicGuide() {
     }
   } catch (e) {
     console.error(e);
-    alert("병원 목록을 불러오지 못했습니다.");
+    window.showAlert?.("병원 목록을 불러오지 못했습니다.");
   }
 }
 
@@ -96,7 +97,7 @@ async function loadClinic(clinicId) {
     currentClinic = await fetchClinicDetail(clinicId);
   } catch (e) {
     console.error(e);
-    alert("병원 가이드 로드 실패");
+    window.showAlert?.("병원 가이드 로드 실패");
     return;
   }
 

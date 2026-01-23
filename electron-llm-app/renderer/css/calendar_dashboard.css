@@ -10,6 +10,15 @@
   color: var(--muted);
 }
 
+.calendar-dashboard .page-canvas {
+  max-width: 100%;
+  padding: 16px 16px;
+}
+
+.calendar-dashboard.page-scope {
+  padding: 12px 16px;
+}
+
 .calendar-filter {
   margin-top: 16px;
   padding: 14px 16px;
@@ -50,6 +59,44 @@
   gap: 8px 12px;
 }
 
+.calendar-dashboard .month-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+}
+
+.calendar-dashboard .month-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #eef2ff 0%, #ffffff 100%);
+  font-size: 13px;
+  color: #4f46e5;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+}
+
+.calendar-dashboard .month-btn:hover {
+  background: linear-gradient(180deg, #dbeafe 0%, #ffffff 100%);
+}
+
+.calendar-dashboard .month-label {
+  min-width: 72px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+}
+
 .calendar-filter.inline .filter-actions {
   margin-left: 4px;
 }
@@ -80,12 +127,20 @@
   background: #ffffff;
   font-size: 12px;
   color: #374151;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.calendar-filter .btn.toggle:hover {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #1f2937;
 }
 
 .calendar-filter .btn.toggle.active {
   background: #111827;
   border-color: #111827;
   color: #ffffff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
 }
 
 .calendar-panel {
@@ -93,12 +148,27 @@
 }
 
 .calendar-dashboard .calendar-grid {
-  gap: 10px;
-  padding: 12px;
+  gap: 16px;
+  padding: 18px;
 }
 
 .calendar-dashboard .calendar-cell {
-  min-height: 92px;
+  min-height: 108px;
+  padding: 12px;
+  gap: 8px;
+  position: relative;
+}
+
+.calendar-dashboard .calendar-day {
+  font-size: 13px;
+}
+
+.calendar-dashboard .calendar-count {
+  font-size: 12px;
+  padding: 3px 8px;
+  position: absolute;
+  top: 8px;
+  right: 8px;
 }
 
 .calendar-detail-panel {

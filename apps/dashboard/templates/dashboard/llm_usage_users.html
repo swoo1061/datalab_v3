@@ -1,0 +1,75 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}유저별 사용량{% endblock %}
+
+{% block content %}
+
+<div class="page-header flex-between">
+  <div>
+    <h1 class="page-title">직원별 사용량</h1>
+    <p class="page-subtitle">직원별 토큰과 비용을 비교합니다</p>
+  </div>
+</div>
+
+<form class="filter-bar" method="get">
+  <div class="filter-group">
+    <label for="usageStart">시작일</label>
+    <input type="date" id="usageStart" name="start" value="{{ start_date|date:'Y-m-d' }}">
+  </div>
+  <div class="filter-group">
+    <label for="usageEnd">종료일</label>
+    <input type="date" id="usageEnd" name="end" value="{{ end_date|date:'Y-m-d' }}">
+  </div>
+  <button type="submit" class="btn btn-primary">조회</button>
+</form>
+
+<div class="grid-2 mt-20">
+  <div class="card data-panel chart-card">
+    <h3 class="card-title">직원별 토큰 (상위 10)</h3>
+    <canvas id="userTokenChart"></canvas>
+  </div>
+
+  <div class="card data-panel chart-card">
+    <h3 class="card-title">직원별 비용 (상위 10)</h3>
+    <canvas id="userCostChart"></canvas>
+  </div>
+</div>
+
+<h2 class="mt-20">직원별 사용량</h2>
+<table class="default-table">
+  <thead>
+    <tr>
+      <th>직원</th>
+      <th>호출 수</th>
+      <th>토큰</th>
+      <th>비용 (원)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in by_user %}
+    <tr>
+      <td>{{ row.user__username|default:"-" }}</td>
+      <td>{{ row.count }}</td>
+      <td>{{ row.total_tokens }}</td>
+      <td>{{ row.total_cost|floatformat:0 }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4">데이터 없음</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+  window.LLM_USAGE_DATA = {
+    userLabels: {{ user_labels|safe }},
+    userTokens: {{ user_tokens|safe }},
+    userCosts: {{ user_costs|safe }},
+  };
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{% static 'dashboard/js/Chart.js' %}"></script>
+{% endblock %}

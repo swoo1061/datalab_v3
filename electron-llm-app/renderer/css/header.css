@@ -101,6 +101,11 @@
   box-shadow: var(--shadow, 0 12px 30px rgba(0,0,0,.12));
   z-index: 2000;
 }
+
+.header-scope .profile-popup,
+.header-scope .profile-popup * {
+  -webkit-app-region: no-drag;
+}
 .header-scope .profile-row { margin-bottom: 8px; }
 
 .header-scope .position-text {
@@ -137,6 +142,160 @@
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.theme-settings-btn {
+  margin-top: 10px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.theme-settings-btn:hover {
+  background: #f8fafc;
+}
+
+.theme-modal {
+  width: 640px;
+}
+
+.theme-modal.preset-modal {
+  width: 320px;
+}
+
+.theme-modal .theme-editor {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.theme-modal .editor-row {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.theme-modal .color-row {
+  display: flex;
+  gap: 12px;
+}
+
+.theme-modal .color-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.theme-modal .editor-row input[type="text"] {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.theme-modal .editor-row input[type="color"] {
+  width: 44px;
+  height: 28px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.theme-modal .editor-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.theme-modal .theme-reset,
+.theme-modal .theme-save,
+.theme-modal .theme-update {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.theme-modal .theme-save,
+.theme-modal .theme-update {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+.theme-modal .theme-save#themePresetManageBtn {
+  background: #eef2ff;
+  color: #1f2937;
+  border-color: #c7d2fe;
+}
+
+.theme-modal .preset-list {
+  display: grid;
+  gap: 8px;
+}
+
+.theme-modal .preset-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.theme-modal .preset-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-modal .preset-swatches {
+  display: flex;
+  gap: 6px;
+}
+
+.theme-modal .preset-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+}
+
+.theme-modal .preset-name {
+  font-size: 12px;
+  color: #111827;
+  font-weight: 600;
+}
+
+.theme-modal .preset-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.theme-modal .preset-actions button {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.theme-modal .preset-actions button.apply {
+  background: #eef2ff;
+  border-color: #c7d2fe;
 }
 
 .theme-btn {
@@ -188,8 +347,8 @@
 /* 기본 정보 모달 */
 .profile-info-modal {
   position: fixed;
-  top: 25%;
-  left: 87%;
+  top: 50%;
+  left: 50%;
   transform: translate(-50%, -50%);
   width: 250px;
   background: #ffffff;
@@ -198,6 +357,14 @@
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   z-index: 3000;
+}
+
+.profile-info-modal.theme-modal {
+  width: 270px !important;
+}
+
+.profile-info-modal.theme-modal.preset-modal {
+  width: 320px;
 }
 
 .profile-info-modal h3 {
@@ -224,6 +391,29 @@
 
 #profileInfoModal .popup-btn:hover {
   color: #111827;
+}
+
+.theme-modal .theme-back-btn,
+#profileInfoModal .info-back-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #111827;
+}
+
+.theme-modal .theme-back-btn:hover,
+#profileInfoModal .info-back-btn:hover {
+  background: #f8fafc;
 }
 
 .info-row {

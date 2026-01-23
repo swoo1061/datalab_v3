@@ -33,7 +33,7 @@
         <section class="detail-filter card">
           <div class="filter-grid">
             <div class="filter-field span-2">
-              <label>구분</label>
+              <!-- <label>구분</label> -->
               <div class="type-pills" id="detailTypePills">
                 <button class="type-pill active" data-type="all">전체</button>
                 <button class="type-pill" data-type="opinion">여론</button>
@@ -41,12 +41,17 @@
               </div>
             </div>
             <div class="filter-field pretty-select">
-              <label>병원</label>
+              <!-- <label>병원</label> -->
               <select id="detailClinicSelect" class="select"></select>
             </div>
             <div class="filter-field pretty-select">
-              <label>월</label>
-              <input type="month" id="detailMonth" class="month-input" />
+              <!-- <label>월</label> -->
+              <div class="month-nav" id="detailMonthNav">
+                <button class="month-btn" id="detailMonthPrev" type="button">◀</button>
+                <div class="month-label" id="detailMonthLabel">-</div>
+                <button class="month-btn" id="detailMonthNext" type="button">▶</button>
+              </div>
+              <input type="month" id="detailMonth" class="month-input hidden" />
             </div>
           </div>
         </section>

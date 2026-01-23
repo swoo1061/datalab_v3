@@ -34,12 +34,164 @@
   min-height: calc(100vh - var(--header-h));
 }
 
+body.theme-vivid {
+  --bg: #eef1fb;
+  --surface: #ffffff;
+  --surface-2: #f6f8ff;
+  --border: #d6dcf5;
+  --text: #111827;
+  --muted: #5b6477;
+  --primary: #4f46e5;
+  --primary-2: #4338ca;
+  --shadow: 0 18px 36px rgba(46, 55, 115, 0.12);
+  --shadow-sm: 0 8px 18px rgba(46, 55, 115, 0.12);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(var(--theme-primary-rgb, 79, 70, 229), 0.18), transparent 55%),
+    radial-gradient(900px 500px at 90% 0%, rgba(var(--theme-accent-rgb, 14, 116, 144), 0.18), transparent 50%),
+    #eef1fb;
+}
+
+body.theme-vivid.theme-flat {
+  background: #f5f7fb;
+}
+
+body.theme-vivid .page-scope {
+  background: transparent;
+}
+
+body.theme-vivid .card {
+  background: linear-gradient(180deg, #ffffff 0%, #f4f6ff 100%);
+  border: 1px solid rgba(var(--theme-primary-rgb, 79, 70, 229), 0.18);
+  box-shadow: var(--shadow-sm);
+}
+
+body.theme-vivid.theme-flat .card {
+  background: #ffffff;
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+body.theme-vivid .page-head .h1 {
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+body.theme-vivid .page-head .sub {
+  color: #5b6477;
+}
+
+body.theme-vivid .input,
+body.theme-vivid .select,
+body.theme-vivid .toolbar-btn {
+  border: 1px solid rgba(var(--theme-primary-rgb, 79, 70, 229), 0.28);
+  background: linear-gradient(180deg, #ffffff 0%, #eef2ff 100%);
+  box-shadow: 0 10px 20px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.12);
+}
+
+body.theme-vivid.theme-flat .input,
+body.theme-vivid.theme-flat .select,
+body.theme-vivid.theme-flat .toolbar-btn {
+  border-color: var(--border);
+  background: #ffffff;
+  box-shadow: none;
+}
+
+body.theme-vivid .app-header-slot .header-scope {
+  background: linear-gradient(180deg, #ffffff 0%, #f4f6ff 100%);
+  border-bottom: 1px solid rgba(var(--theme-primary-rgb, 79, 70, 229), 0.18);
+  box-shadow: 0 8px 18px rgba(46, 55, 115, 0.1);
+}
+
+body.theme-vivid .sidebar {
+  background: linear-gradient(180deg, #ffffff 0%, #eef1ff 100%);
+  /* border-right: 1px solid rgba(var(--theme-primary-rgb, 79, 70, 229), 0.2); */
+}
+
+body.theme-vivid.theme-flat .app-header-slot .header-scope {
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+  box-shadow: none;
+}
+
+body.theme-vivid.theme-flat .sidebar {
+  background: #ffffff;
+  border-right: 1px solid var(--border);
+}
+
+body.theme-vivid .nav-sub a:hover {
+  background: rgba(var(--theme-primary-rgb, 79, 70, 229), 0.12);
+}
+
+body.theme-vivid .nav-sub a.active {
+  background: linear-gradient(135deg, var(--theme-primary, #4f46e5) 0%, #4338ca 100%);
+  box-shadow: 0 6px 14px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.25);
+}
+
 /* 공통 카드/테이블 베이스 (page-scope 내부에서만 쓰는 걸 권장) */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
+}
+
+/* App confirm modal (custom, avoids native confirm focus issues) */
+.app-confirm.hidden {
+  display: none;
+}
+
+.app-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.app-confirm-card {
+  position: relative;
+  width: min(420px, 86vw);
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+  padding: 18px 18px 16px;
+  z-index: 1;
+}
+
+.app-confirm-message {
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+.app-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.app-confirm-btn {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.app-confirm-btn.primary {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
 }
 
 .card-hd {

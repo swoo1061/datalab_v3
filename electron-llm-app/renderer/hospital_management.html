@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | 병원 커뮤니티 참고</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/hospital_management.css" />
+</head>
+<body class="theme-vivid" data-nav="hospital_management">
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope hospital-management">
+
+      <section class="page-head">
+        <div>
+          <h1 class="h1">병원 커뮤니티 참고 · 쪽지 예시</h1>
+        </div>
+        <div class="head-meta">
+          <div class="select-block">
+            <label for="hospitalSelect">병원 선택</label>
+            <select id="hospitalSelect" class="select"></select>
+          </div>
+        </div>
+      </section>
+
+      <section class="reference-grid">
+        <article class="table-card">
+          <header class="table-card-hd">
+            <div class="title-block">
+              <p class="title">커뮤니티 참고사항</p>
+            </div>
+            <span class="tag">커뮤니티</span>
+          </header>
+          <div class="table-card-body">
+            <div class="edit-toggle">
+              <button type="button" class="btn" id="communityEditToggle">편집 모드</button>
+            </div>
+            <div class="table-actions">
+              <button type="button" class="btn" id="communityAddRow">행 추가</button>
+              <button type="button" class="btn" id="communityRemoveRow">행 삭제</button>
+              <button type="button" class="btn" id="communityAddCol">열 추가</button>
+              <button type="button" class="btn" id="communityRemoveCol">열 삭제</button>
+            </div>
+            <table class="editable-table" id="communityTable" data-active-row="" data-active-col="" spellcheck="false">
+              <thead>
+                <tr>
+                  <th contenteditable="true" spellcheck="false">병원<div class="col-resizer" aria-hidden="true"></div></th>
+                  <th contenteditable="true" spellcheck="false">커뮤니티 상황<div class="col-resizer" aria-hidden="true"></div></th>
+                  <th contenteditable="true" spellcheck="false">톤 / 주의<div class="col-resizer" aria-hidden="true"></div></th>
+                </tr>
+              </thead>
+              <tbody id="communityTableBody">
+                <tr>
+                  <td contenteditable="true" spellcheck="false"></td>
+                  <td contenteditable="true" spellcheck="false"></td>
+                  <td contenteditable="true" spellcheck="false"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="table-card">
+          <header class="table-card-hd">
+            <div class="title-block">
+              <p class="title">쪽지 작업 예시</p>
+              <p class="subtitle">상황별 템플릿을 기반으로 담당자가 바로 복사해서 사용할 수 있습니다.</p>
+            </div>
+            <span class="tag">쪽지</span>
+          </header>
+          <div class="table-card-body">
+            <div class="edit-toggle">
+              <button type="button" class="btn" id="messageEditToggle">편집 모드</button>
+            </div>
+            <div class="table-actions">
+              <button type="button" class="btn" id="messageAddRow">행 추가</button>
+              <button type="button" class="btn" id="messageRemoveRow">행 삭제</button>
+              <button type="button" class="btn" id="messageAddCol">열 추가</button>
+              <button type="button" class="btn" id="messageRemoveCol">열 삭제</button>
+            </div>
+            <table class="editable-table" id="messageTable" data-active-row="" data-active-col="" spellcheck="false">
+              <thead>
+                <tr>
+                  <th contenteditable="true" spellcheck="false">구분<div class="col-resizer" aria-hidden="true"></div></th>
+                  <th contenteditable="true" spellcheck="false">상황 요약<div class="col-resizer" aria-hidden="true"></div></th>
+                  <th contenteditable="true" spellcheck="false">쪽지 템플릿<div class="col-resizer" aria-hidden="true"></div></th>
+                </tr>
+              </thead>
+              <tbody id="messageTableBody">
+                <tr>
+                  <td contenteditable="true" spellcheck="false"></td>
+                  <td contenteditable="true" spellcheck="false"></td>
+                  <td contenteditable="true" spellcheck="false"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/header.js"></script>
+<script>
+  (async () => {
+    await loadLayout();
+    await loadHeader("병원 참고사항");
+  })();
+</script>
+<script>
+  const HOSPITALS = [
+    { id: "bombit", name: "봄빛 병원" },
+    { id: "wante", name: "원트 성형외과" },
+    { id: "wuneprs", name: "윈느 성형외과" },
+    { id: "shinsang", name: "신상 성형외과" },
+    { id: "balance", name: "밸런스랩 성형외과" },
+    { id: "hit", name: "히트 성형외과" },
+    { id: "daram", name: "다름 성형외과" },
+    { id: "jihillingsquare", name: "지힐링스퀘어" },
+    { id: "aure", name: "아우어 성형외과" },
+    { id: "gangnam12", name: "강남12의원" },
+    { id: "prima", name: "프리마 성형외과" },
+    { id: "A&A", name: "A&A" },
+    { id: "seojin", name: "서진 성형외과" },
+    { id: "lara", name: "라라 성형외과" },
+    { id: "sachibio", name: "사치바이오" },
+    { id: "yongdoctor", name: "용닥터의원" },
+    { id: "phd", name: "PHD피부과" },
+    { id: "repton", name: "리프톤 피부과" },
+    { id: "prettywoman", name: "이쁜여성의원" },
+    { id: "younopi", name: "여노피 산부인과" },
+  ];
+
+  const STORE_KEY = "hospital-management-tables";
+
+  function readStore() {
+    try {
+      return JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function writeStore(next) {
+    localStorage.setItem(STORE_KEY, JSON.stringify(next));
+  }
+
+  function getHospitalName(hospitalId) {
+    return HOSPITALS.find((item) => item.id === hospitalId)?.name || "";
+  }
+
+  function serializeTable(tableBody) {
+    const headRow = tableBody.closest("table")?.querySelector("thead tr");
+    const headers = headRow
+      ? Array.from(headRow.querySelectorAll("th")).map((th) => th.innerText.trim())
+      : [];
+    const widths = headRow
+      ? Array.from(headRow.querySelectorAll("th")).map((th) => th.style.width || "")
+      : [];
+    const rows = [];
+    tableBody.querySelectorAll("tr").forEach((row) => {
+      const cells = Array.from(row.querySelectorAll("td")).map((cell) =>
+        cell.innerText.trim()
+      );
+      rows.push(cells);
+    });
+    return { headers, widths, rows };
+  }
+
+  function buildRow(cells, colCount) {
+    const row = document.createElement("tr");
+    const total = colCount || cells.length;
+    for (let i = 0; i < total; i += 1) {
+      const value = cells[i] || "";
+      const td = document.createElement("td");
+      td.setAttribute("contenteditable", "true");
+      td.setAttribute("spellcheck", "false");
+      td.innerText = value || "";
+      row.appendChild(td);
+    }
+    return row;
+  }
+
+  function renderTable(tableBody, data, fallbackRow) {
+    tableBody.innerHTML = "";
+    const tableEl = tableBody.closest("table");
+    const headRow = tableEl?.querySelector("thead tr");
+    if (data?.headers?.length && headRow) {
+      headRow.innerHTML = "";
+      data.headers.forEach((label, index) => {
+        const th = document.createElement("th");
+        th.setAttribute("contenteditable", "true");
+        th.setAttribute("spellcheck", "false");
+        th.innerText = label || "열";
+        if (data.widths?.length && data.widths[index]) {
+          th.style.width = data.widths[index];
+        }
+        const resizer = document.createElement("div");
+        resizer.className = "col-resizer";
+        resizer.setAttribute("aria-hidden", "true");
+        th.appendChild(resizer);
+        headRow.appendChild(th);
+      });
+    }
+    const rows = data?.rows || [];
+    if (!rows.length) {
+      const colCount = tableEl?.querySelectorAll("thead th").length || fallbackRow.length;
+      tableBody.appendChild(buildRow(fallbackRow, colCount));
+      return;
+    }
+    const colCount = tableEl?.querySelectorAll("thead th").length || 0;
+    rows.forEach((cells) => tableBody.appendChild(buildRow(cells, colCount)));
+  }
+
+  function normalizeTable(tableEl) {
+    const headRow = tableEl.querySelector("thead tr");
+    if (!headRow) return;
+    const colCount = headRow.querySelectorAll("th").length;
+    tableEl.querySelectorAll("tbody tr").forEach((row) => {
+      const tds = row.querySelectorAll("td");
+      if (tds.length > colCount) {
+        for (let i = tds.length - 1; i >= colCount; i -= 1) {
+          row.removeChild(tds[i]);
+        }
+      } else if (tds.length < colCount) {
+        for (let i = tds.length; i < colCount; i += 1) {
+          const td = document.createElement("td");
+          td.setAttribute("contenteditable", "true");
+          td.setAttribute("spellcheck", "false");
+          td.innerText = "";
+          row.appendChild(td);
+        }
+      }
+    });
+  }
+
+  function loadHospitalTables(hospitalId) {
+    const store = readStore();
+    const data = store[hospitalId] || {};
+    const communityBody = document.getElementById("communityTableBody");
+    const messageBody = document.getElementById("messageTableBody");
+    if (!communityBody || !messageBody) return;
+
+    renderTable(communityBody, data.community || {}, ["", "", ""]);
+
+    renderTable(messageBody, data.message || {}, ["", "", ""]);
+    if (communityBody?.closest("table")) {
+      normalizeTable(communityBody.closest("table"));
+    }
+    if (messageBody?.closest("table")) {
+      normalizeTable(messageBody.closest("table"));
+    }
+  }
+
+  function saveHospitalTables(hospitalId) {
+    const communityBody = document.getElementById("communityTableBody");
+    const messageBody = document.getElementById("messageTableBody");
+    if (!communityBody || !messageBody) return;
+
+    const store = readStore();
+    store[hospitalId] = {
+      community: serializeTable(communityBody),
+      message: serializeTable(messageBody),
+    };
+    writeStore(store);
+  }
+
+  function addRow(tableBody, defaults) {
+    const colCount = tableBody.closest("table")?.querySelectorAll("thead th").length || defaults.length;
+    const row = buildRow(defaults, colCount);
+    tableBody.appendChild(row);
+  }
+
+  function insertRowAt(tableBody, index, defaults) {
+    const colCount = tableBody.closest("table")?.querySelectorAll("thead th").length || defaults.length;
+    const row = buildRow(defaults, colCount);
+    const rows = tableBody.querySelectorAll("tr");
+    if (index >= 0 && index < rows.length) {
+      tableBody.insertBefore(row, rows[index]);
+    } else {
+      tableBody.appendChild(row);
+    }
+  }
+
+  function addColumnAt(tableEl, index, label) {
+    const headRow = tableEl.querySelector("thead tr");
+    if (!headRow) return;
+    const th = document.createElement("th");
+    th.setAttribute("contenteditable", "true");
+    th.setAttribute("spellcheck", "false");
+    th.innerText = label || "새 열";
+    const resizer = document.createElement("div");
+    resizer.className = "col-resizer";
+    resizer.setAttribute("aria-hidden", "true");
+    th.appendChild(resizer);
+    const ths = headRow.querySelectorAll("th");
+    if (index >= 0 && index < ths.length) {
+      headRow.insertBefore(th, ths[index + 1] || null);
+    } else {
+      headRow.appendChild(th);
+    }
+
+    tableEl.querySelectorAll("tbody tr").forEach((row) => {
+      const td = document.createElement("td");
+      td.setAttribute("contenteditable", "true");
+      td.setAttribute("spellcheck", "false");
+      td.innerText = "";
+      const tds = row.querySelectorAll("td");
+      if (index >= 0 && index < tds.length) {
+        row.insertBefore(td, tds[index + 1] || null);
+      } else {
+        row.appendChild(td);
+      }
+    });
+  }
+
+  function removeColumnAt(tableEl, index) {
+    const headRow = tableEl.querySelector("thead tr");
+    if (!headRow) return;
+    const ths = headRow.querySelectorAll("th");
+    if (ths.length <= 1) return;
+    const targetIndex = index >= 0 && index < ths.length ? index : ths.length - 1;
+    headRow.removeChild(ths[targetIndex]);
+
+    tableEl.querySelectorAll("tbody tr").forEach((row) => {
+      const tds = row.querySelectorAll("td");
+      if (tds.length > 0) {
+        const tdIndex = targetIndex >= 0 && targetIndex < tds.length ? targetIndex : tds.length - 1;
+        row.removeChild(tds[tdIndex]);
+      }
+    });
+  }
+
+  function removeRowAt(tableBody, index) {
+    const rows = tableBody.querySelectorAll("tr");
+    if (rows.length <= 1) return;
+    const targetIndex = index >= 0 && index < rows.length ? index : rows.length - 1;
+    tableBody.removeChild(rows[targetIndex]);
+  }
+
+  function highlightSelection(tableEl) {
+    const activeRow = Number(tableEl.dataset.activeRow || -1);
+    const activeCol = Number(tableEl.dataset.activeCol || -1);
+    tableEl.querySelectorAll("tbody tr").forEach((row, rowIndex) => {
+      row.classList.toggle("row-selected", rowIndex === activeRow);
+      row.querySelectorAll("td").forEach((cell, colIndex) => {
+        cell.classList.toggle("col-selected", colIndex === activeCol);
+      });
+    });
+    tableEl.querySelectorAll("thead th").forEach((th, colIndex) => {
+      th.classList.toggle("col-selected", colIndex === activeCol);
+    });
+  }
+
+  function getActiveIndex(value) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : -1;
+  }
+
+  function setActiveCol(tableEl, index) {
+    tableEl.dataset.activeCol = String(index);
+    highlightSelection(tableEl);
+  }
+
+  function bindEditableTable(tableEl, tableBody, hospitalSelect) {
+    let saveTimer = null;
+    const queueSave = () => {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        saveHospitalTables(hospitalSelect.value);
+      }, 400);
+    };
+
+    tableEl.addEventListener("input", queueSave);
+    tableEl.addEventListener("mousedown", (event) => {
+      if (tableEl.dataset.editing !== "true") return;
+      const resizer = event.target.closest(".col-resizer");
+      const th = event.target.closest("th");
+      if (!th) return;
+
+      const rect = th.getBoundingClientRect();
+      const isNearEdge = event.clientX >= rect.right - 12;
+      if (!resizer && !isNearEdge) return;
+
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = th.offsetWidth;
+
+      const onMove = (moveEvent) => {
+        const nextWidth = Math.max(80, startWidth + (moveEvent.clientX - startX));
+        th.style.width = `${nextWidth}px`;
+      };
+
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        queueSave();
+      };
+
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
+    tableEl.addEventListener("click", (event) => {
+      const cell = event.target.closest("td, th");
+      if (!cell) return;
+      const row = cell.closest("tr");
+      const isHeader = row?.parentElement?.tagName.toLowerCase() === "thead";
+      if (isHeader) {
+        tableEl.dataset.activeRow = "-1";
+        tableEl.dataset.activeCol = String(Array.from(row.children).indexOf(cell));
+      } else {
+        const rows = Array.from(tableBody.querySelectorAll("tr"));
+        tableEl.dataset.activeRow = String(rows.indexOf(row));
+        tableEl.dataset.activeCol = String(Array.from(row.children).indexOf(cell));
+      }
+      highlightSelection(tableEl);
+    });
+
+    highlightSelection(tableEl);
+  }
+
+  function addColumn(tableEl, label) {
+    const headRow = tableEl.querySelector("thead tr");
+    if (!headRow) return;
+    const th = document.createElement("th");
+    th.innerText = label || "새 열";
+    headRow.appendChild(th);
+
+    tableEl.querySelectorAll("tbody tr").forEach((row) => {
+      const td = document.createElement("td");
+      td.setAttribute("contenteditable", "true");
+      td.innerText = "";
+      row.appendChild(td);
+    });
+  }
+
+  function removeColumn(tableEl) {
+    const headRow = tableEl.querySelector("thead tr");
+    if (!headRow) return;
+    const ths = headRow.querySelectorAll("th");
+    if (ths.length <= 1) return;
+    headRow.removeChild(ths[ths.length - 1]);
+
+    tableEl.querySelectorAll("tbody tr").forEach((row) => {
+      const tds = row.querySelectorAll("td");
+      if (tds.length > 0) {
+        row.removeChild(tds[tds.length - 1]);
+      }
+    });
+  }
+
+  function removeRow(tableBody) {
+    const rows = tableBody.querySelectorAll("tr");
+    if (rows.length <= 1) return;
+    tableBody.removeChild(rows[rows.length - 1]);
+  }
+
+  function initHospitalTables() {
+    const select = document.getElementById("hospitalSelect");
+    const communityBody = document.getElementById("communityTableBody");
+    const messageBody = document.getElementById("messageTableBody");
+    const communityAdd = document.getElementById("communityAddRow");
+    const communityRemove = document.getElementById("communityRemoveRow");
+    const communityAddCol = document.getElementById("communityAddCol");
+    const communityRemoveCol = document.getElementById("communityRemoveCol");
+    const communityToggle = document.getElementById("communityEditToggle");
+    const messageAdd = document.getElementById("messageAddRow");
+    const messageRemove = document.getElementById("messageRemoveRow");
+    const messageAddCol = document.getElementById("messageAddCol");
+    const messageRemoveCol = document.getElementById("messageRemoveCol");
+    const messageToggle = document.getElementById("messageEditToggle");
+    const communityTable = document.getElementById("communityTable");
+    const messageTable = document.getElementById("messageTable");
+
+    if (!select || !communityBody || !messageBody) return;
+
+    select.innerHTML = HOSPITALS.map(
+      (hospital) => `<option value="${hospital.id}">${hospital.name}</option>`
+    ).join("");
+
+    const loadSelected = () => loadHospitalTables(select.value);
+    select.addEventListener("change", loadSelected);
+
+    if (communityTable) {
+      communityTable.dataset.activeRow = "-1";
+      communityTable.dataset.activeCol = "-1";
+    }
+    if (messageTable) {
+      messageTable.dataset.activeRow = "-1";
+      messageTable.dataset.activeCol = "-1";
+    }
+
+    const setEditing = (tableEl, isEditing) => {
+      if (!tableEl) return;
+      tableEl.closest(".table-card-body")?.classList.toggle("editing", isEditing);
+      tableEl.dataset.editing = isEditing ? "true" : "false";
+    };
+
+    const bindToggle = (toggleBtn, tableEl) => {
+      if (!toggleBtn || !tableEl) return;
+      const applyState = (isEditing) => {
+        setEditing(tableEl, isEditing);
+        toggleBtn.innerText = isEditing ? "편집 종료" : "편집 모드";
+      };
+      applyState(false);
+      toggleBtn.addEventListener("click", () => {
+        const next = tableEl.dataset.editing !== "true";
+        applyState(next);
+      });
+    };
+
+    bindToggle(communityToggle, communityTable);
+    bindToggle(messageToggle, messageTable);
+
+    communityAdd?.addEventListener("click", () => {
+      if (communityTable?.dataset.editing !== "true") return;
+      if (!communityTable) return;
+      const index = Number(communityTable.dataset.activeRow || -1);
+      insertRowAt(communityBody, index + 1, [getHospitalName(select.value), "", ""]);
+      normalizeTable(communityTable);
+      saveHospitalTables(select.value);
+      highlightSelection(communityTable);
+    });
+
+    communityRemove?.addEventListener("click", () => {
+      if (communityTable?.dataset.editing !== "true") return;
+      if (!communityTable) return;
+      const index = Number(communityTable.dataset.activeRow || -1);
+      removeRowAt(communityBody, index);
+      normalizeTable(communityTable);
+      saveHospitalTables(select.value);
+      highlightSelection(communityTable);
+    });
+
+    communityAddCol?.addEventListener("click", () => {
+      if (communityTable?.dataset.editing !== "true") return;
+      if (!communityTable) return;
+      const index = getActiveIndex(communityTable.dataset.activeCol);
+      addColumnAt(communityTable, index, "새 열");
+      normalizeTable(communityTable);
+      saveHospitalTables(select.value);
+      highlightSelection(communityTable);
+    });
+
+    communityRemoveCol?.addEventListener("click", () => {
+      if (communityTable?.dataset.editing !== "true") return;
+      if (!communityTable) return;
+      const index = getActiveIndex(communityTable.dataset.activeCol);
+      removeColumnAt(communityTable, index);
+      const next = Math.max(-1, (communityTable.querySelectorAll("thead th").length || 1) - 1);
+      setActiveCol(communityTable, next);
+      normalizeTable(communityTable);
+      saveHospitalTables(select.value);
+    });
+
+    messageAdd?.addEventListener("click", () => {
+      if (messageTable?.dataset.editing !== "true") return;
+      if (!messageTable) return;
+      const index = Number(messageTable.dataset.activeRow || -1);
+      insertRowAt(messageBody, index + 1, ["", "", ""]);
+      normalizeTable(messageTable);
+      saveHospitalTables(select.value);
+      highlightSelection(messageTable);
+    });
+
+    messageRemove?.addEventListener("click", () => {
+      if (messageTable?.dataset.editing !== "true") return;
+      if (!messageTable) return;
+      const index = Number(messageTable.dataset.activeRow || -1);
+      removeRowAt(messageBody, index);
+      normalizeTable(messageTable);
+      saveHospitalTables(select.value);
+      highlightSelection(messageTable);
+    });
+
+    messageAddCol?.addEventListener("click", () => {
+      if (messageTable?.dataset.editing !== "true") return;
+      if (!messageTable) return;
+      const index = getActiveIndex(messageTable.dataset.activeCol);
+      addColumnAt(messageTable, index, "새 열");
+      normalizeTable(messageTable);
+      saveHospitalTables(select.value);
+      highlightSelection(messageTable);
+    });
+
+    messageRemoveCol?.addEventListener("click", () => {
+      if (messageTable?.dataset.editing !== "true") return;
+      if (!messageTable) return;
+      const index = getActiveIndex(messageTable.dataset.activeCol);
+      removeColumnAt(messageTable, index);
+      const next = Math.max(-1, (messageTable.querySelectorAll("thead th").length || 1) - 1);
+      setActiveCol(messageTable, next);
+      normalizeTable(messageTable);
+      saveHospitalTables(select.value);
+    });
+
+    if (communityTable) {
+      bindEditableTable(communityTable, communityBody, select);
+    }
+    if (messageTable) {
+      bindEditableTable(messageTable, messageBody, select);
+    }
+
+    loadSelected();
+  }
+
+  document.addEventListener("DOMContentLoaded", initHospitalTables);
+</script>
+</body>
+</html>

@@ -9,78 +9,109 @@
   <!-- Fonts -->
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- CSS -->
   <link rel="stylesheet" href="{% static 'dashboard/css/base.css' %}">
   {% block extra_css %}{% endblock %}
 </head>
 <body>
-  <div class="layout">
-    <aside class="sidebar">
-      <a href="{% url 'core:home' %}" class="logo">🏥 Datalab90</a>
-      <nav>
-        <a href="{% url 'dashboard:index' %}" class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">
-          📊 대시보드
-        </a>
+  <div class="layout layout-topnav">
+    <header class="topbar">
+      <a href="{% url 'core:home' %}" class="logo">Datalab90</a>
+      <nav class="topnav" aria-label="주요 메뉴">
+        <div class="topnav-item">
+          <button class="topnav-trigger" type="button">통계</button>
+          <div class="topnav-panel">
+            <a href="{% url 'dashboard:index' %}" class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+              대시보드
+            </a>
+            <a href="{% url 'dashboard:llm_usage' %}" class="{% if request.resolver_match.url_name == 'llm_usage' %}active{% endif %}">
+              LLM 사용량 통계
+            </a>
+            <a href="{% url 'dashboard:llm_usage_users' %}" class="{% if request.resolver_match.url_name == 'llm_usage_users' %}active{% endif %}">
+              직원별 사용량
+            </a>
+            <a href="{% url 'dashboard:llm_usage_models' %}" class="{% if request.resolver_match.url_name == 'llm_usage_models' %}active{% endif %}">
+              모델별 사용량
+            </a>
+          </div>
+        </div>
 
-        <a href="{% url 'dashboard:llm_usage' %}">
-          📊 LLM 사용량 통계
-        </a>
+        <div class="topnav-item">
+          <button class="topnav-trigger" type="button">리뷰 생성</button>
+          <div class="topnav-panel">
+            <a href="{% url 'dashboard:generate_review_basic' %}" class="{% if request.resolver_match.url_name == 'generate_review_basic' or request.resolver_match.url_name == 'generate_review' %}active{% endif %}">
+              Basic
+            </a>
+            <a href="{% url 'dashboard:generate_review_basic_plus' %}" class="{% if 'basic_plus' in request.resolver_match.url_name %}active{% endif %}">
+              Basic+
+            </a>
+            <a href="{% url 'dashboard:generate_review_pro' %}" class="{% if 'pro' in request.resolver_match.url_name or 'v2' in request.resolver_match.url_name %}active{% endif %}">
+              PRO
+            </a>
+            <a href="{% url 'dashboard:generated_list' %}" class="{% if 'generated' in request.resolver_match.url_name %}active{% endif %}">
+              생성 목록
+            </a>
+          </div>
+        </div>
 
-        <div class="nav-section">리뷰 생성</div>
-        <a href="{% url 'dashboard:generate_review_basic' %}" class="{% if request.resolver_match.url_name == 'generate_review_basic' or request.resolver_match.url_name == 'generate_review' %}active{% endif %}">
-          ✨ Basic
-        </a>
-        <a href="{% url 'dashboard:generate_review_basic_plus' %}" class="{% if 'basic_plus' in request.resolver_match.url_name %}active{% endif %}">
-          ⚡ Basic+
-        </a>
-        <a href="{% url 'dashboard:generate_review_pro' %}" class="{% if 'pro' in request.resolver_match.url_name or 'v2' in request.resolver_match.url_name %}active{% endif %}">
-          🚀 PRO
-        </a>
-        <a href="{% url 'dashboard:generated_list' %}" class="{% if 'generated' in request.resolver_match.url_name %}active{% endif %}">
-          📝 생성 목록
-        </a>
+        <div class="topnav-item">
+          <button class="topnav-trigger" type="button">앱 리뷰</button>
+          <div class="topnav-panel">
+            <a href="{% url 'dashboard:app_review_gangnam' %}" class="{% if 'gangnam' in request.resolver_match.url_name %}active{% endif %}">
+              강남언니
+            </a>
+          </div>
+        </div>
 
-        <div class="nav-section">어플 리뷰 생성</div>
-        <a href="{% url 'dashboard:app_review_gangnam' %}" class="{% if 'gangnam' in request.resolver_match.url_name %}active{% endif %}">
-          💄 강남언니
-        </a>
+        <div class="topnav-item">
+          <button class="topnav-trigger" type="button">프리셋 관리</button>
+          <div class="topnav-panel">
+            <a href="{% url 'dashboard:preset_extractor' %}" class="{% if 'style' in request.resolver_match.url_name or 'preset_extractor' in request.resolver_match.url_name %}active{% endif %}">
+              프리셋 추출
+            </a>
+            <a href="{% url 'dashboard:persona_list' %}" class="{% if 'persona' in request.resolver_match.url_name %}active{% endif %}">
+              페르소나
+            </a>
+            <a href="{% url 'dashboard:cafe_list' %}" class="{% if 'cafe' in request.resolver_match.url_name %}active{% endif %}">
+              카페 셋팅
+            </a>
+            <a href="{% url 'dashboard:content_type_list' %}" class="{% if 'content_type' in request.resolver_match.url_name %}active{% endif %}">
+              컨텐츠 타입
+            </a>
+          </div>
+        </div>
 
-        <div class="nav-section">프리셋 관리</div>
-        <a href="{% url 'dashboard:preset_extractor' %}" class="{% if 'style' in request.resolver_match.url_name or 'preset_extractor' in request.resolver_match.url_name %}active{% endif %}">
-          🔍 프리셋 추출
-        </a>
-        <a href="{% url 'dashboard:persona_list' %}" class="{% if 'persona' in request.resolver_match.url_name %}active{% endif %}">
-          👤 페르소나
-        </a>
-        <a href="{% url 'dashboard:cafe_list' %}" class="{% if 'cafe' in request.resolver_match.url_name %}active{% endif %}">
-          ☕ 카페 셋팅
-        </a>
-        <a href="{% url 'dashboard:content_type_list' %}" class="{% if 'content_type' in request.resolver_match.url_name %}active{% endif %}">
-          📄 컨텐츠 타입
-        </a>
+        <div class="topnav-item">
+          <button class="topnav-trigger" type="button">데이터 관리</button>
+          <div class="topnav-panel">
+            <a href="{% url 'dashboard:clinic_list' %}" class="{% if 'clinic' in request.resolver_match.url_name %}active{% endif %}">
+              병원 가이드
+            </a>
+            <a href="{% url 'dashboard:reviews_list' %}" class="{% if request.resolver_match.url_name == 'reviews_list' %}active{% endif %}">
+              수집 리뷰
+            </a>
+            <a href="{% url 'dashboard:image_browser' %}" class="{% if request.resolver_match.url_name == 'image_browser' %}active{% endif %}">
+              이미지
+            </a>
+          </div>
+        </div>
 
-        <div class="nav-section">데이터 관리</div>
-        <a href="{% url 'dashboard:clinic_list' %}" class="{% if 'clinic' in request.resolver_match.url_name %}active{% endif %}">
-          🏥 병원 가이드
-        </a>
-        <a href="{% url 'dashboard:reviews_list' %}" class="{% if request.resolver_match.url_name == 'reviews_list' %}active{% endif %}">
-          📋 수집 리뷰
-        </a>
-        <a href="{% url 'dashboard:image_browser' %}" class="{% if request.resolver_match.url_name == 'image_browser' %}active{% endif %}">
-          🖼️ 이미지
-        </a>
-
-        <div class="nav-section">시스템</div>
-        <a href="{% url 'dashboard:prompt_template_list' %}" class="{% if 'prompt_template' in request.resolver_match.url_name %}active{% endif %}">
-          📝 프롬프트 관리
-        </a>
-        <a href="{% url 'dashboard:server_settings' %}" class="{% if 'server' in request.resolver_match.url_name %}active{% endif %}">
-          ⚙️ 서버 설정
-        </a>
+        <div class="topnav-item">
+          <button class="topnav-trigger" type="button">시스템</button>
+          <div class="topnav-panel">
+            <a href="{% url 'dashboard:prompt_template_list' %}" class="{% if 'prompt_template' in request.resolver_match.url_name %}active{% endif %}">
+              프롬프트 관리
+            </a>
+            <a href="{% url 'dashboard:server_settings' %}" class="{% if request.resolver_match.url_name == 'server_settings' %}active{% endif %}">
+              서버 설정
+            </a>
+          </div>
+        </div>
       </nav>
-      <div class="version">v2.0 · 내부용</div>
-    </aside>
+      <div class="topbar-meta">v2.0 · 내부용</div>
+    </header>
 
     <main class="content">
       {% block content %}{% endblock %}

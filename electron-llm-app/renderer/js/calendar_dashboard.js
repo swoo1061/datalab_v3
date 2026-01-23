@@ -24,6 +24,16 @@ let calendarItems = [];
 let calendarMemos = [];
 let calendarSelectedDate = "";
 const assigneeCache = new Map();
+const postsCache = new Map();
+const memosCache = new Map();
+
+const askConfirm = async (message) => {
+  if (typeof window.appConfirm === "function") {
+    return window.appConfirm(message);
+  }
+  return confirm(message);
+};
+
 
 async function buildAuthHeaders() {
   const headers = {};
@@ -40,6 +50,27 @@ function getMonthValue() {
     input.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   }
   return input.value;
+}
+
+function formatMonthLabel(value) {
+  if (!value) return "-";
+  const [y, m] = value.split("-").map(Number);
+  if (!y || !m) return value;
+  return `${y}년 ${m}월`;
+}
+
+function shiftMonth(value, delta) {
+  const [y, m] = value.split("-").map(Number);
+  if (!y || !m) return value;
+  const next = new Date(y, m - 1 + delta, 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function setMonth(value) {
+  const input = document.getElementById("calendarMonth");
+  const label = document.getElementById("calendarMonthLabel");
+  if (input) input.value = value;
+  if (label) label.textContent = formatMonthLabel(value);
 }
 
 function getPostDate(post) {
@@ -125,6 +156,10 @@ async function fetchAssignees(clinicId) {
 }
 
 async function fetchClinicPosts(clinicId, month, type) {
+  const cacheKey = `${clinicId}|${month}|${type}`;
+  if (postsCache.has(cacheKey)) {
+    return postsCache.get(cacheKey);
+  }
   const params = new URLSearchParams({
     type,
     platform: "all",
@@ -135,10 +170,15 @@ async function fetchClinicPosts(clinicId, month, type) {
   const res = await fetch(url, { credentials: "include", headers });
   if (!res.ok) return [];
   const data = await res.json();
-  return data.results || [];
+  const results = data.results || [];
+  postsCache.set(cacheKey, results);
+  return results;
 }
 
 async function fetchCalendarMemos(month) {
+  if (memosCache.has(month)) {
+    return memosCache.get(month);
+  }
   const params = new URLSearchParams({ month });
   const headers = await buildAuthHeaders();
   const res = await fetch(`${window.API_BASE}/api/data/calendar-memos/?${params}`, {
@@ -147,7 +187,9 @@ async function fetchCalendarMemos(month) {
   });
   if (!res.ok) return [];
   const data = await res.json();
-  return data.results || [];
+  const results = data.results || [];
+  memosCache.set(month, results);
+  return results;
 }
 
 function formatMemoTime(remindAt) {
@@ -193,42 +235,47 @@ async function loadCalendar({ keepPanelOpen = false } = {}) {
 
   const items = [];
 
-  await Promise.all(targetClinics.map(async (clinic) => {
-    const [opinions, reviews] = await Promise.all([
-      fetchClinicPosts(clinic.id, month, "opinion"),
-      fetchClinicPosts(clinic.id, month, "review"),
-    ]);
+  if (!memoOnly) {
+    await Promise.all(targetClinics.map(async (clinic) => {
+      const posts = await fetchClinicPosts(clinic.id, month, "all");
 
-    [...opinions, ...reviews].forEach((post) => {
-      const normalizedSubtype = post.review_subtype || getSubtypeByPhotos(post);
-      const subtype = normalizedSubtype === "photo" ? "사진" : normalizedSubtype === "text" ? "텍스트" : "";
-      const typeLabel = post.type === "review" ? "후기" : "여론";
-      const titlePrefix = `[${typeLabel}]`;
-      items.push({
-        date: getPostDate(post),
-        title: post.title,
-        title_display: `${titlePrefix} ${post.title}`,
-        url: post.url,
+      posts.forEach((post) => {
+        const normalizedSubtype = post.review_subtype || getSubtypeByPhotos(post);
+      const subtype = normalizedSubtype === "photo"
+        ? "사진"
+        : normalizedSubtype === "text"
+          ? "텍스트"
+          : normalizedSubtype === "consultation"
+            ? "상담"
+            : "";
+        const typeLabel = post.type === "review" ? "후기" : "여론";
+        const titlePrefix = `[${typeLabel}]`;
+        items.push({
+          date: getPostDate(post),
+          title: post.title,
+          title_display: `${titlePrefix} ${post.title}`,
+          url: post.url,
         platform: post.platform,
         platform_label: post.platform_label,
         status: post.status,
-        account: post.account || post.assignee_name || "",
+        account: post.account || "",
         account_password: post.account_password || "",
         memo: post.memo || "",
-        views: post.views ?? 0,
-        comments: post.comments ?? 0,
-        message_count: post.message_count ?? 0,
-        post_id: post.id,
-        type: post.type,
-        review_subtype: normalizedSubtype,
-        doctor_name: getDoctorLabel(post),
-        assignee: getAssigneeLabel(post),
-        photos: (post.photos || []).map((p) => p.url),
-        clinic: clinic.name,
-        clinicId: clinic.id,
+          views: post.views ?? 0,
+          comments: post.comments ?? 0,
+          message_count: post.message_count ?? 0,
+          post_id: post.id,
+          type: post.type,
+          review_subtype: normalizedSubtype,
+          doctor_name: getDoctorLabel(post),
+          assignee: getAssigneeLabel(post),
+          photos: (post.photos || []).map((p) => p.url),
+          clinic: clinic.name,
+          clinicId: clinic.id,
+        });
       });
-    });
-  }));
+    }));
+  }
 
   const memos = await fetchCalendarMemos(month);
   const filteredMemos = filterMemosByClinic(memos, clinicId);
@@ -304,7 +351,25 @@ async function initCalendarDashboard() {
   };
   const monthInput = document.getElementById("calendarMonth");
   if (monthInput) {
-    monthInput.addEventListener("change", loadCalendar);
+    setMonth(getMonthValue());
+    monthInput.addEventListener("change", () => {
+      setMonth(monthInput.value);
+      loadCalendar();
+    });
+  }
+  const monthPrev = document.getElementById("calendarMonthPrev");
+  const monthNext = document.getElementById("calendarMonthNext");
+  if (monthPrev) {
+    monthPrev.addEventListener("click", () => {
+      setMonth(shiftMonth(getMonthValue(), -1));
+      loadCalendar();
+    });
+  }
+  if (monthNext) {
+    monthNext.addEventListener("click", () => {
+      setMonth(shiftMonth(getMonthValue(), 1));
+      loadCalendar();
+    });
   }
   const workToggle = document.getElementById("calendarWorkToggle");
   const memoToggle = document.getElementById("calendarMemoToggle");
@@ -474,11 +539,11 @@ function openMemoModal() {
   const memoOnly = document.getElementById("calendarMemoToggle")?.classList.contains("active");
   const memoPanelVisible = !document.getElementById("calendarMemoPanel")?.classList.contains("hidden");
   if (!memoOnly && !memoPanelVisible) {
-    alert("메모 캘린더로 전환하고 작성해 주세요.");
+    window.showAlert?.("메모 캘린더로 전환하고 작성해 주세요.");
     return;
   }
   if (!calendarSelectedDate) {
-    alert("먼저 날짜를 선택하세요.");
+    window.showAlert?.("먼저 날짜를 선택하세요.");
     return;
   }
   const modal = document.getElementById("calendarMemoModal");
@@ -553,12 +618,12 @@ async function saveCalendarMemo() {
   const memoOnly = document.getElementById("calendarMemoToggle")?.classList.contains("active");
   const memoPanelVisible = !document.getElementById("calendarMemoPanel")?.classList.contains("hidden");
   if (!memoOnly && !memoPanelVisible) {
-    alert("메모 캘린더로 전환하고 작성해 주세요.");
+    window.showAlert?.("메모 캘린더로 전환하고 작성해 주세요.");
     return;
   }
   const date = calendarSelectedDate;
   if (!date) {
-    alert("먼저 날짜를 선택하세요.");
+    window.showAlert?.("먼저 날짜를 선택하세요.");
     return;
   }
 
@@ -570,7 +635,7 @@ async function saveCalendarMemo() {
   const memoPassword = document.getElementById("calendarMemoPassword");
   const content = (contentEl?.value || "").trim();
   if (!content) {
-    alert("메모 내용을 입력하세요.");
+    window.showAlert?.("메모 내용을 입력하세요.");
     return;
   }
 
@@ -608,7 +673,7 @@ async function saveCalendarMemo() {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      alert("메모 저장 실패");
+      window.showAlert?.("메모 저장 실패");
       return;
     }
     if (contentEl) contentEl.value = "";
@@ -621,7 +686,7 @@ async function saveCalendarMemo() {
     setMemoDate(date);
   } catch (e) {
     console.error("memo save failed", e);
-    alert("메모 저장 실패");
+    window.showAlert?.("메모 저장 실패");
   }
 }
 
@@ -634,14 +699,14 @@ async function deleteCalendarMemo(memoId) {
       headers,
     });
     if (!res.ok) {
-      alert("메모 삭제 실패");
+      window.showAlert?.("메모 삭제 실패");
       return;
     }
     await loadCalendar({ keepPanelOpen: true });
     setMemoDate(calendarSelectedDate);
   } catch (e) {
     console.error("memo delete failed", e);
-    alert("메모 삭제 실패");
+    window.showAlert?.("메모 삭제 실패");
   }
 }
 
@@ -750,7 +815,7 @@ async function saveCalendarEdit() {
   });
 
   if (!res.ok) {
-    alert("저장 실패");
+    window.showAlert?.("저장 실패");
     return;
   }
 
@@ -758,27 +823,32 @@ async function saveCalendarEdit() {
   loadCalendar();
 }
 
-async function deleteCalendarEdit() {
-  const modal = document.getElementById("calendarEditModal");
-  if (!modal) return;
-  const postId = modal.dataset.postId;
-  const clinicId = modal.dataset.clinicId;
-  if (!postId || !clinicId) return;
-  if (!confirm("게시글을 삭제할까요?")) return;
+  async function deleteCalendarEdit() {
+    const modal = document.getElementById("calendarEditModal");
+    if (!modal) return;
+    const postId = modal.dataset.postId;
+    const clinicId = modal.dataset.clinicId;
+    if (!postId || !clinicId) return;
+    if (!(await askConfirm("게시글을 삭제할까요?"))) {
+      window.resetInteractionState?.();
+      return;
+    }
 
-  const headers = await buildAuthHeaders();
-  const res = await fetch(`${window.API_BASE}/api/data/clinics/${clinicId}/posts/${postId}/`, {
-    method: "DELETE",
-    credentials: "include",
-    headers,
-  });
+    const headers = await buildAuthHeaders();
+    const res = await fetch(`${window.API_BASE}/api/data/clinics/${clinicId}/posts/${postId}/`, {
+      method: "DELETE",
+      credentials: "include",
+      headers,
+    });
 
-  if (!res.ok) {
-    alert("삭제 실패");
-    return;
+    if (!res.ok) {
+      window.showAlert?.("삭제 실패");
+      window.resetInteractionState?.();
+      return;
+    }
+
+    modal.classList.add("hidden");
+    loadCalendar();
+    window.resetInteractionState?.();
   }
-
-  modal.classList.add("hidden");
-  loadCalendar();
-}
 

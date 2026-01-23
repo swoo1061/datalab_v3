@@ -21,17 +21,28 @@ function getMonthMeta(yearMonth) {
 
 function buildCalendarCells(yearMonth) {
   const meta = getMonthMeta(yearMonth);
-  const cells = [];
-  const total = 42;
-  for (let i = 0; i < total; i += 1) {
-    const day = i - meta.firstDay + 1;
-    const inMonth = day > 0 && day <= meta.daysInMonth;
-    const date = inMonth
-      ? `${meta.year}-${String(meta.month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-      : "";
-    cells.push({ day, date, inMonth });
+  const weeks = [];
+  let week = new Array(5).fill(null);
+
+  for (let day = 1; day <= meta.daysInMonth; day += 1) {
+    const dateObj = new Date(meta.year, meta.month - 1, day);
+    const dayOfWeek = dateObj.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
+    if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+
+    if (dayOfWeek === 1 && week.some(Boolean)) {
+      weeks.push(week);
+      week = new Array(5).fill(null);
+    }
+
+    const date = `${meta.year}-${String(meta.month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    week[dayOfWeek - 1] = { day, date, inMonth: true };
   }
-  return cells;
+
+  if (week.some(Boolean)) {
+    weeks.push(week);
+  }
+
+  return weeks.flat().map((cell) => cell || { day: "", date: "", inMonth: false });
 }
 
 function groupByDate(items) {
@@ -59,7 +70,22 @@ function renderScheduleCalendar({
 
   const grouped = groupByDate(items);
   const cells = buildCalendarCells(yearMonth);
-  const labels = ["일", "월", "화", "수", "목", "금", "토"];
+  const labels = ["월", "화", "수", "목", "금"];
+
+  const cleanAssignee = (value) =>
+    String(value || "")
+      .replace(/\s*(매니저|팀장|대표이사|대표)\s*$/g, "")
+      .trim();
+
+  const assigneesByDate = new Map();
+  items.forEach((item) => {
+    if (!item.date) return;
+    if (item.kind === "memo") return;
+    const name = cleanAssignee(item.assignee);
+    if (!name) return;
+    if (!assigneesByDate.has(item.date)) assigneesByDate.set(item.date, new Set());
+    assigneesByDate.get(item.date).add(name);
+  });
 
   const headerHtml = labels
     .map((l) => `<div class="calendar-head">${l}</div>`)
@@ -71,11 +97,20 @@ function renderScheduleCalendar({
         return `<div class="calendar-cell muted"></div>`;
       }
       const count = grouped.get(cell.date)?.length || 0;
+      const assignees = assigneesByDate.get(cell.date);
+      const assigneeList = assignees ? Array.from(assignees) : [];
+      const maxNames = 6;
+      const displayed = assigneeList.slice(0, maxNames);
+      const extraCount = Math.max(assigneeList.length - maxNames, 0);
+      const assigneeLabel = assigneeList.length
+        ? `${displayed.join("<br>")}${extraCount ? `<br>+${extraCount}` : ""}`
+        : "";
       const clickable = (allowEmptyClick || count > 0) ? "clickable" : "";
       return `
         <div class="calendar-cell ${clickable}" data-date="${cell.date}">
           <div class="calendar-day">${cell.day}</div>
           ${count ? `<span class="calendar-count">${count}건</span>` : ""}
+          ${assigneeLabel ? `<div class="calendar-assignees" title="${assigneeList.join(" · ")}">${assigneeLabel}</div>` : ""}
         </div>
       `;
     })
@@ -126,7 +161,9 @@ function renderScheduleCalendar({
       ? "사진"
       : item.review_subtype === "text"
         ? "텍스트"
-        : "";
+        : item.review_subtype === "consultation"
+          ? "상담"
+          : "";
     let reviewLabel = typeLabel
       ? (subtypeLabel ? `${typeLabel}/${subtypeLabel}` : typeLabel)
       : "";

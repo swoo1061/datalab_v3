@@ -1018,6 +1018,7 @@ class ClinicPost(models.Model):
     REVIEW_SUBTYPE_CHOICES = [
         ("text", "텍스트 후기"),
         ("photo", "사진 후기"),
+        ("consultation", "상담 후기"),
     ]
 
     PLATFORM_CHOICES = [

@@ -39,6 +39,7 @@ body {
   background: #eaeef8;
 }
 
+
 body[data-theme="classic"] {
   --bg: #f6f7fb;
   --surface: #ffffff;

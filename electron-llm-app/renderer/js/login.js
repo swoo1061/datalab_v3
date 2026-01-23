@@ -1,4 +1,4 @@
-console.log("🔥 login.js loaded"); // 디버깅용 로그
+console.log("?? login.js loaded"); // 디버깅용 로그
 
 const KEY_REMEMBER = "remember_login";
 let isSubmitting = false;
@@ -7,6 +7,14 @@ window.addEventListener("DOMContentLoaded", async () => {
   const saved = localStorage.getItem(KEY_REMEMBER) === "true";
   const rememberEl = document.getElementById("rememberLogin");
   if (rememberEl) rememberEl.checked = saved;
+
+  const form = document.getElementById("loginForm");
+  if (form) {
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      login();
+    });
+  }
 
   initLoginClock();
 
@@ -42,14 +50,14 @@ function initLoginClock() {
   setInterval(update, 1000);
 }
 
-// 🔒 로딩 상태 관리
+// ?? 로딩 상태 관리
 function setLoading(loading) {
-  document.querySelectorAll("input, button").forEach(el => {
+  document.querySelectorAll("input, button").forEach((el) => {
     el.disabled = loading;
   });
 }
 
-// 🔔 메시지 표시 (alert ❌)
+// ?? 메시지 표시 (alert ?)
 function showMessage(text, isError = true) {
   const msg = document.getElementById("message");
   if (!msg) return;
@@ -58,9 +66,9 @@ function showMessage(text, isError = true) {
   msg.className = isError ? "msg error" : "msg success";
 }
 
-// ✅ 로그인
+// ? 로그인
 async function login() {
-  if (isSubmitting) return; // 🔥 중복 방지
+  if (isSubmitting) return; // ?? 중복 방지
   isSubmitting = true;
 
   const usernameEl = document.getElementById("username");
@@ -88,10 +96,10 @@ async function login() {
     window.nav.go("my_dashboard");
 
   } catch (e) {
-    console.error("❌ login error", e);
+    console.error("? login error", e);
     showMessage("관리자 승인 후 로그인 가능합니다.");
 
-    // 🔥 포커스 복구
+    // ?? 포커스 복구
     setTimeout(() => {
       usernameEl.focus();
     }, 0);
@@ -102,7 +110,7 @@ async function login() {
   }
 }
 
-// ✅ Enter 키 로그인 (중복 방지 포함)
+// ? Enter 키 로그인 (중복 방지 포함)
 document.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     e.preventDefault();

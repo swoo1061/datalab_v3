@@ -16,7 +16,8 @@ import re
 import csv
 from openpyxl import Workbook
 from django.db import models
-from datetime import timedelta
+from datetime import datetime, timedelta
+import calendar
 from django.utils import timezone
 from django.db.models import Sum, Count
 from django.db.models.functions import TruncDate
@@ -38,6 +39,24 @@ from apps.ml.services.clinic_parser import parse_clinic_content
 @dashboard_required
 def is_staff(user):
     return user.groups.filter(name='staff').exists() or user.is_superuser
+
+
+def _parse_date_param(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+
+def _get_usage_range(request, default_days=30):
+    today = timezone.now().date()
+    start = _parse_date_param(request.GET.get("start")) or (today - timedelta(days=default_days - 1))
+    end = _parse_date_param(request.GET.get("end")) or today
+    if start > end:
+        start, end = end, start
+    return start, end
 
 @dashboard_required
 def index(request):
@@ -1577,89 +1596,170 @@ def api_load_content_type_presets(request):
 
 @dashboard_required
 def llm_usage_dashboard(request):
-    today = timezone.now().date()
-    month_start = today.replace(day=1)
-    start_date = today - timedelta(days=14)
+    start_date, end_date = _get_usage_range(request, default_days=30)
 
-    qs = LLMUsageLog.objects.select_related("user")
+    qs = LLMUsageLog.objects.select_related("user").filter(
+        created_at__date__gte=start_date,
+        created_at__date__lte=end_date
+    )
 
-    # =========================
-    # 오늘 통계
-    # =========================
-    today_stats = qs.filter(created_at__date=today).aggregate(
+    total_stats = qs.aggregate(
         total_cost=Sum("cost_krw"),
         total_tokens=Sum("total_tokens"),
+        input_tokens=Sum("input_tokens"),
+        output_tokens=Sum("output_tokens"),
         count=Count("id"),
     )
 
     # =========================
-    # 이번 달 통계
-    # =========================
-    month_stats = qs.filter(created_at__date__gte=month_start).aggregate(
-        total_cost=Sum("cost_krw"),
-        total_tokens=Sum("total_tokens"),
-        count=Count("id"),
-    )
-
-    # =========================
-    # 📈 날짜별 비용 (그래프)
+    # 📈 날짜별 사용량 (그래프)
     # =========================
     daily_stats = (
-        qs.filter(created_at__date__gte=start_date)
-        .annotate(day=TruncDate("created_at"))
+        qs.annotate(day=TruncDate("created_at"))
         .values("day")
-        .annotate(total_cost=Sum("cost_krw"))
-        .order_by("day")
-    )
-
-    daily_labels = [d["day"].strftime("%m/%d") for d in daily_stats]
-    daily_costs = [float(d["total_cost"] or 0) for d in daily_stats]
-
-    # =========================
-    # 📊 모델별 비용
-    # =========================
-    by_model = (
-        qs.values("model")
         .annotate(
             total_cost=Sum("cost_krw"),
             total_tokens=Sum("total_tokens"),
-            count=Count("id"),
+            input_tokens=Sum("input_tokens"),
+            output_tokens=Sum("output_tokens"),
         )
-        .order_by("-total_cost")
+        .order_by("day")
     )
 
-    model_labels = [m["model"] for m in by_model]
-    model_costs = [float(m["total_cost"] or 0) for m in by_model]
+    daily_map = {d["day"]: d for d in daily_stats}
+    range_days = max((end_date - start_date).days + 1, 1)
+    daily_labels = []
+    daily_costs = []
+    daily_total_tokens = []
+    daily_input_tokens = []
+    daily_output_tokens = []
+
+    for offset in range(range_days):
+        day = start_date + timedelta(days=offset)
+        data = daily_map.get(day)
+        daily_labels.append(day.strftime("%m/%d"))
+        daily_costs.append(float(data["total_cost"] or 0) if data else 0)
+        daily_total_tokens.append(int(data["total_tokens"] or 0) if data else 0)
+        daily_input_tokens.append(int(data["input_tokens"] or 0) if data else 0)
+        daily_output_tokens.append(int(data["output_tokens"] or 0) if data else 0)
+
+    total_tokens = int(total_stats.get("total_tokens") or 0)
+    total_cost = float(total_stats.get("total_cost") or 0)
+    total_count = int(total_stats.get("count") or 0)
+
+    avg_daily_tokens = total_tokens / range_days if range_days else 0
+    avg_daily_cost = total_cost / range_days if range_days else 0
+    avg_tokens_per_call = total_tokens / total_count if total_count else 0
+    avg_cost_per_call = total_cost / total_count if total_count else 0
+
+    peak_day_label = "-"
+    peak_day_tokens = 0
+    if daily_total_tokens:
+        peak_day_tokens = max(daily_total_tokens)
+        peak_index = daily_total_tokens.index(peak_day_tokens)
+        peak_day_label = (start_date + timedelta(days=peak_index)).strftime("%Y-%m-%d")
+
+    next_month = end_date.month + 1
+    next_year = end_date.year
+    if next_month == 13:
+        next_month = 1
+        next_year += 1
+    next_month_days = calendar.monthrange(next_year, next_month)[1]
+    forecast_next_month_tokens = avg_daily_tokens * next_month_days
+    forecast_next_month_cost = avg_daily_cost * next_month_days
 
     # =========================
-    # 유저별 비용 (표용)
-    # =========================
+    # 📊 모델별 비용
+    context = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "total": total_stats,
+        "daily_labels": daily_labels,
+        "daily_costs": daily_costs,
+        "daily_total_tokens": daily_total_tokens,
+        "daily_input_tokens": daily_input_tokens,
+        "daily_output_tokens": daily_output_tokens,
+        "avg_daily_tokens": avg_daily_tokens,
+        "avg_daily_cost": avg_daily_cost,
+        "avg_tokens_per_call": avg_tokens_per_call,
+        "avg_cost_per_call": avg_cost_per_call,
+        "peak_day_label": peak_day_label,
+        "peak_day_tokens": peak_day_tokens,
+        "forecast_next_month_tokens": forecast_next_month_tokens,
+        "forecast_next_month_cost": forecast_next_month_cost,
+    }
+    return render(request, "dashboard/llm_usage_dashboard.html", context)
+
+
+@dashboard_required
+def llm_usage_users(request):
+    start_date, end_date = _get_usage_range(request, default_days=30)
+    qs = LLMUsageLog.objects.select_related("user").filter(
+        created_at__date__gte=start_date,
+        created_at__date__lte=end_date
+    )
+
     by_user = (
         qs.values("user__username")
         .annotate(
             total_cost=Sum("cost_krw"),
             total_tokens=Sum("total_tokens"),
+            input_tokens=Sum("input_tokens"),
+            output_tokens=Sum("output_tokens"),
             count=Count("id"),
         )
-        .order_by("-total_cost")
+        .order_by("-total_tokens")
     )
 
+    top_users = list(by_user[:10])
+    user_labels = [u["user__username"] or "-" for u in top_users]
+    user_tokens = [int(u["total_tokens"] or 0) for u in top_users]
+    user_costs = [float(u["total_cost"] or 0) for u in top_users]
+
     context = {
-        # 요약
-        "today": today_stats,
-        "month": month_stats,
-
-        # 표
-        "by_model": by_model,
+        "start_date": start_date,
+        "end_date": end_date,
         "by_user": by_user,
+        "user_labels": user_labels,
+        "user_tokens": user_tokens,
+        "user_costs": user_costs,
+    }
+    return render(request, "dashboard/llm_usage_users.html", context)
 
-        # 그래프
-        "daily_labels": daily_labels,
-        "daily_costs": daily_costs,
+
+@dashboard_required
+def llm_usage_models(request):
+    start_date, end_date = _get_usage_range(request, default_days=30)
+    qs = LLMUsageLog.objects.filter(
+        created_at__date__gte=start_date,
+        created_at__date__lte=end_date
+    )
+
+    by_model = (
+        qs.values("model")
+        .annotate(
+            total_cost=Sum("cost_krw"),
+            total_tokens=Sum("total_tokens"),
+            input_tokens=Sum("input_tokens"),
+            output_tokens=Sum("output_tokens"),
+            count=Count("id"),
+        )
+        .order_by("-total_tokens")
+    )
+
+    model_labels = [m["model"] for m in by_model]
+    model_tokens = [int(m["total_tokens"] or 0) for m in by_model]
+    model_costs = [float(m["total_cost"] or 0) for m in by_model]
+
+    context = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "by_model": by_model,
         "model_labels": model_labels,
+        "model_tokens": model_tokens,
         "model_costs": model_costs,
     }
-    return render(request, "dashboard/llm_usage_dashboard.html", context)
+    return render(request, "dashboard/llm_usage_models.html", context)
 
 @dashboard_required
 def export_llm_usage_csv(request):

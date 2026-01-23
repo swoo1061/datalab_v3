@@ -44,7 +44,7 @@ async function toggleFavorite(e, clinicId) {
       await window.api.addFavorite(id);
     }
   } catch (e) {
-    alert("즐겨찾기 저장 실패");
+    window.showAlert?.("즐겨찾기 저장 실패");
     return;
   }
 

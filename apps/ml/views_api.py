@@ -1,10 +1,14 @@
 import json
 import random
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 from datetime import datetime, timedelta
+from django.contrib.auth import get_user_model
+from django.contrib.sessions.models import Session
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from apps.ml.services.llm_service import generate_review_with_prompt
+from apps.ml.services.usage_logger import log_llm_usage
 from apps.data.models import PromptTemplate
 
 MODEL_ALIAS_MAP = {
@@ -15,6 +19,22 @@ MODEL_ALIAS_MAP = {
     "claude-4.5": "claude-sonnet-4-5-20250929",
     "claude-opus": "claude-opus-4-5-20251101",
 }
+
+def _resolve_request_user(request):
+    if getattr(request, "user", None) and request.user.is_authenticated:
+        return request.user
+    session_key = request.headers.get("X-Sessionid")
+    if not session_key:
+        return None
+    try:
+        session = Session.objects.get(session_key=session_key, expire_date__gte=timezone.now())
+    except Session.DoesNotExist:
+        return None
+    user_id = session.get_decoded().get("_auth_user_id")
+    if not user_id:
+        return None
+    User = get_user_model()
+    return User.objects.filter(id=user_id).first()
 
 @csrf_exempt
 def review_generate_api(request):
@@ -47,17 +67,29 @@ def review_generate_api(request):
         return JsonResponse({"error": "missing prompt"}, status=400)
 
     try:
-        review_text = generate_review_with_prompt(
+        result = generate_review_with_prompt(
             prompt=prompt,
             model=model,
             max_tokens=1200,
+            return_usage=True,
         )
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+    user = _resolve_request_user(request)
+    if user and isinstance(result, dict):
+        log_llm_usage(user=user, model=model, usage=result)
+
     return JsonResponse({
-        "review_text": review_text,
+        "review_text": result["text"] if isinstance(result, dict) else result,
         "model": model,
+        "usage": {
+            "input_tokens": result.get("input_tokens", 0),
+            "output_tokens": result.get("output_tokens", 0),
+            "cached_input_tokens": result.get("cached_input_tokens", 0),
+            "total_tokens": result.get("total_tokens", 0),
+            "cost_usd": result.get("cost_usd", 0),
+        } if isinstance(result, dict) else None,
     })
 
 @csrf_exempt
@@ -320,6 +352,10 @@ JSON 출력:"""
         good_selected = normalize_tags(parsed.get("good_tags", []))
         bad_selected = normalize_tags(parsed.get("bad_tags", [])) or ["없어요"]
         cost_krw = result["cost_usd"] * 1450
+
+        user = _resolve_request_user(request)
+        if user:
+            log_llm_usage(user=user, model=model, usage=result)
 
         return JsonResponse({
             "success": True,

@@ -184,7 +184,7 @@ function buildPrompt() {
 /* ---------- generate ---------- */
 async function generateReview() {
   if (!state.modelKey) {
-    alert("AI 모델을 선택하세요.");
+    window.showAlert?.("AI 모델을 선택하세요.");
     return;
   }
 
@@ -226,7 +226,7 @@ async function generateReview() {
     ok = true;
   } catch (e) {
     console.error("❌ generateReview error:", e);
-    alert("리뷰 생성 실패");
+    window.showAlert?.("리뷰 생성 실패");
     forceCloseModal();
     clearModalOverlays();
   } finally {

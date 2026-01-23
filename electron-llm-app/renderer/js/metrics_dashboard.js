@@ -17,6 +17,27 @@ function toMonthValue() {
   return input.value;
 }
 
+function formatMonthLabel(value) {
+  if (!value) return "-";
+  const [y, m] = value.split("-").map(Number);
+  if (!y || !m) return value;
+  return `${y}년 ${m}월`;
+}
+
+function shiftMonth(value, delta) {
+  const [y, m] = value.split("-").map(Number);
+  if (!y || !m) return value;
+  const next = new Date(y, m - 1 + delta, 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function setMonth(value) {
+  const input = document.getElementById("detailMonth");
+  const label = document.getElementById("detailMonthLabel");
+  if (input) input.value = value;
+  if (label) label.textContent = formatMonthLabel(value);
+}
+
 async function fetchClinics() {
   try {
     if (window.api?.getClinics) {
@@ -339,7 +360,27 @@ async function initDetail() {
   clinicSelect.addEventListener("change", loadDetail);
 
   const monthInput = document.getElementById("detailMonth");
-  if (monthInput) monthInput.addEventListener("change", loadDetail);
+  if (monthInput) {
+    setMonth(toMonthValue());
+    monthInput.addEventListener("change", () => {
+      setMonth(monthInput.value);
+      loadDetail();
+    });
+  }
+  const monthPrev = document.getElementById("detailMonthPrev");
+  const monthNext = document.getElementById("detailMonthNext");
+  if (monthPrev) {
+    monthPrev.addEventListener("click", () => {
+      setMonth(shiftMonth(toMonthValue(), -1));
+      loadDetail();
+    });
+  }
+  if (monthNext) {
+    monthNext.addEventListener("click", () => {
+      setMonth(shiftMonth(toMonthValue(), 1));
+      loadDetail();
+    });
+  }
 
   bindTypePills();
   loadDetail();

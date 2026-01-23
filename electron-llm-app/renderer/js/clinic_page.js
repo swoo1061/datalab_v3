@@ -68,7 +68,7 @@ function escapeHtml(str) {
 async function initClinicPage() {
   currentClinicId = getClinicIdFromQuery();
   if (!currentClinicId) {
-    alert("clinic_id 없음");
+    window.showAlert?.("clinic_id 없음");
     return;
   }
 
@@ -181,6 +181,7 @@ function initAiIntakeForm() {
   const confirmDoctor = document.getElementById("aiConfirmDoctor");
   const confirmPlatform = document.getElementById("aiConfirmPlatform");
   const confirmTypePills = document.getElementById("aiConfirmTypePills");
+  const confirmSubtype = document.getElementById("aiConfirmSubtype");
   const confirmPhotos = document.getElementById("aiConfirmPhotos");
   const confirmPhotoHint = document.getElementById("aiConfirmPhotoHint");
   const confirmSummary = document.getElementById("aiConfirmSummary");
@@ -207,6 +208,26 @@ function initAiIntakeForm() {
 
   let currentIntakeType = "opinion";
   let platformManual = false;
+  let currentReviewSubtype = "text";
+  let intakeFiles = [];
+  let confirmFiles = [];
+
+  const fileKey = (file) => `${file.name}|${file.size}|${file.lastModified}`;
+
+  const addFiles = (targetList, files) => {
+    const existing = new Set(targetList.map(fileKey));
+    Array.from(files || []).forEach((file) => {
+      if (!existing.has(fileKey(file))) {
+        targetList.push(file);
+        existing.add(fileKey(file));
+      }
+    });
+  };
+
+  const updateFileHint = (hintEl, list) => {
+    if (!hintEl) return;
+    hintEl.textContent = list.length ? `${list.length}개 파일 선택됨` : "선택된 파일 없음";
+  };
 
   const detectPlatformFromUrl = (url) => {
     const raw = String(url || "").toLowerCase();
@@ -261,6 +282,14 @@ function initAiIntakeForm() {
     });
   }
 
+  if (confirmSubtype && !confirmSubtype.options.length) {
+    confirmSubtype.innerHTML = `
+      <option value="text">텍스트 후기</option>
+      <option value="photo">사진 후기</option>
+      <option value="consultation">상담 후기</option>
+    `;
+  }
+
   urlInput.addEventListener("input", syncPlatformAuto);
 
   const closeConfirmModal = () => {
@@ -273,8 +302,16 @@ function initAiIntakeForm() {
     if (confirmEditBtn) confirmEditBtn.classList.toggle("hidden", editing);
   };
 
+  const syncSubtypeVisibility = () => {
+    const isReview = (confirmTypePills?.querySelector(".seg-tab.active")?.dataset?.type || currentIntakeType) === "review";
+    if (confirmSubtype) {
+      confirmSubtype.closest(".ai-field")?.classList.toggle("hidden", !isReview);
+    }
+  };
+
   const openConfirmModal = () => {
     if (!confirmModal) return;
+    confirmFiles = [];
     if (confirmPlatform && !confirmPlatform.options.length) {
       confirmPlatform.innerHTML = platformSelect.innerHTML;
     }
@@ -290,17 +327,23 @@ function initAiIntakeForm() {
         b.classList.toggle("active", b.dataset.type === currentIntakeType);
       });
     }
-    if (confirmPhotoHint) {
-      const count = photoInput?.files?.length || 0;
-      confirmPhotoHint.textContent = count ? `${count}개 파일 선택됨` : "선택된 파일 없음";
+    if (confirmSubtype) {
+      if (currentIntakeType === "review") {
+        const photoCount = photoInput?.files?.length || 0;
+        currentReviewSubtype = photoCount ? "photo" : "text";
+      } else {
+        currentReviewSubtype = "text";
+      }
+      confirmSubtype.value = currentReviewSubtype;
     }
+    updateFileHint(confirmPhotoHint, intakeFiles);
     if (confirmTypeText) {
       confirmTypeText.textContent = currentIntakeType === "review" ? "후기" : "여론";
     }
     if (confirmSubtypeText) {
-      const photoCount = photoInput?.files?.length || 0;
       if (currentIntakeType === "review") {
-        confirmSubtypeText.textContent = photoCount ? "사진 후기" : "텍스트 후기";
+        const label = confirmSubtype?.selectedOptions?.[0]?.textContent || "텍스트 후기";
+        confirmSubtypeText.textContent = label;
       } else {
         confirmSubtypeText.textContent = "텍스트 여론";
       }
@@ -320,11 +363,10 @@ function initAiIntakeForm() {
       confirmDateText.textContent = now.toLocaleDateString("ko-KR");
     }
     if (confirmPhotoText) {
-      const count = photoInput?.files?.length || 0;
-      confirmPhotoText.textContent = count ? `${count}개` : "없음";
+      confirmPhotoText.textContent = intakeFiles.length ? `${intakeFiles.length}개` : "없음";
     }
     if (confirmPhotoPreview) {
-      const files = photoInput?.files ? Array.from(photoInput.files) : [];
+      const files = intakeFiles;
       if (!files.length) {
         confirmPhotoPreview.innerHTML = "<span class='muted'>없음</span>";
       } else {
@@ -345,6 +387,7 @@ function initAiIntakeForm() {
         });
       }
     }
+    syncSubtypeVisibility();
     toggleConfirmEdit(false);
     confirmModal.classList.remove("hidden");
   };
@@ -354,6 +397,7 @@ function initAiIntakeForm() {
     confirmTypePills.querySelectorAll(".seg-tab").forEach((btn) => {
       btn.addEventListener("click", () => {
         confirmTypePills.querySelectorAll(".seg-tab").forEach((b) => b.classList.toggle("active", b === btn));
+        syncSubtypeVisibility();
       });
     });
   };
@@ -384,8 +428,9 @@ function initAiIntakeForm() {
 
   if (confirmPhotos && confirmPhotoHint) {
     confirmPhotos.addEventListener("change", () => {
-      const count = confirmPhotos.files ? confirmPhotos.files.length : 0;
-      confirmPhotoHint.textContent = count ? `${count}개 파일 선택됨` : "선택된 파일 없음";
+      addFiles(confirmFiles, confirmPhotos.files);
+      updateFileHint(confirmPhotoHint, confirmFiles);
+      confirmPhotos.value = "";
     });
   }
 
@@ -409,6 +454,7 @@ function initAiIntakeForm() {
       const doctor = (confirmDoctor?.value || "").trim();
       const platform = confirmPlatform?.value || "";
       const type = confirmTypePills?.querySelector(".seg-tab.active")?.dataset?.type || currentIntakeType;
+      const subtype = confirmSubtype?.value || "text";
 
       if (!url) {
         if (statusEl) statusEl.textContent = "URL을 입력하세요.";
@@ -428,14 +474,14 @@ function initAiIntakeForm() {
       if (accountPassword) form.append("account_password", accountPassword);
       if (memo) form.append("memo", memo);
       form.append("type", type);
-
-      const modalFiles = confirmPhotos?.files?.length ? confirmPhotos.files : null;
-      const sourceFiles = modalFiles || photoInput?.files;
-      if (sourceFiles?.length) {
-        Array.from(sourceFiles).forEach((file) => {
-          form.append("photos", file);
-        });
+      if (type === "review") {
+        form.append("review_subtype", subtype);
       }
+
+      const sourceFiles = confirmFiles.length ? confirmFiles : intakeFiles;
+      sourceFiles.forEach((file) => {
+        form.append("photos", file);
+      });
 
       if (statusEl) statusEl.textContent = "처리 중...";
       confirmSave.disabled = true;
@@ -466,8 +512,10 @@ function initAiIntakeForm() {
         if (doctorInput) doctorInput.value = "";
         if (photoInput) photoInput.value = "";
         if (confirmPhotos) confirmPhotos.value = "";
-        if (photoHint) photoHint.textContent = "선택된 파일 없음";
-        if (confirmPhotoHint) confirmPhotoHint.textContent = "선택된 파일 없음";
+        intakeFiles = [];
+        confirmFiles = [];
+        updateFileHint(photoHint, intakeFiles);
+        updateFileHint(confirmPhotoHint, confirmFiles);
         if (confirmPhotoPreview) confirmPhotoPreview.innerHTML = "";
         platformSelect.value = "";
         platformManual = false;
@@ -523,8 +571,9 @@ function initAiIntakeForm() {
 
   if (photoInput && photoHint) {
     photoInput.addEventListener("change", () => {
-      const count = photoInput.files ? photoInput.files.length : 0;
-      photoHint.textContent = count ? `${count}개 파일 선택됨` : "선택된 파일 없음";
+      addFiles(intakeFiles, photoInput.files);
+      updateFileHint(photoHint, intakeFiles);
+      photoInput.value = "";
     });
   }
 }

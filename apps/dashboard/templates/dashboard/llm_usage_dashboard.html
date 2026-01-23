@@ -5,127 +5,107 @@
 
 {% block content %}
 
-<!-- 페이지 헤더 -->
 <div class="page-header flex-between">
   <div>
-    <h1 class="page-title">📊 LLM 사용량 통계</h1>
-  <p class="page-subtitle">LLM 호출 비용 및 사용량을 분석합니다</p>
+    <h1 class="page-title">LLM 사용량 통계</h1>
+    <p class="page-subtitle">LLM 호출 비용과 토큰 사용량을 요약합니다</p>
   </div>
 
   <div class="export-actions">
     <a href="{% url 'dashboard:export_llm_usage_excel' %}"
           class="btn btn-primary">
-          ⬇ Excel
+          Excel
       </a>
     <a href="{% url 'dashboard:export_llm_usage_csv' %}"
           class="btn btn-primary">
-          ⬇ CSV
+          CSV
   </a>
 
   </div>
 </div>
 
-<!-- 요약 카드 -->
-<div class="stats-grid">
-  <div class="stat-card">
-    <div class="stat-label">오늘 비용</div>
-    <div class="stat-value">
-      {{ today.total_cost|default:0|floatformat:0 }} 원
-    </div>
-    <div class="stat-sub">{{ today.count|default:0 }} 회</div>
+<form class="filter-bar" method="get">
+  <div class="filter-group">
+    <label for="usageStart">시작일</label>
+    <input type="date" id="usageStart" name="start" value="{{ start_date|date:'Y-m-d' }}">
   </div>
+  <div class="filter-group">
+    <label for="usageEnd">종료일</label>
+    <input type="date" id="usageEnd" name="end" value="{{ end_date|date:'Y-m-d' }}">
+  </div>
+  <button type="submit" class="btn btn-primary">조회</button>
+</form>
 
+<div class="kpi-grid">
   <div class="stat-card">
-    <div class="stat-label">이번 달 비용</div>
-    <div class="stat-value">
-      {{ month.total_cost|default:0|floatformat:0 }} 원
-    </div>
-    <div class="stat-sub">{{ month.count|default:0 }} 회</div>
+    <div class="stat-label">총 토큰</div>
+    <div class="stat-value">{{ total.total_tokens|default:0|floatformat:0 }}</div>
+    <div class="stat-sub">Input {{ total.input_tokens|default:0|floatformat:0 }} · Output {{ total.output_tokens|default:0|floatformat:0 }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">총 비용</div>
+    <div class="stat-value">{{ total.total_cost|default:0|floatformat:0 }} 원</div>
+    <div class="stat-sub">{{ total.count|default:0 }} 회</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">일 평균 토큰</div>
+    <div class="stat-value">{{ avg_daily_tokens|floatformat:0 }}</div>
+    <div class="stat-sub">토큰/일</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">일 평균 비용</div>
+    <div class="stat-value">{{ avg_daily_cost|floatformat:0 }} 원</div>
+    <div class="stat-sub">비용/일</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">다음달 예상 토큰</div>
+    <div class="stat-value">{{ forecast_next_month_tokens|floatformat:0 }}</div>
+    <div class="stat-sub">예상치</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">다음달 예상 비용</div>
+    <div class="stat-value">{{ forecast_next_month_cost|floatformat:0 }} 원</div>
+    <div class="stat-sub">예상치</div>
   </div>
 </div>
 
-<!-- 그래프 -->
+<div class="insight-grid">
+  <div class="insight-card">
+    <div class="insight-title">피크 사용일</div>
+    <div class="insight-value">{{ peak_day_label }}</div>
+    <div class="insight-sub">{{ peak_day_tokens|floatformat:0 }} 토큰</div>
+  </div>
+  <div class="insight-card">
+    <div class="insight-title">콜당 평균</div>
+    <div class="insight-value">{{ avg_tokens_per_call|floatformat:0 }} 토큰</div>
+    <div class="insight-sub">{{ avg_cost_per_call|floatformat:0 }} 원</div>
+  </div>
+</div>
+
 <div class="grid-2 mt-20">
-  <div class="card">
-    <h3 class="card-title">📈 일자별 비용 (최근 14일)</h3>
+  <div class="card data-panel chart-card">
+    <h3 class="card-title">일자별 토큰</h3>
+    <canvas id="dailyTokenChart"></canvas>
+  </div>
+
+  <div class="card data-panel chart-card">
+    <h3 class="card-title">일자별 비용</h3>
     <canvas id="dailyCostChart"></canvas>
   </div>
-
-  <div class="card">
-    <h3 class="card-title">📊 모델별 비용</h3>
-    <canvas id="modelCostChart"></canvas>
-  </div>
 </div>
 
-<hr>
-
-<!-- 모델별 테이블 -->
-<h2>🧠 모델별 사용량</h2>
-<table class="default-table">
-  <thead>
-    <tr>
-      <th>모델</th>
-      <th>호출 수</th>
-      <th>토큰</th>
-      <th>비용 (원)</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in by_model %}
-    <tr>
-      <td>{{ row.model }}</td>
-      <td>{{ row.count }}</td>
-      <td>{{ row.total_tokens }}</td>
-      <td>{{ row.total_cost|floatformat:0 }}</td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="4">데이터 없음</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-<hr>
-
-<!-- 유저별 테이블 -->
-<h2>👤 직원별 사용량</h2>
-<table class="default-table">
-  <thead>
-    <tr>
-      <th>유저</th>
-      <th>호출 수</th>
-      <th>토큰</th>
-      <th>비용 (원)</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in by_user %}
-    <tr>
-      <td>{{ row.user__username }}</td>
-      <td>{{ row.count }}</td>
-      <td>{{ row.total_tokens }}</td>
-      <td>{{ row.total_cost|floatformat:0 }}</td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="4">데이터 없음</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-<!-- 🔥 그래프 데이터 전달 (JS로) -->
 <script>
   window.LLM_USAGE_DATA = {
     dailyLabels: {{ daily_labels|safe }},
     dailyCosts: {{ daily_costs|safe }},
-    modelLabels: {{ model_labels|safe }},
-    modelCosts: {{ model_costs|safe }},
+    dailyTotalTokens: {{ daily_total_tokens|safe }},
+    dailyInputTokens: {{ daily_input_tokens|safe }},
+    dailyOutputTokens: {{ daily_output_tokens|safe }},
   };
 </script>
 {% endblock %}
 
 {% block extra_js %}
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<!-- 분리된 JS -->
 <script src="{% static 'dashboard/js/Chart.js' %}"></script>
 {% endblock %}

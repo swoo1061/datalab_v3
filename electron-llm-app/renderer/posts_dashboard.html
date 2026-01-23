@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="css/header.css" />
   <link rel="stylesheet" href="css/posts_dashboard.css" />
 </head>
-<body>
+<body class="theme-vivid">
 
 <div class="app-root">
   <div class="app-sidebar-slot" id="appSidebar"></div>
@@ -29,46 +29,56 @@
         <section class="post-toolbar card">
           <div class="toolbar-left">
             <select id="postClinicSelect" class="select"></select>
-            <input type="month" id="postMonth" class="month-input" />
-            <input id="postSearch" class="input" placeholder="제목 검색 (Enter)" />
+            <div class="month-nav" id="postMonthNav">
+              <button class="month-btn" id="postMonthPrev" type="button">◀</button>
+              <div class="month-label" id="postMonthLabel">-</div>
+              <button class="month-btn" id="postMonthNext" type="button">▶</button>
+            </div>
+            <input type="month" id="postMonth" class="month-input hidden" />
+            <button class="toolbar-btn" id="toggleFiltersBtn">플랫폼</button>
+            <section class="post-filters-panel card hidden" id="postFiltersPanel">
+              <div class="filter-grid">
+                <div class="filter-field">
+      
+                  <div class="platform-pills" id="postPlatformPills"></div>
+                </div>
+              </div>
+            </section>
           </div>
           <div class="toolbar-right">
-            <button class="toolbar-btn" id="toggleFiltersBtn">필터 열기</button>
             <div class="summary-chip">
-              <span>여론</span>
+              <span>총 여론</span>
+              <strong id="opinionTotalCount">0</strong>
+            </div>
+            <div class="summary-chip">
+              <span>총 후기</span>
+              <strong id="reviewTotalCount">0</strong>
+            </div>
+            <div class="summary-chip">
+              <span>월 여론</span>
               <strong id="opinionCount">0</strong>
             </div>
             <div class="summary-chip">
-              <span>후기</span>
+              <span>월 후기</span>
               <strong id="reviewCount">0</strong>
-            </div>
-          </div>
-        </section>
-
-        <section class="post-filters-panel card hidden" id="postFiltersPanel">
-          <div class="filter-grid">
-            <div class="filter-field">
-              <label>구분</label>
-              <div class="type-pills" id="postTypePills">
-                <button class="type-pill active" data-type="all">전체</button>
-                <button class="type-pill" data-type="opinion">여론</button>
-                <button class="type-pill" data-type="review">후기</button>
-              </div>
-            </div>
-            <div class="filter-field">
-              <label>플랫폼</label>
-              <div class="platform-pills" id="postPlatformPills"></div>
             </div>
           </div>
         </section>
 
         <section class="post-table card">
           <div class="card-hd post-table-head">
-            <span>게시글 리스트</span>
+            <div class="table-title">
+              <span>게시글 리스트</span>
+              <div class="type-pills" id="postTypePills">
+                <button class="type-pill active" data-type="opinion">여론</button>
+                <button class="type-pill" data-type="review">후기</button>
+              </div>
+              <input id="postSearch" class="input post-search" placeholder="제목 검색 (Enter)" />
+            </div>
             <div class="table-actions">
               <button class="table-edit" id="postEditAllBtn">수정</button>
-              <button class="table-delete" id="postDeleteSelectedBtn" disabled>삭제</button>
-              <button class="table-save hidden" id="postSaveAllBtn">전체 저장</button>
+              <button class="table-save hidden" id="postSaveAllBtn">저장</button>
+              <button class="table-delete hidden" id="postDeleteSelectedBtn" disabled>삭제</button>
               <button class="table-cancel hidden" id="postCancelAllBtn">취소</button>
             </div>
           </div>
@@ -101,5 +111,18 @@
     await loadHeader("게시글 관리");
   })();
 </script>
+<div id="postPhotoModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card photo-modal">
+    <div class="modal-head">
+      <div class="modal-title">사진 보기</div>
+      <button class="modal-close" data-close="true">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div id="postPhotoList" class="photo-list"></div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

@@ -110,6 +110,45 @@
   box-shadow: 0 8px 18px rgba(99, 102, 241, 0.12);
 }
 
+.metrics-detail .month-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 8px 18px rgba(99, 102, 241, 0.12);
+}
+
+.metrics-detail .month-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #eef2ff 0%, #ffffff 100%);
+  font-size: 13px;
+  color: #4f46e5;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+}
+
+.metrics-detail .month-btn:hover {
+  background: linear-gradient(180deg, #dbeafe 0%, #ffffff 100%);
+}
+
+.metrics-detail .month-label {
+  min-width: 72px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+}
+
 
 .type-pills {
   display: flex;

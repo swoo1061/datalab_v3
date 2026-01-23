@@ -12,6 +12,8 @@ urlpatterns = [
 
     # LLM 사용량 통계
     path("usage/", views.llm_usage_dashboard, name="llm_usage"),
+    path("usage/users/", views.llm_usage_users, name="llm_usage_users"),
+    path("usage/models/", views.llm_usage_models, name="llm_usage_models"),
 
     # LLM 사용량 Export
     path("usage/export/csv/", views.export_llm_usage_csv, name="export_llm_usage_csv"),

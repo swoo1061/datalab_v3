@@ -36,6 +36,20 @@ async function loadHeader(pageTitle = "") {
     headerRoot.innerHTML = await res.text();
   }
 
+  const themeCloseBtn = document.querySelector("#themeSettingsModal .popup-btn");
+  if (themeCloseBtn) {
+    themeCloseBtn.textContent = "←";
+    themeCloseBtn.setAttribute("aria-label", "뒤로가기");
+    themeCloseBtn.classList.add("theme-back-btn");
+  }
+
+  const infoCloseBtn = document.querySelector("#profileInfoModal .popup-btn");
+  if (infoCloseBtn) {
+    infoCloseBtn.textContent = "←";
+    infoCloseBtn.setAttribute("aria-label", "뒤로가기");
+    infoCloseBtn.classList.add("info-back-btn");
+  }
+
   // ----------------
   // 페이지 타이틀
   // ----------------
@@ -52,6 +66,14 @@ async function loadHeader(pageTitle = "") {
     console.warn("getMe failed");
     return;
   }
+
+  const userKey = me?.id ? `user:${me.id}` : `user:${me?.username || me?.email || "unknown"}`;
+  localStorage.setItem("currentUserKey", userKey);
+  window.migrateUserStorage?.("themePrimary");
+  window.migrateUserStorage?.("themeAccent");
+  window.migrateUserStorage?.("appTheme");
+  window.migrateUserStorage?.("themePresets");
+  window.applyCustomThemeVars?.();
 
   const name = me?.name || me?.username || "사용자";
   const rawPosition = me?.position || "";
@@ -83,6 +105,7 @@ async function loadHeader(pageTitle = "") {
   bindGlobalSearch();
   startLiveClock();
   bindNotifications();
+  bindThemeSettingsModal();
 }
 
 // ================================
@@ -106,7 +129,7 @@ function bindProfileMenu() {
     item.onclick = () => {
       const action = item.dataset.action;
       if (action === "profile") openProfileInfo();
-      if (action === "attendance") alert("출퇴근 기록 준비중");
+      if (action === "attendance") window.showAlert?.("출퇴근 기록 준비중");
       if (action === "my_dashboard") window.nav.go("my_dashboard");
     };
   });
@@ -115,17 +138,211 @@ function bindProfileMenu() {
 function applyTheme(theme) {
   const nextTheme = theme || "classic";
   document.body.dataset.theme = nextTheme;
-  localStorage.setItem("appTheme", nextTheme);
+  if (window.writeUserStorage) window.writeUserStorage("appTheme", nextTheme);
+  else localStorage.setItem("appTheme", nextTheme);
   document.querySelectorAll(".theme-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.theme === nextTheme);
   });
 }
 
 function bindThemeSelector() {
-  const saved = localStorage.getItem("appTheme") || "classic";
-  applyTheme(saved);
+  const saved = window.readUserStorage
+    ? window.readUserStorage("appTheme")
+    : localStorage.getItem("appTheme");
+  const resolved = saved || "classic";
+  applyTheme(resolved);
   document.querySelectorAll(".theme-btn").forEach((btn) => {
     btn.addEventListener("click", () => applyTheme(btn.dataset.theme));
+  });
+}
+
+let activePresetId = null;
+
+function loadThemePresets() {
+  try {
+    const stored = window.readUserStorage
+      ? window.readUserStorage("themePresets")
+      : localStorage.getItem("themePresets");
+    return JSON.parse(stored || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveThemePresets(list) {
+  if (window.writeUserStorage) window.writeUserStorage("themePresets", JSON.stringify(list));
+  else localStorage.setItem("themePresets", JSON.stringify(list));
+}
+
+function openThemeSettings() {
+  const modal = document.getElementById("themeSettingsModal");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  const primary = window.readUserStorage
+    ? window.readUserStorage("themePrimary") || "#4f46e5"
+    : localStorage.getItem("themePrimary") || "#4f46e5";
+  const accent = window.readUserStorage
+    ? window.readUserStorage("themeAccent") || "#0e7490"
+    : localStorage.getItem("themeAccent") || "#0e7490";
+  const primaryInput = document.getElementById("themePrimaryInput");
+  const accentInput = document.getElementById("themeAccentInput");
+  const nameInput = document.getElementById("themeCustomName");
+  if (primaryInput) primaryInput.value = primary;
+  if (accentInput) accentInput.value = accent;
+  if (nameInput) nameInput.value = "";
+}
+
+function closeThemeSettings() {
+  document.getElementById("themeSettingsModal")?.classList.add("hidden");
+}
+
+function openThemePresets() {
+  const modal = document.getElementById("themePresetModal");
+  if (!modal) return;
+  activePresetId = null;
+  modal.classList.remove("hidden");
+  const nameInput = document.getElementById("themePresetName");
+  const updateBtn = document.getElementById("themePresetUpdateBtn");
+  if (nameInput) nameInput.value = "";
+  if (updateBtn) updateBtn.classList.add("hidden");
+  renderThemePresets();
+}
+
+function closeThemePresets() {
+  document.getElementById("themePresetModal")?.classList.add("hidden");
+}
+
+function renderThemePresets() {
+  const listEl = document.getElementById("themePresetList");
+  if (!listEl) return;
+  const presets = loadThemePresets();
+  listEl.innerHTML = presets.map((preset) => `
+    <div class="preset-item" data-id="${preset.id}">
+      <div class="preset-info">
+        <div class="preset-swatches">
+          <span class="preset-swatch" style="background:${preset.primary}"></span>
+          <span class="preset-swatch" style="background:${preset.accent}"></span>
+        </div>
+        <div class="preset-name">${preset.name}</div>
+      </div>
+      <div class="preset-actions">
+        <button class="apply" data-action="apply">적용</button>
+        <button data-action="edit">수정</button>
+        <button data-action="delete">삭제</button>
+      </div>
+    </div>
+  `).join("");
+
+  listEl.querySelectorAll(".preset-item").forEach((item) => {
+    const presetId = item.dataset.id;
+    const preset = presets.find((p) => String(p.id) === String(presetId));
+    if (!preset) return;
+    item.querySelectorAll("button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const action = btn.dataset.action;
+        if (action === "apply") {
+          window.setCustomThemeColors?.(preset.primary, preset.accent);
+          const primaryInput = document.getElementById("themePrimaryInput");
+          const accentInput = document.getElementById("themeAccentInput");
+          if (primaryInput) primaryInput.value = preset.primary;
+          if (accentInput) accentInput.value = preset.accent;
+          return;
+        }
+        if (action === "edit") {
+          activePresetId = preset.id;
+          const primaryInput = document.getElementById("themePrimaryInput");
+          const accentInput = document.getElementById("themeAccentInput");
+          const nameInput = document.getElementById("themePresetName");
+          const updateBtn = document.getElementById("themePresetUpdateBtn");
+          if (primaryInput) primaryInput.value = preset.primary;
+          if (accentInput) accentInput.value = preset.accent;
+          if (nameInput) nameInput.value = preset.name;
+          if (updateBtn) updateBtn.classList.remove("hidden");
+          return;
+        }
+        if (action === "delete") {
+          const next = presets.filter((p) => String(p.id) !== String(presetId));
+          saveThemePresets(next);
+          renderThemePresets();
+        }
+      });
+    });
+  });
+}
+
+function bindThemeSettingsModal() {
+  const openBtn = document.getElementById("themeSettingsBtn");
+  const manageBtn = document.getElementById("themePresetManageBtn");
+  const resetBtn = document.getElementById("themeColorsResetBtn");
+  const createBtn = document.getElementById("themePresetCreateBtn");
+  const updateBtn = document.getElementById("themePresetUpdateBtn");
+  const primaryInput = document.getElementById("themePrimaryInput");
+  const accentInput = document.getElementById("themeAccentInput");
+  const nameInput = document.getElementById("themeCustomName");
+
+  openBtn?.addEventListener("click", () => {
+    closeProfilePopup();
+    openThemeSettings();
+  });
+
+  resetBtn?.addEventListener("click", () => {
+    window.resetCustomThemeColors?.();
+    if (primaryInput) primaryInput.value = "#4f46e5";
+    if (accentInput) accentInput.value = "#0e7490";
+  });
+
+  manageBtn?.addEventListener("click", () => {
+    openThemePresets();
+  });
+
+  const applyCustom = () => {
+    const primary = primaryInput?.value;
+    const accent = accentInput?.value;
+    window.setCustomThemeColors?.(primary, accent);
+  };
+
+  primaryInput?.addEventListener("input", applyCustom);
+  accentInput?.addEventListener("input", applyCustom);
+
+  createBtn?.addEventListener("click", () => {
+    const name = nameInput?.value?.trim();
+    if (!name) {
+      window.showAlert?.("프리셋 이름을 입력해 주세요.");
+      return;
+    }
+    const presets = loadThemePresets();
+    presets.push({
+      id: Date.now(),
+      name,
+      primary: primaryInput?.value || "#4f46e5",
+      accent: accentInput?.value || "#0e7490",
+    });
+    saveThemePresets(presets);
+    if (nameInput) nameInput.value = "";
+  });
+
+  updateBtn?.addEventListener("click", () => {
+    if (!activePresetId) return;
+    const name = document.getElementById("themePresetName")?.value?.trim();
+    if (!name) {
+      window.showAlert?.("프리셋 이름을 입력해 주세요.");
+      return;
+    }
+    const presets = loadThemePresets();
+    const target = presets.find((preset) => String(preset.id) === String(activePresetId));
+    if (!target) return;
+    target.name = name;
+    target.primary = primaryInput?.value || target.primary;
+    target.accent = accentInput?.value || target.accent;
+    saveThemePresets(presets);
+    activePresetId = null;
+    renderThemePresets();
+    const save = document.getElementById("themePresetSaveBtn");
+    const update = document.getElementById("themePresetUpdateBtn");
+    if (save) save.classList.remove("hidden");
+    if (update) update.classList.add("hidden");
+    const nameInput = document.getElementById("themePresetName");
+    if (nameInput) nameInput.value = "";
   });
 }
 
@@ -193,7 +410,7 @@ function bindGlobalSearch() {
       return;
     }
 
-    alert("검색 결과가 없습니다");
+    window.showAlert?.("검색 결과가 없습니다");
   });
 }
 
@@ -455,6 +672,8 @@ function startLiveClock() {
 window.loadHeader = loadHeader;
 window.toggleProfile = toggleProfile;
 window.closeProfilePopup = closeProfilePopup;
+window.closeThemeSettings = closeThemeSettings;
+window.closeThemePresets = closeThemePresets;
 window.logout = logout;
 window.openProfileInfo = openProfileInfo;
 window.closeProfileInfo = closeProfileInfo;

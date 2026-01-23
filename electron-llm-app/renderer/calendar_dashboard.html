@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="css/schedule.css" />
   <link rel="stylesheet" href="css/calendar_dashboard.css" />
 </head>
-<body>
+<body class="theme-vivid">
 
 <div class="app-root">
   <div class="app-sidebar-slot" id="appSidebar"></div>
@@ -22,7 +22,7 @@
       <section class="page-canvas">
         <header class="page-head">
           <h1 class="h1">캘린더 대시보드</h1>
-          <p class="sub">병원별 작업 캘린더를 한 화면에서 관리합니다.</p>
+          <p class="sub">병원별 캘린더를 한 화면에서 관리합니다.</p>
         </header>
 
         
@@ -45,7 +45,12 @@
                       </div>
                       <div class="filter-field">
                         <!-- <label>월</label> -->
-                        <input type="month" id="calendarMonth" class="month-input" />
+                        <div class="month-nav" id="calendarMonthNav">
+                          <button class="month-btn" id="calendarMonthPrev" type="button">◀</button>
+                          <div class="month-label" id="calendarMonthLabel">-</div>
+                          <button class="month-btn" id="calendarMonthNext" type="button">▶</button>
+                        </div>
+                        <input type="month" id="calendarMonth" class="month-input hidden" />
                       </div>
                     </div>
                   </div>
@@ -120,6 +125,7 @@
           <select id="calendarEditSubtype" class="select">
             <option value="text">텍스트</option>
             <option value="photo">사진</option>
+            <option value="consultation">상담</option>
           </select>
         </div>
         <div class="ai-field">

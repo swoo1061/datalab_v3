@@ -414,7 +414,7 @@ class ClinicPostListCreateView(APIView):
         if post_type not in ["opinion", "review"]:
             return Response({"message": "type must be opinion|review"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if post_type == "review" and review_subtype not in ["text", "photo"]:
+        if post_type == "review" and review_subtype not in ["text", "photo", "consultation"]:
             _, review_subtype = _fallback_classify_post(title, platform)
 
         assignee_id = payload.get("assignee") or request.user.id
@@ -531,7 +531,7 @@ class ClinicPostDetailView(APIView):
                     post.review_subtype = None
                     updated_fields.append("review_subtype")
             else:
-                if review_subtype not in ["text", "photo"]:
+                if review_subtype not in ["text", "photo", "consultation"]:
                     _, review_subtype = _fallback_classify_post(post.title, post.platform)
                 if post.review_subtype != review_subtype:
                     post.review_subtype = review_subtype

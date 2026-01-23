@@ -32,12 +32,12 @@ async function signup() {
   console.log("SIGNUP PAYLOAD:", payload); // 디버깅용 로그
 
   if (!payload.name || !payload.email || !payload.username || !payload.password) {
-    alert("모든 항목을 입력하세요.");
+    window.showAlert?.("모든 항목을 입력하세요.");
     return;
   }
 
   if (!payload.position) {
-    alert("직급을 선택하세요.");
+    window.showAlert?.("직급을 선택하세요.");
     return;
   }
 
@@ -51,7 +51,7 @@ async function signup() {
     const data = await res.json();
 
     if (!res.ok) {
-      alert(data.error || "회원가입 실패");
+      window.showAlert?.(data.error || "회원가입 실패");
       return;
     }
 
@@ -64,7 +64,7 @@ async function signup() {
 
   } catch (e) {
     console.error(e); // 디버깅용 로그
-    alert("회원가입 중 오류 발생");
+    window.showAlert?.("회원가입 중 오류 발생");
   }
 }
 
