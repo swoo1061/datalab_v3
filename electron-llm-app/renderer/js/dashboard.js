@@ -17,6 +17,9 @@ function goClinicGuide(clinicId) {
 }
 
 function goClinicPage(clinicId) {
+  if (clinicId) {
+    localStorage.setItem("lastClinicId", String(clinicId));
+  }
   window.location.href = `clinic_page.html?clinic_id=${encodeURIComponent(clinicId)}`;
 }
 

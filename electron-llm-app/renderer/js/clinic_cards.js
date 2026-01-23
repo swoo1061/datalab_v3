@@ -77,8 +77,11 @@ function goClinicGuide(event, clinicId) {
 }
 
 function goClinicPage(event, clinicId) {
-  event?.stopPropagation();
-  navigate(`clinic_page?clinic_id=${encodeURIComponent(clinicId)}`);
+  event?.stopPropagation?.();
+  const resolvedId = clinicId ?? event;
+  if (!resolvedId) return;
+  localStorage.setItem("lastClinicId", String(resolvedId));
+  navigate(`clinic_page?clinic_id=${encodeURIComponent(resolvedId)}`);
 }
 
 function goPostsDashboard(event, clinicId) {
@@ -88,6 +91,15 @@ function goPostsDashboard(event, clinicId) {
     window.nav.go(`posts_dashboard?${query}`).catch(() => {});
   }
   window.location.href = `posts_dashboard.html?${query}`;
+}
+
+function goCalendarDashboard(event, clinicId) {
+  event?.stopPropagation();
+  const query = `clinic_id=${encodeURIComponent(clinicId)}`;
+  if (window.nav?.go) {
+    window.nav.go(`calendar_dashboard?${query}`).catch(() => {});
+  }
+  window.location.href = `calendar_dashboard.html?${query}`;
 }
 
 function getContractKey(clinicId) {
@@ -146,7 +158,7 @@ function renderClinics(list, gridId = "clinicGrid") {
     card.className = "clinic-card";
     card.addEventListener("click", (e) => {
       if (e.target.closest(".clinic-actions")) return;
-      goClinicPage(null, c.id);
+      goClinicPage(c.id);
     });
 
     card.innerHTML = `
@@ -192,6 +204,7 @@ function renderClinics(list, gridId = "clinicGrid") {
         <div class="more-menu">
           <button class="menu-item" data-action="guide" data-clinic-id="${c.id}">${stripClinicSuffix(c.name)} 가이드</button>
           <button class="menu-item" data-action="posts" data-clinic-id="${c.id}">게시글 대시보드</button>
+          <button class="menu-item" data-action="calendar" data-clinic-id="${c.id}">캘린더 대시보드</button>
           <div class="menu-row">
             <span>계약일</span>
             <input class="contract-input" type="date" data-clinic-id="${c.id}" />
@@ -231,6 +244,10 @@ function bindMoreMenuActions() {
       }
       if (action === "posts") {
         goPostsDashboard(event, clinicId);
+        return;
+      }
+      if (action === "calendar") {
+        goCalendarDashboard(event, clinicId);
       }
     });
   });
@@ -239,3 +256,4 @@ function bindMoreMenuActions() {
 // 전역 노출
 window.renderClinics = renderClinics;
 window.goPostsDashboard = goPostsDashboard;
+window.goCalendarDashboard = goCalendarDashboard;

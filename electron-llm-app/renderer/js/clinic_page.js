@@ -1,6 +1,7 @@
 console.log("clinic_page.js loaded");
 
 const API_BASE = window?.config?.apiBase || "http://127.0.0.1:8000";
+const LAST_CLINIC_KEY = "lastClinicId";
 
 // ================================
 // 상태
@@ -43,6 +44,21 @@ function getClinicIdFromQuery() {
   return new URLSearchParams(window.location.search).get("clinic_id");
 }
 
+function normalizeClinicId(raw) {
+  const value = String(raw || "").trim();
+  if (!value || value === "null" || value === "undefined") return null;
+  return value;
+}
+
+function rememberClinicId(clinicId) {
+  if (!clinicId) return;
+  localStorage.setItem(LAST_CLINIC_KEY, String(clinicId));
+}
+
+function getRememberedClinicId() {
+  return normalizeClinicId(localStorage.getItem(LAST_CLINIC_KEY));
+}
+
 function getThisMonth() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -66,11 +82,12 @@ function escapeHtml(str) {
 // 초기 로드
 // ================================
 async function initClinicPage() {
-  currentClinicId = getClinicIdFromQuery();
+  currentClinicId = normalizeClinicId(getClinicIdFromQuery()) || getRememberedClinicId();
   if (!currentClinicId) {
     window.showAlert?.("clinic_id 없음");
     return;
   }
+  rememberClinicId(currentClinicId);
 
   await loadClinicInfo();
 
@@ -82,6 +99,7 @@ async function initClinicPage() {
 // 병원 정보
 // ================================
 async function loadClinicInfo() {
+  if (!currentClinicId) return;
   const data = await window.api.getClinicDetail(currentClinicId);
   const c = data?.clinic || {};
 
@@ -590,6 +608,7 @@ function bindPostsDashboardLink() {
 // 게시글 로드
 // ================================
 async function loadPosts() {
+  if (!currentClinicId) return;
   const root = document.getElementById("postList");
   if (!root) return;
 
