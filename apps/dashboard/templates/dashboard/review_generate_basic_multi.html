@@ -240,6 +240,7 @@
             <input type="number" class="len-input" id="len_title" value="5" min="1" max="20" step="1" style="width:50px;">
             <span class="len-label">개</span>
           </div>
+          <hr style="border: none; border-top: 1px dashed var(--border); margin: 8px 0;">
           <div class="content-type-row">
             <input type="checkbox" id="ct_question" value="question" checked>
             <label for="ct_question">고민 & 질문</label>
@@ -265,24 +266,6 @@
             <span class="len-label">자</span>
           </div>
           <div class="content-type-row">
-            <input type="checkbox" id="ct_month1" value="month1" checked>
-            <label for="ct_month1">시술 후 1개월</label>
-            <input type="number" class="len-input" id="len_month1" value="600" min="100" max="2000" step="50">
-            <span class="len-label">자</span>
-          </div>
-          <div class="content-type-row">
-            <input type="checkbox" id="ct_month2" value="month2">
-            <label for="ct_month2">시술 후 2개월</label>
-            <input type="number" class="len-input" id="len_month2" value="600" min="100" max="2000" step="50">
-            <span class="len-label">자</span>
-          </div>
-          <div class="content-type-row">
-            <input type="checkbox" id="ct_month3" value="month3">
-            <label for="ct_month3">시술 후 3개월</label>
-            <input type="number" class="len-input" id="len_month3" value="500" min="100" max="2000" step="50">
-            <span class="len-label">자</span>
-          </div>
-          <div class="content-type-row">
             <input type="checkbox" id="ct_week1" value="week1">
             <label for="ct_week1">시술 후 1주일</label>
             <input type="number" class="len-input" id="len_week1" value="500" min="100" max="2000" step="50">
@@ -298,6 +281,24 @@
             <input type="checkbox" id="ct_week3" value="week3">
             <label for="ct_week3">시술 후 3주일</label>
             <input type="number" class="len-input" id="len_week3" value="500" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_month1" value="month1" checked>
+            <label for="ct_month1">시술 후 1개월</label>
+            <input type="number" class="len-input" id="len_month1" value="600" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_month2" value="month2">
+            <label for="ct_month2">시술 후 2개월</label>
+            <input type="number" class="len-input" id="len_month2" value="600" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_month3" value="month3">
+            <label for="ct_month3">시술 후 3개월</label>
+            <input type="number" class="len-input" id="len_month3" value="500" min="100" max="2000" step="50">
             <span class="len-label">자</span>
           </div>
         </div>
@@ -758,61 +759,17 @@ async function generateSeries() {
 
 function renderSeries(series) {
   const container = document.getElementById('seriesResult');
-
-  // 제목과 나머지 컨텐츠 분리
-  const titles = series.filter(s => s.type === 'title');
-  const contents = series.filter(s => s.type !== 'title');
-
-  let html = '';
-
-  // 제목 섹션 (있는 경우)
-  if (titles.length > 0) {
-    html += `<div class="series-item" style="background: var(--brand-bg); border: 2px solid var(--brand); border-radius: 12px;">
-      <div class="series-item-header">
-        <span class="series-item-type" style="color: var(--brand);">📝 추천 제목</span>
-      </div>
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        ${titles.map(t => {
-          const titleLines = t.content.split('\n').filter(line => line.trim());
-          return titleLines.map((line, idx) => `
-            <div class="title-option" onclick="copyTitle(this, '${escapeAttr(line)}')" data-title="${escapeAttr(line)}">
-              ${idx + 1}. ${line.replace(/^\d+[\.\)]\s*/, '')}
-            </div>
-          `).join('');
-        }).join('')}
-      </div>
-    </div>`;
-  }
-
-  // 나머지 컨텐츠
-  html += contents.map((s, i) => `
+  container.innerHTML = series.map((s, i) => {
+    const countLabel = s.type === 'title' ? '' : `<span class="series-item-count">${s.char_count}자</span>`;
+    return `
     <div class="series-item" data-index="${i}">
       <div class="series-item-header">
         <span class="series-item-type">${TYPE_NAMES[s.type] || s.type}</span>
-        <span class="series-item-count">${s.char_count}자</span>
+        ${countLabel}
       </div>
       <div class="series-item-content">${escapeHtml(s.content)}</div>
     </div>
-  `).join('');
-
-  container.innerHTML = html;
-}
-
-function copyTitle(el, title) {
-  // 이전 선택 해제
-  document.querySelectorAll('.title-option.selected').forEach(opt => opt.classList.remove('selected'));
-  // 현재 선택
-  el.classList.add('selected');
-  // 클립보드 복사
-  navigator.clipboard.writeText(title).then(() => {
-    const originalBg = el.style.background;
-    el.style.background = 'var(--success)';
-    el.style.color = 'white';
-    setTimeout(() => {
-      el.style.background = '';
-      el.style.color = '';
-    }, 500);
-  });
+  `}).join('');
 }
 
 function renderTitles(series) {
