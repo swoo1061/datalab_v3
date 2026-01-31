@@ -62,6 +62,24 @@
     margin-bottom: 12px;
     font-size: 1rem;
   }
+  .title-option {
+    padding: 10px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.95rem;
+  }
+  .title-option:hover {
+    background: var(--brand-bg);
+    border-color: var(--brand);
+  }
+  .title-option.selected {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
   .checkbox-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -342,6 +360,12 @@
       <div class="form-group">
         <label class="form-label">생성할 컨텐츠 선택 (체크 & 글자수 설정)</label>
         <div class="content-type-list">
+          <div class="content-type-row" style="background: var(--brand-bg);">
+            <input type="checkbox" id="ct-title" value="title">
+            <label for="ct-title">📝 제목 생성</label>
+            <input type="number" id="len-title" class="len-input" value="5" min="1" max="20" step="1" style="width:50px;">
+            <span class="len-label">개</span>
+          </div>
           <div class="content-type-row">
             <input type="checkbox" id="ct-question" value="question" checked>
             <label for="ct-question">고민 & 질문</label>
@@ -384,8 +408,26 @@
             <input type="number" id="len-month3" class="len-input" value="500" min="200" max="1500" step="50">
             <span class="len-label">자</span>
           </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct-week1" value="week1">
+            <label for="ct-week1">시술 후 1주일</label>
+            <input type="number" id="len-week1" class="len-input" value="500" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct-week2" value="week2">
+            <label for="ct-week2">시술 후 2주일</label>
+            <input type="number" id="len-week2" class="len-input" value="500" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct-week3" value="week3">
+            <label for="ct-week3">시술 후 3주일</label>
+            <input type="number" id="len-week3" class="len-input" value="500" min="200" max="1500" step="50">
+            <span class="len-label">자</span>
+          </div>
         </div>
-        <p class="form-hint">각 컨텐츠별 목표 글자수를 설정하세요 (권장: 400~600자)</p>
+        <p class="form-hint">각 컨텐츠별 목표 글자수를 설정하세요 (권장: 400~600자). 제목은 개수를 지정합니다.</p>
       </div>
 
       <div class="form-group">
@@ -438,6 +480,7 @@
               <div>
                 <label>연령대</label>
                 <select id="persona-age" class="form-select">
+                  <option value="미지정" selected>미지정</option>
                   <option value="">랜덤</option>
                   <option value="20대 초반">20대 초반</option>
                   <option value="20대 중후반">20대 중후반</option>
@@ -450,6 +493,7 @@
               <div>
                 <label>성별</label>
                 <select id="persona-gender" class="form-select">
+                  <option value="미지정" selected>미지정</option>
                   <option value="">랜덤</option>
                   <option value="여성">여성</option>
                   <option value="남성">남성</option>
@@ -458,6 +502,7 @@
               <div>
                 <label>직업</label>
                 <select id="persona-job" class="form-select">
+                  <option value="미지정" selected>미지정</option>
                   <option value="">랜덤</option>
                   <option value="직장인">직장인</option>
                   <option value="대학생">대학생</option>
@@ -470,6 +515,7 @@
               <div>
                 <label>성격</label>
                 <select id="persona-personality" class="form-select">
+                  <option value="미지정" selected>미지정</option>
                   <option value="">랜덤</option>
                   <option value="꼼꼼하고 신중한">꼼꼼/신중</option>
                   <option value="활발하고 수다스러운">활발/수다</option>
@@ -481,6 +527,7 @@
               <div>
                 <label>말투</label>
                 <select id="persona-tone" class="form-select">
+                  <option value="미지정" selected>미지정</option>
                   <option value="">랜덤</option>
                   <option value="친근한 반말">친근 반말</option>
                   <option value="정중한 존댓말">정중 존댓말</option>
@@ -492,6 +539,7 @@
               <div>
                 <label>시술 경험</label>
                 <select id="persona-exp" class="form-select">
+                  <option value="미지정" selected>미지정</option>
                   <option value="">랜덤</option>
                   <option value="완전 처음">완전 처음</option>
                   <option value="1~2번 해봄">1~2번</option>
@@ -1058,21 +1106,70 @@ function copyPrompt() {
 
 function formatSeriesOutput(series) {
   const typeNames = {
+    'title': '📝 제목',
     'question': '고민 & 질문',
     'research': '발품/손품',
     'consultation': '방문상담 후기',
     'day0': '시술 당일',
+    'week1': '1주일 후기',
+    'week2': '2주일 후기',
+    'week3': '3주일 후기',
     'month1': '1개월 후기',
     'month2': '2개월 후기',
     'month3': '3개월 후기',
   };
 
-  return series.map(item => `
+  // 제목과 나머지 컨텐츠 분리
+  const titles = series.filter(item => item.type === 'title');
+  const contents = series.filter(item => item.type !== 'title');
+
+  let html = '';
+
+  // 제목 섹션 (있는 경우)
+  if (titles.length > 0) {
+    html += `<div class="series-item" style="background: var(--brand-bg); border: 2px solid var(--brand);">
+      <div class="series-title" style="color: var(--brand);">📝 추천 제목</div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        ${titles.map(t => {
+          // 제목이 여러 줄이면 각 줄을 옵션으로 표시
+          const titleLines = t.content.split('\n').filter(line => line.trim());
+          return titleLines.map((line, idx) => `
+            <div class="title-option" onclick="selectTitle(this, '${line.replace(/'/g, "\\'")}')">
+              ${idx + 1}. ${line.replace(/^\d+[\.\)]\s*/, '')}
+            </div>
+          `).join('');
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  // 나머지 컨텐츠
+  html += contents.map(item => `
     <div class="series-item">
       <div class="series-title">${typeNames[item.type] || item.type} <span style="font-weight:400;color:var(--muted);font-size:0.85rem;">(${item.char_count || item.content.length}자)</span></div>
       <div>${item.content.replace(/\n/g, '<br>')}</div>
     </div>
   `).join('');
+
+  return html;
+}
+
+function selectTitle(el, title) {
+  // 이전 선택 해제
+  document.querySelectorAll('.title-option.selected').forEach(opt => opt.classList.remove('selected'));
+  // 현재 선택
+  el.classList.add('selected');
+  // 클립보드 복사
+  navigator.clipboard.writeText(title).then(() => {
+    // 간단한 피드백
+    const originalBg = el.style.background;
+    el.style.background = 'var(--success)';
+    el.style.color = 'white';
+    setTimeout(() => {
+      el.style.background = '';
+      el.style.color = '';
+    }, 500);
+  });
 }
 
 function copySeriesResult() {

@@ -316,6 +316,9 @@
         <a href="{% url 'dashboard:generate_review_basic_plus' %}" class="{% if 'basic_plus' in request.resolver_match.url_name %}active{% endif %}">
           ⚡ Basic+
         </a>
+        <a href="{% url 'dashboard:generate_review_basic_multi' %}" class="{% if 'basic_multi' in request.resolver_match.url_name %}active{% endif %}">
+          🔥 Basic Multi
+        </a>
         <a href="{% url 'dashboard:generate_review_pro' %}" class="{% if 'pro' in request.resolver_match.url_name or 'v2' in request.resolver_match.url_name %}active{% endif %}">
           🚀 PRO
         </a>
@@ -343,6 +346,9 @@
         </a>
 
         <div class="nav-section">데이터 관리</div>
+        <a href="{% url 'dashboard:procedure_list' %}" class="{% if 'procedure' in request.resolver_match.url_name %}active{% endif %}">
+          💉 시술 정보 DB
+        </a>
         <a href="{% url 'dashboard:clinic_list' %}" class="{% if 'clinic' in request.resolver_match.url_name %}active{% endif %}">
           🏥 병원 가이드
         </a>
@@ -356,6 +362,9 @@
         <div class="nav-section">시스템</div>
         <a href="{% url 'dashboard:prompt_template_list' %}" class="{% if 'prompt_template' in request.resolver_match.url_name %}active{% endif %}">
           📝 프롬프트 관리
+        </a>
+        <a href="{% url 'dashboard:optimization_list' %}" class="{% if 'optimization' in request.resolver_match.url_name %}active{% endif %}">
+          🔄 프롬프트 최적화
         </a>
         <a href="{% url 'dashboard:server_settings' %}" class="{% if 'server' in request.resolver_match.url_name %}active{% endif %}">
           ⚙️ 서버 설정

@@ -1,0 +1,1042 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}{{ session.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .tab {
+    padding: 12px 20px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-size: 0.95rem;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--brand);
+    border-bottom-color: var(--brand);
+    font-weight: 600;
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .score-cards {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .score-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .score-card .score {
+    font-size: 2rem;
+    font-weight: 700;
+  }
+  .score-card .label {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .score-good { color: var(--success); }
+  .score-warning { color: var(--warning); }
+  .score-bad { color: var(--danger); }
+
+  .progress-container {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .progress-bar {
+    height: 12px;
+    background: var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(135deg, var(--brand) 0%, #7c3aed 100%);
+    border-radius: 6px;
+    transition: width 0.3s;
+  }
+
+  .sample-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  .sample-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .sample-card .sample-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .sample-card .sample-content {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    max-height: 150px;
+    overflow: hidden;
+    position: relative;
+  }
+  .sample-card .sample-content::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: linear-gradient(transparent, var(--surface));
+  }
+
+  .diff-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .diff-pane {
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .diff-pane h4 {
+    margin-bottom: 12px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+  }
+  .diff-pane pre {
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .chart-container {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .log-list {
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  .log-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .log-item:last-child { border-bottom: none; }
+  .log-item .log-type {
+    width: 80px;
+    flex-shrink: 0;
+  }
+  .log-item .log-message { flex: 1; }
+  .log-item .log-time {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .round-selector {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .round-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .round-btn.active {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
+  .round-btn:hover:not(.active) {
+    background: var(--bg);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ session.name }}</h1>
+    <p class="page-subtitle">
+      {% if session.procedure %}{{ session.procedure.name }} · {% endif %}
+      R{{ session.current_round }}/{{ session.target_rounds }} ·
+      <span class="tag {% if session.status == 'in_progress' %}tag-warning{% elif session.status == 'completed' %}tag-success{% else %}tag-muted{% endif %}">{{ session.get_status_display }}</span>
+    </p>
+  </div>
+  <div class="flex gap-2">
+    <a href="{% url 'dashboard:optimization_session_auto' pk=session.id %}" class="btn btn-primary">자동 모드</a>
+    <button class="btn btn-secondary" onclick="exportSession()">내보내기</button>
+    <a href="{% url 'dashboard:optimization_list' %}" class="btn btn-ghost">목록</a>
+  </div>
+</div>
+
+<!-- 탭 메뉴 -->
+<div class="tabs">
+  <button class="tab active" data-tab="settings">설정</button>
+  <button class="tab" data-tab="generate">생성</button>
+  <button class="tab" data-tab="analysis">분석</button>
+  <button class="tab" data-tab="improve">개선</button>
+  <button class="tab" data-tab="compare">비교</button>
+  <button class="tab" data-tab="logs">로그</button>
+</div>
+
+<!-- 탭 1: 설정 -->
+<div id="tab-settings" class="tab-content active">
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">세션 설정</span>
+      </div>
+      <table style="width: 100%;">
+        <tr><td class="text-muted" style="width: 120px;">세션명</td><td>{{ session.name }}</td></tr>
+        <tr><td class="text-muted">시술</td><td>{{ session.procedure.name|default:"-" }}</td></tr>
+        <tr><td class="text-muted">템플릿</td><td>{{ session.base_prompt_template.name|default:"기본 프롬프트" }}</td></tr>
+        <tr><td class="text-muted">샘플/라운드</td><td>{{ session.samples_per_round }}개</td></tr>
+        <tr><td class="text-muted">목표 라운드</td><td>{{ session.target_rounds }}회</td></tr>
+        <tr><td class="text-muted">실행 모드</td><td>{{ session.get_mode_display }}</td></tr>
+        <tr><td class="text-muted">생성 모델</td><td>{{ session.model_used }}</td></tr>
+        <tr><td class="text-muted">분석 모델</td><td>{{ session.analysis_model }}</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">현재 프롬프트</span>
+      </div>
+      <div id="current-prompt" style="background: var(--bg); border-radius: 8px; padding: 16px; max-height: 300px; overflow-y: auto;">
+        <pre style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6;">{% if current_round %}{{ current_round.prompt_content }}{% elif session.base_prompt_template %}{{ session.base_prompt_template.content }}{% else %}아직 라운드가 시작되지 않았습니다.{% endif %}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+      <span class="card-title">사용자 입력</span>
+    </div>
+    <div style="background: var(--bg); border-radius: 8px; padding: 16px;">
+      <pre style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6;">{{ session.user_input|default:"(없음)" }}</pre>
+    </div>
+  </div>
+</div>
+
+<!-- 탭 2: 생성 -->
+<div id="tab-generate" class="tab-content">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">샘플 생성</span>
+      <div class="flex gap-2">
+        <button class="btn btn-primary" id="btn-start-round" onclick="startRound()">라운드 시작</button>
+        <button class="btn btn-secondary" id="btn-generate" onclick="generateSamples()" disabled>생성 시작</button>
+        <button class="btn btn-ghost" id="btn-stop" onclick="stopGeneration()" disabled>중지</button>
+      </div>
+    </div>
+
+    <div class="progress-container">
+      <div class="flex justify-between items-center mb-4">
+        <div class="flex items-center gap-2">
+          <div id="progress-spinner" class="spinner" style="width: 20px; height: 20px; display: none;"></div>
+          <span id="progress-status">대기 중</span>
+        </div>
+        <span id="progress-count">0/{{ session.samples_per_round }}</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
+      </div>
+      <div id="progress-detail" class="text-sm text-muted" style="margin-top: 8px; display: none;">
+        API 호출 중... 잠시 기다려주세요.
+      </div>
+    </div>
+
+    <div class="sample-grid" id="sample-grid">
+      <!-- 샘플들이 여기에 추가됨 -->
+    </div>
+  </div>
+</div>
+
+<!-- 탭 3: 분석 -->
+<div id="tab-analysis" class="tab-content">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">분석 결과</span>
+      <div class="flex gap-2 items-center">
+        <div id="analysis-spinner" class="spinner" style="width: 20px; height: 20px; display: none;"></div>
+        <span id="analysis-status" class="text-sm text-muted"></span>
+        <button class="btn btn-primary" id="btn-analyze" onclick="runAnalysis()">분석 실행</button>
+      </div>
+    </div>
+
+    <div class="score-cards" id="score-cards">
+      <div class="score-card">
+        <div class="score" id="score-ai">-</div>
+        <div class="label">AI 탐지 회피</div>
+      </div>
+      <div class="score-card">
+        <div class="score" id="score-natural">-</div>
+        <div class="label">자연스러움</div>
+      </div>
+      <div class="score-card">
+        <div class="score" id="score-diverse">-</div>
+        <div class="label">다양성</div>
+      </div>
+      <div class="score-card">
+        <div class="score" id="score-accurate">-</div>
+        <div class="label">정보 정확도</div>
+      </div>
+      <div class="score-card">
+        <div class="score" id="score-overall">-</div>
+        <div class="label">종합 점수</div>
+      </div>
+    </div>
+
+    <div id="analysis-detail" style="background: var(--bg); border-radius: 12px; padding: 20px;">
+      <h4 style="margin-bottom: 12px;">분석 피드백</h4>
+      <div id="analysis-feedback">샘플 생성 완료 후 '분석 실행' 버튼을 눌러주세요.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 탭 4: 개선 -->
+<div id="tab-improve" class="tab-content">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">프롬프트 개선 제안</span>
+      <div class="flex gap-2 items-center">
+        <div id="improve-spinner" class="spinner" style="width: 20px; height: 20px; display: none;"></div>
+        <span id="improve-status" class="text-sm text-muted"></span>
+        <button class="btn btn-secondary" id="btn-get-suggestions" onclick="getSuggestions()">제안 생성</button>
+        <button class="btn btn-primary" id="btn-approve" onclick="approvePrompt()">제안 승인</button>
+      </div>
+    </div>
+
+    <div class="diff-container">
+      <div class="diff-pane">
+        <h4>현재 프롬프트</h4>
+        <pre id="diff-current">{% if current_round %}{{ current_round.prompt_content }}{% else %}라운드를 시작해주세요.{% endif %}</pre>
+      </div>
+      <div class="diff-pane">
+        <h4>제안 프롬프트 <span id="suggested-status" class="text-sm text-muted"></span></h4>
+        <pre id="diff-suggested">분석 후 '제안 생성' 버튼을 눌러주세요.</pre>
+      </div>
+    </div>
+
+    <div style="margin-top: 20px;">
+      <div class="form-group">
+        <label class="form-label">프롬프트 직접 수정</label>
+        <textarea id="modified-prompt" class="form-textarea" rows="8" placeholder="제안된 프롬프트를 수정하거나 새 프롬프트를 입력하세요."></textarea>
+      </div>
+      <div class="flex gap-2 justify-end items-center">
+        <span id="approve-status" class="text-sm text-muted"></span>
+        <button class="btn btn-secondary" onclick="copyFromSuggested()">제안 복사</button>
+        <button class="btn btn-primary" id="btn-approve-modified" onclick="approveModified()">수정 후 승인</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 탭 5: 비교 -->
+<div id="tab-compare" class="tab-content">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">라운드별 점수 비교</span>
+      <button class="btn btn-secondary" onclick="loadComparison()">새로고침</button>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="comparison-chart" height="200"></canvas>
+    </div>
+
+    <div class="table-container">
+      <table id="comparison-table">
+        <thead>
+          <tr>
+            <th>라운드</th>
+            <th>AI탐지</th>
+            <th>자연스러움</th>
+            <th>다양성</th>
+            <th>정확도</th>
+            <th>종합</th>
+            <th>비용</th>
+            <th>변경사항</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rounds %}
+          <tr>
+            <td>R{{ r.round_number }}</td>
+            <td>{{ r.score_ai_detection|floatformat:1|default:"-" }}</td>
+            <td>{{ r.score_naturalness|floatformat:1|default:"-" }}</td>
+            <td>{{ r.score_diversity|floatformat:1|default:"-" }}</td>
+            <td>{{ r.score_accuracy|floatformat:1|default:"-" }}</td>
+            <td><strong>{{ r.score_overall|floatformat:1|default:"-" }}</strong></td>
+            <td>${{ r.cost_usd|floatformat:4 }}</td>
+            <td class="text-sm">{{ r.prompt_changes|truncatewords:10 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-center text-muted">아직 라운드가 없습니다.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 생성된 샘플 조회 -->
+  <div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+      <span class="card-title">생성된 리뷰 샘플</span>
+      <div class="flex gap-2">
+        <select id="sample-round-select" class="form-select" style="width: auto;" onchange="loadRoundSamples()">
+          <option value="">라운드 선택</option>
+          {% for r in rounds %}
+          <option value="{{ r.id }}">R{{ r.round_number }} ({{ r.generated_count }}개)</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="exportRoundSamples()">내보내기</button>
+      </div>
+    </div>
+    <div id="round-samples-container" style="max-height: 500px; overflow-y: auto;">
+      <div class="text-center text-muted" style="padding: 40px;">라운드를 선택하면 생성된 샘플을 확인할 수 있습니다.</div>
+    </div>
+  </div>
+
+  <!-- 최종 프롬프트 -->
+  {% if latest_approved_round %}
+  <div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+      <span class="card-title">최종 승인 프롬프트 (R{{ latest_approved_round.round_number }})</span>
+      <button class="btn btn-secondary btn-sm" onclick="copyFinalPrompt()">복사</button>
+    </div>
+    <div style="background: var(--bg); border-radius: 12px; padding: 16px; max-height: 300px; overflow-y: auto;">
+      <pre id="final-approved-prompt" style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6;">{{ latest_approved_round.approved_prompt }}</pre>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- 탭 6: 로그 -->
+<div id="tab-logs" class="tab-content">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">실행 로그</span>
+      <button class="btn btn-secondary" onclick="loadLogs()">새로고침</button>
+    </div>
+
+    <div class="log-list" id="log-list">
+      <div class="text-center text-muted" style="padding: 40px;">로그를 불러오는 중...</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const SESSION_ID = {{ session.id }};
+const SAMPLES_PER_ROUND = {{ session.samples_per_round }};
+let currentRoundId = {{ current_round.id|default:"null" }};
+let isGenerating = false;
+let generatedCount = 0;
+
+// 탭 전환
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+
+    // 탭별 초기화
+    if (tab.dataset.tab === 'compare') loadComparison();
+    if (tab.dataset.tab === 'logs') loadLogs();
+  });
+});
+
+// 라운드 시작
+async function startRound() {
+  document.getElementById('btn-start-round').disabled = true;
+  document.getElementById('progress-status').textContent = '라운드 시작 중...';
+  document.getElementById('progress-spinner').style.display = 'block';
+  document.getElementById('progress-detail').style.display = 'block';
+  document.getElementById('progress-detail').textContent = '새 라운드를 생성하고 있습니다...';
+
+  try {
+    const resp = await fetch(`/dashboard/api/optimization/sessions/${SESSION_ID}/start-round/`, {
+      method: 'POST',
+      headers: {'X-CSRFToken': '{{ csrf_token }}'}
+    });
+    const data = await resp.json();
+
+    document.getElementById('progress-spinner').style.display = 'none';
+
+    if (data.success) {
+      currentRoundId = data.round_id;
+      document.getElementById('btn-generate').disabled = false;
+      document.getElementById('progress-status').textContent = `라운드 ${data.round_number} 준비됨`;
+      document.getElementById('progress-detail').textContent = '\'생성 시작\' 버튼을 눌러 샘플 생성을 시작하세요.';
+    } else {
+      document.getElementById('progress-status').textContent = '오류';
+      document.getElementById('progress-detail').textContent = data.error || '라운드 시작 실패';
+      alert(data.error || '라운드 시작 실패');
+    }
+  } catch (e) {
+    document.getElementById('progress-spinner').style.display = 'none';
+    document.getElementById('progress-status').textContent = '오류';
+    document.getElementById('progress-detail').textContent = e.message;
+    alert('오류: ' + e.message);
+  }
+
+  document.getElementById('btn-start-round').disabled = false;
+}
+
+// 샘플 생성
+async function generateSamples() {
+  if (isGenerating) return;
+
+  isGenerating = true;
+  generatedCount = 0;
+
+  // 즉시 UI 피드백
+  document.getElementById('btn-generate').disabled = true;
+  document.getElementById('btn-start-round').disabled = true;
+  document.getElementById('btn-stop').disabled = false;
+  document.getElementById('sample-grid').innerHTML = '';
+  document.getElementById('progress-spinner').style.display = 'block';
+  document.getElementById('progress-status').textContent = '생성 시작 중...';
+  document.getElementById('progress-detail').style.display = 'block';
+  document.getElementById('progress-detail').textContent = '첫 번째 샘플 생성 중... (LLM 응답 대기)';
+
+  while (isGenerating && generatedCount < SAMPLES_PER_ROUND) {
+    try {
+      document.getElementById('progress-detail').textContent = `샘플 ${generatedCount + 1} 생성 중... (LLM 응답 대기)`;
+
+      console.log(`[생성] 샘플 ${generatedCount + 1} 요청 중...`);
+      const resp = await fetch(`/dashboard/api/optimization/sessions/${SESSION_ID}/generate-next/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}'}
+      });
+      console.log(`[생성] 응답 상태: ${resp.status}`);
+      const data = await resp.json();
+      console.log(`[생성] 응답 데이터:`, data);
+
+      if (data.success) {
+        generatedCount = data.generated_count;
+        updateProgress(generatedCount);
+        addSampleCard(data);
+
+        if (data.completed) {
+          isGenerating = false;
+          document.getElementById('progress-status').textContent = '생성 완료!';
+          document.getElementById('progress-spinner').style.display = 'none';
+          document.getElementById('progress-detail').textContent = '모든 샘플 생성이 완료되었습니다. 분석 탭에서 분석을 실행하세요.';
+          document.getElementById('btn-analyze').disabled = false;
+        }
+      } else {
+        document.getElementById('progress-detail').textContent = '오류: ' + (data.error || '생성 실패');
+        document.getElementById('progress-status').textContent = '오류 발생';
+        document.getElementById('progress-spinner').style.display = 'none';
+        alert(data.error || '생성 실패');
+        isGenerating = false;
+      }
+    } catch (e) {
+      console.error(e);
+      document.getElementById('progress-detail').textContent = '네트워크 오류: ' + e.message;
+      document.getElementById('progress-status').textContent = '오류 발생';
+      document.getElementById('progress-spinner').style.display = 'none';
+      isGenerating = false;
+    }
+  }
+
+  document.getElementById('btn-generate').disabled = false;
+  document.getElementById('btn-start-round').disabled = false;
+  document.getElementById('btn-stop').disabled = true;
+  if (!isGenerating && generatedCount < SAMPLES_PER_ROUND) {
+    document.getElementById('progress-spinner').style.display = 'none';
+  }
+}
+
+function stopGeneration() {
+  isGenerating = false;
+  document.getElementById('progress-status').textContent = '중지됨';
+  document.getElementById('progress-spinner').style.display = 'none';
+  document.getElementById('progress-detail').textContent = `${generatedCount}개 샘플에서 중지됨. 다시 시작하려면 '생성 시작' 버튼을 누르세요.`;
+}
+
+function updateProgress(count) {
+  const pct = (count / SAMPLES_PER_ROUND) * 100;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-count').textContent = `${count}/${SAMPLES_PER_ROUND}`;
+  document.getElementById('progress-status').textContent = `생성 중... (${count}/${SAMPLES_PER_ROUND})`;
+}
+
+function addSampleCard(data) {
+  const grid = document.getElementById('sample-grid');
+  const card = document.createElement('div');
+  card.className = 'sample-card';
+  card.innerHTML = `
+    <div class="sample-header">
+      <span class="tag tag-primary">#${data.sample_index}</span>
+    </div>
+    <div class="sample-content">${data.content_preview}</div>
+  `;
+  grid.appendChild(card);
+}
+
+// 분석 실행
+async function runAnalysis() {
+  if (!currentRoundId) {
+    alert('먼저 라운드를 시작하고 샘플을 생성해주세요.');
+    return;
+  }
+
+  // 로딩 표시
+  document.getElementById('btn-analyze').disabled = true;
+  document.getElementById('analysis-spinner').style.display = 'block';
+  document.getElementById('analysis-status').textContent = '분석 중... (30초~1분 소요)';
+  document.getElementById('analysis-feedback').innerHTML = '<div class="flex items-center gap-2"><div class="spinner" style="width: 16px; height: 16px;"></div> AI가 샘플들을 분석하고 있습니다...</div>';
+
+  try {
+    const resp = await fetch(`/dashboard/api/optimization/rounds/${currentRoundId}/analyze/`, {
+      method: 'POST',
+      headers: {'X-CSRFToken': '{{ csrf_token }}'}
+    });
+    const data = await resp.json();
+
+    document.getElementById('analysis-spinner').style.display = 'none';
+
+    if (data.success) {
+      document.getElementById('analysis-status').textContent = '분석 완료';
+      updateScores(data.scores);
+      document.getElementById('analysis-feedback').innerHTML = formatAnalysis(data.analysis);
+    } else {
+      document.getElementById('analysis-status').textContent = '오류 발생';
+      document.getElementById('analysis-feedback').textContent = data.error || '분석 실패';
+      alert(data.error || '분석 실패');
+    }
+  } catch (e) {
+    document.getElementById('analysis-spinner').style.display = 'none';
+    document.getElementById('analysis-status').textContent = '네트워크 오류';
+    document.getElementById('analysis-feedback').textContent = e.message;
+    alert('오류: ' + e.message);
+  }
+
+  document.getElementById('btn-analyze').disabled = false;
+}
+
+function updateScores(scores) {
+  const fields = ['ai_detection', 'naturalness', 'diversity', 'accuracy', 'overall'];
+  const ids = ['score-ai', 'score-natural', 'score-diverse', 'score-accurate', 'score-overall'];
+
+  fields.forEach((f, i) => {
+    const el = document.getElementById(ids[i]);
+    const val = scores[f];
+    if (val !== null && val !== undefined) {
+      el.textContent = val.toFixed(1);
+      el.className = 'score ' + (val >= 8 ? 'score-good' : val >= 6 ? 'score-warning' : 'score-bad');
+    }
+  });
+}
+
+function formatAnalysis(analysis) {
+  let html = '';
+  if (analysis.overall_feedback) {
+    html += `<p><strong>종합:</strong> ${analysis.overall_feedback}</p>`;
+  }
+  if (analysis.improvement_suggestions && analysis.improvement_suggestions.length) {
+    html += '<p><strong>개선 제안:</strong></p><ul>';
+    analysis.improvement_suggestions.forEach(s => {
+      html += `<li>${s}</li>`;
+    });
+    html += '</ul>';
+  }
+  return html || '분석 결과가 없습니다.';
+}
+
+// 제안 생성
+async function getSuggestions() {
+  if (!currentRoundId) {
+    alert('먼저 분석을 실행해주세요.');
+    return;
+  }
+
+  // 로딩 표시
+  document.getElementById('btn-get-suggestions').disabled = true;
+  document.getElementById('improve-spinner').style.display = 'block';
+  document.getElementById('improve-status').textContent = '제안 생성 중...';
+  document.getElementById('diff-suggested').textContent = 'AI가 개선된 프롬프트를 생성하고 있습니다...';
+
+  try {
+    const resp = await fetch(`/dashboard/api/optimization/rounds/${currentRoundId}/suggestions/`, {
+      method: 'POST',
+      headers: {'X-CSRFToken': '{{ csrf_token }}'}
+    });
+    const data = await resp.json();
+
+    document.getElementById('improve-spinner').style.display = 'none';
+    document.getElementById('btn-get-suggestions').disabled = false;
+
+    console.log('[제안] 응답:', data);
+    if (data.success) {
+      const suggestion = data.suggestion || {};
+      console.log('[제안] suggestion 객체:', suggestion);
+
+      // suggested_prompt가 없거나 에러가 있는 경우
+      if (suggestion.error) {
+        document.getElementById('diff-suggested').textContent = '파싱 실패: ' + (suggestion.raw || suggestion.error);
+        document.getElementById('improve-status').textContent = '파싱 오류';
+      } else if (suggestion.suggested_prompt) {
+        document.getElementById('diff-suggested').textContent = suggestion.suggested_prompt;
+        document.getElementById('modified-prompt').value = suggestion.suggested_prompt;
+        document.getElementById('improve-status').textContent = '제안 생성 완료';
+        document.getElementById('suggested-status').textContent = '(생성됨)';
+      } else {
+        // suggested_prompt가 없는 경우 - 전체 응답 표시
+        document.getElementById('diff-suggested').textContent = JSON.stringify(suggestion, null, 2);
+        document.getElementById('improve-status').textContent = '예상치 못한 응답 형식';
+      }
+    } else {
+      document.getElementById('improve-status').textContent = '오류 발생';
+      document.getElementById('diff-suggested').textContent = data.error || '제안 생성 실패';
+      alert(data.error || '제안 생성 실패');
+    }
+  } catch (e) {
+    document.getElementById('improve-spinner').style.display = 'none';
+    document.getElementById('btn-get-suggestions').disabled = false;
+    document.getElementById('improve-status').textContent = '네트워크 오류';
+    alert('오류: ' + e.message);
+  }
+}
+
+function copyFromSuggested() {
+  const suggested = document.getElementById('diff-suggested').textContent;
+  document.getElementById('modified-prompt').value = suggested;
+}
+
+// 승인
+async function approvePrompt() {
+  if (!currentRoundId) return;
+
+  document.getElementById('btn-approve').disabled = true;
+  document.getElementById('improve-spinner').style.display = 'block';
+  document.getElementById('improve-status').textContent = '승인 처리 중...';
+
+  try {
+    const resp = await fetch(`/dashboard/api/optimization/rounds/${currentRoundId}/approve/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({use_suggested: true})
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      document.getElementById('improve-status').textContent = '승인 완료! 페이지 새로고침 중...';
+      location.reload();
+    } else {
+      document.getElementById('improve-spinner').style.display = 'none';
+      document.getElementById('btn-approve').disabled = false;
+      document.getElementById('improve-status').textContent = '오류 발생';
+      alert(data.error || '승인 실패');
+    }
+  } catch (e) {
+    document.getElementById('improve-spinner').style.display = 'none';
+    document.getElementById('btn-approve').disabled = false;
+    document.getElementById('improve-status').textContent = '네트워크 오류';
+    alert('오류: ' + e.message);
+  }
+}
+
+async function approveModified() {
+  if (!currentRoundId) return;
+
+  const prompt = document.getElementById('modified-prompt').value.trim();
+  if (!prompt) {
+    alert('프롬프트를 입력해주세요.');
+    return;
+  }
+
+  document.getElementById('btn-approve-modified').disabled = true;
+  document.getElementById('approve-status').textContent = '승인 처리 중...';
+
+  try {
+    const resp = await fetch(`/dashboard/api/optimization/rounds/${currentRoundId}/modify/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({prompt: prompt})
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      document.getElementById('approve-status').textContent = '승인 완료! 페이지 새로고침 중...';
+      location.reload();
+    } else {
+      document.getElementById('btn-approve-modified').disabled = false;
+      document.getElementById('approve-status').textContent = '오류 발생';
+      alert(data.error || '승인 실패');
+    }
+  } catch (e) {
+    document.getElementById('btn-approve-modified').disabled = false;
+    document.getElementById('approve-status').textContent = '네트워크 오류';
+    alert('오류: ' + e.message);
+  }
+}
+
+// 비교 차트
+let comparisonChart = null;
+
+async function loadComparison() {
+  try {
+    const resp = await fetch(`/dashboard/api/optimization/sessions/${SESSION_ID}/compare/`);
+    const data = await resp.json();
+
+    if (data.comparison && data.comparison.length > 0) {
+      renderComparisonChart(data.comparison);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderComparisonChart(comparison) {
+  const ctx = document.getElementById('comparison-chart').getContext('2d');
+
+  if (comparisonChart) comparisonChart.destroy();
+
+  const labels = comparison.map(r => `R${r.round_number}`);
+  const datasets = [
+    {label: 'AI탐지', data: comparison.map(r => r.scores.ai_detection), borderColor: '#4f46e5'},
+    {label: '자연스러움', data: comparison.map(r => r.scores.naturalness), borderColor: '#06b6d4'},
+    {label: '다양성', data: comparison.map(r => r.scores.diversity), borderColor: '#10b981'},
+    {label: '정확도', data: comparison.map(r => r.scores.accuracy), borderColor: '#f59e0b'},
+    {label: '종합', data: comparison.map(r => r.scores.overall), borderColor: '#7c3aed', borderWidth: 3},
+  ];
+
+  comparisonChart = new Chart(ctx, {
+    type: 'line',
+    data: {labels, datasets},
+    options: {
+      responsive: true,
+      scales: {y: {min: 0, max: 10}},
+      plugins: {legend: {position: 'bottom'}}
+    }
+  });
+}
+
+// 로그
+async function loadLogs() {
+  try {
+    const resp = await fetch(`/dashboard/api/optimization/sessions/${SESSION_ID}/logs/`);
+    const data = await resp.json();
+
+    const container = document.getElementById('log-list');
+    if (data.logs && data.logs.length > 0) {
+      container.innerHTML = data.logs.map(log => `
+        <div class="log-item">
+          <span class="log-type tag tag-${log.type === 'error' ? 'warning' : 'muted'}">${log.type}</span>
+          <span class="log-message">${log.message}</span>
+          <span class="log-time">${log.created_at}</span>
+        </div>
+      `).join('');
+    } else {
+      container.innerHTML = '<div class="text-center text-muted" style="padding: 40px;">로그가 없습니다.</div>';
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// 내보내기
+function exportSession() {
+  window.open(`/dashboard/api/optimization/sessions/${SESSION_ID}/export/?format=json`, '_blank');
+}
+
+// 샘플 로드
+async function loadRoundSamples() {
+  const roundId = document.getElementById('sample-round-select').value;
+  const container = document.getElementById('round-samples-container');
+
+  if (!roundId) {
+    container.innerHTML = '<div class="text-center text-muted" style="padding: 40px;">라운드를 선택하면 생성된 샘플을 확인할 수 있습니다.</div>';
+    return;
+  }
+
+  container.innerHTML = '<div class="text-center" style="padding: 40px;"><span class="spinner"></span> 샘플 로딩 중...</div>';
+
+  try {
+    const resp = await fetch(`/dashboard/api/optimization/rounds/${roundId}/samples/`);
+    const data = await resp.json();
+
+    if (!data.success) {
+      throw new Error(data.error || '샘플 로드 실패');
+    }
+
+    if (data.samples.length === 0) {
+      container.innerHTML = '<div class="text-center text-muted" style="padding: 40px;">생성된 샘플이 없습니다.</div>';
+      return;
+    }
+
+    let html = '<div style="padding: 16px;">';
+    data.samples.forEach((sample, i) => {
+      html += `
+        <div style="background: var(--bg); border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 3px solid var(--brand);">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span class="tag tag-primary">#${sample.index + 1}</span>
+            ${sample.scores?.naturalness ? `<span class="text-sm text-muted">자연스러움: ${sample.scores.naturalness}/10</span>` : ''}
+          </div>
+          <div style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6;">${escapeHtml(sample.content)}</div>
+        </div>
+      `;
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
+
+  } catch (e) {
+    container.innerHTML = `<div class="text-center" style="padding: 40px; color: var(--danger);">오류: ${e.message}</div>`;
+  }
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// 라운드 샘플 내보내기
+async function exportRoundSamples() {
+  const roundId = document.getElementById('sample-round-select').value;
+
+  if (!roundId) {
+    alert('라운드를 먼저 선택해주세요.');
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/dashboard/api/optimization/rounds/${roundId}/samples/`);
+    const data = await resp.json();
+
+    if (!data.success) {
+      throw new Error(data.error || '샘플 로드 실패');
+    }
+
+    let content = `=== 라운드 ${data.round_number} 샘플 (${data.count}개) ===\n\n`;
+    content += `--- 사용된 프롬프트 ---\n${data.prompt}\n\n`;
+    content += `--- 생성된 리뷰 ---\n\n`;
+
+    data.samples.forEach((sample, i) => {
+      content += `[#${sample.index + 1}]\n${sample.content}\n\n---\n\n`;
+    });
+
+    const blob = new Blob([content], {type: 'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `optimization_round_${data.round_number}_samples.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+  } catch (e) {
+    alert('내보내기 실패: ' + e.message);
+  }
+}
+
+// 최종 프롬프트 복사
+function copyFinalPrompt() {
+  const prompt = document.getElementById('final-approved-prompt')?.textContent || '';
+  if (!prompt) {
+    alert('복사할 프롬프트가 없습니다.');
+    return;
+  }
+  navigator.clipboard.writeText(prompt).then(() => {
+    alert('프롬프트가 클립보드에 복사되었습니다.');
+  }).catch(err => {
+    console.error('복사 실패:', err);
+    alert('복사에 실패했습니다.');
+  });
+}
+
+// 페이지 로드 시 기존 데이터 표시
+{% if current_round %}
+  console.log('[초기화] 현재 라운드:', {
+    id: {{ current_round.id }},
+    status: '{{ current_round.status }}',
+    generated_count: {{ current_round.generated_count }}
+  });
+
+  {% if current_round.status == 'pending' or current_round.status == 'generating' %}
+    // 진행중인 라운드가 있으면 생성 버튼 활성화
+    document.getElementById('btn-generate').disabled = false;
+    document.getElementById('progress-detail').style.display = 'block';
+    {% if current_round.generated_count > 0 %}
+      generatedCount = {{ current_round.generated_count }};
+      const pct = (generatedCount / SAMPLES_PER_ROUND) * 100;
+      document.getElementById('progress-fill').style.width = pct + '%';
+      document.getElementById('progress-count').textContent = `${generatedCount}/${SAMPLES_PER_ROUND}`;
+      document.getElementById('progress-status').textContent = `라운드 {{ current_round.round_number }} 진행중 (${generatedCount}개 생성됨)`;
+      document.getElementById('progress-detail').textContent = '\'생성 시작\' 버튼을 눌러 계속 생성하세요.';
+    {% else %}
+      document.getElementById('progress-status').textContent = '라운드 {{ current_round.round_number }} 준비됨';
+      document.getElementById('progress-detail').textContent = '\'생성 시작\' 버튼을 눌러 샘플 생성을 시작하세요.';
+    {% endif %}
+  {% elif current_round.status == 'generated' or current_round.status == 'analyzed' or current_round.status == 'approved' %}
+    // 이미 생성된 샘플이 있으면 표시
+    document.getElementById('progress-fill').style.width = '100%';
+    document.getElementById('progress-count').textContent = '{{ current_round.generated_count }}/{{ session.samples_per_round }}';
+    document.getElementById('progress-status').textContent = '생성 완료';
+    document.getElementById('progress-detail').style.display = 'block';
+    document.getElementById('progress-detail').textContent = '분석 탭에서 분석을 실행하세요.';
+  {% endif %}
+
+  {% if current_round.score_overall %}
+    updateScores({
+      ai_detection: {{ current_round.score_ai_detection|default:"null" }},
+      naturalness: {{ current_round.score_naturalness|default:"null" }},
+      diversity: {{ current_round.score_diversity|default:"null" }},
+      accuracy: {{ current_round.score_accuracy|default:"null" }},
+      overall: {{ current_round.score_overall|default:"null" }}
+    });
+  {% endif %}
+
+  {% if current_round.suggested_prompt %}
+    document.getElementById('diff-suggested').textContent = `{{ current_round.suggested_prompt|escapejs }}`;
+  {% endif %}
+{% else %}
+  console.log('[초기화] 현재 라운드 없음 - 라운드 시작 필요');
+  document.getElementById('progress-detail').style.display = 'block';
+  document.getElementById('progress-detail').textContent = '\'라운드 시작\' 버튼을 눌러 새 라운드를 시작하세요.';
+{% endif %}
+</script>
+{% endblock %}

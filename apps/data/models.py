@@ -814,12 +814,15 @@ class PromptTemplate(models.Model):
     MODE_CHOICES = [
         ('basic', 'Basic'),
         ('basic_plus', 'Basic Plus'),
+        ('basic_multi', 'Basic Multi'),
+        ('basic_multi_title', 'Basic Multi - 제목'),
+        ('basic_multi_score', 'Basic Multi - 점수'),
         ('pro_header', 'Pro - 헤더'),
         ('pro_guidelines', 'Pro - 가이드라인'),
         ('app_gangnam', '앱 - 강남언니'),
     ]
 
-    mode = models.CharField(max_length=20, choices=MODE_CHOICES, verbose_name="모드")
+    mode = models.CharField(max_length=30, choices=MODE_CHOICES, verbose_name="모드")
     name = models.CharField(max_length=100, verbose_name="템플릿 이름")
     content = models.TextField(verbose_name="프롬프트 내용")
     description = models.TextField(blank=True, verbose_name="설명")
@@ -862,3 +865,314 @@ class PromptTemplateVersion(models.Model):
 
     def __str__(self):
         return f"{self.template.name} v{self.version}"
+
+
+class ProcedureInfo(models.Model):
+    """시술 정보 DB"""
+    CATEGORY_CHOICES = [
+        ('skin', '피부 시술'),
+        ('injection', '주사/필러'),
+        ('laser', '레이저'),
+        ('lifting', '리프팅'),
+        ('body', '바디'),
+        ('hair', '모발'),
+        ('etc', '기타'),
+    ]
+
+    name = models.CharField(max_length=100, unique=True, verbose_name="시술명")
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='skin', verbose_name="카테고리")
+    description = models.TextField(blank=True, verbose_name="시술 설명")
+    pain_level = models.CharField(
+        max_length=20,
+        choices=[
+            ('none', '거의 없음'), ('mild', '약간'), ('moderate', '보통'),
+            ('high', '높음'), ('very_high', '매우 높음')
+        ],
+        default='moderate',
+        verbose_name="통증 레벨"
+    )
+    recovery_time = models.CharField(max_length=100, blank=True, verbose_name="회복 기간")
+    typical_results = models.TextField(blank=True, verbose_name="일반적 결과")
+    common_side_effects = JSONField(default=list, blank=True, verbose_name="일반적 부작용")
+    precautions = JSONField(default=list, blank=True, verbose_name="주의사항")
+    price_range = models.CharField(max_length=100, blank=True, verbose_name="가격 범위")
+    duration = models.CharField(max_length=100, blank=True, verbose_name="시술 시간")
+    anesthesia_type = models.CharField(max_length=100, blank=True, verbose_name="마취 방법")
+    sessions_recommended = models.CharField(max_length=100, blank=True, verbose_name="권장 회차")
+    knowledge_base = JSONField(default=dict, blank=True, verbose_name="체험 지식 DB (파싱됨)",
+        help_text="파싱된 체험 기반 지식 (감각, 감정, 커뮤니티 표현 등)")
+    raw_knowledge_entries = JSONField(default=list, blank=True, verbose_name="원본 수집 데이터",
+        help_text="수집한 원본 텍스트 목록. 나중에 일괄 파싱 가능.")
+    is_active = models.BooleanField(default=True, verbose_name="활성화")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "시술 정보"
+        verbose_name_plural = "시술 정보 목록"
+        ordering = ['category', 'name']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_category_display()})"
+
+
+class MultiSeriesBatch(models.Model):
+    """Basic Multi 배치 세션"""
+    STATUS_CHOICES = [
+        ('pending', '대기'),
+        ('in_progress', '진행중'),
+        ('completed', '완료'),
+        ('failed', '실패'),
+    ]
+
+    name = models.CharField(max_length=200, blank=True, verbose_name="배치 이름")
+    procedure = models.ForeignKey(ProcedureInfo, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="시술")
+    user_input = models.TextField(verbose_name="사용자 입력")
+    content_types = JSONField(default=list, verbose_name="컨텐츠 타입 목록")
+    model_used = models.CharField(max_length=100, default='claude-sonnet-4-5-20250929', verbose_name="사용 모델")
+    target_count = models.IntegerField(default=30, verbose_name="목표 생성 수")
+    completed_count = models.IntegerField(default=0, verbose_name="완료 수")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name="상태")
+    total_input_tokens = models.IntegerField(default=0, verbose_name="총 입력 토큰")
+    total_output_tokens = models.IntegerField(default=0, verbose_name="총 출력 토큰")
+    total_cost_usd = models.FloatField(default=0.0, verbose_name="총 비용 (USD)")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Multi 배치"
+        verbose_name_plural = "Multi 배치 목록"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name or '배치'} ({self.completed_count}/{self.target_count})"
+
+
+class MultiSeriesItem(models.Model):
+    """Basic Multi 개별 시리즈"""
+    STATUS_CHOICES = [
+        ('generated', '생성됨'),
+        ('scored', '점수완료'),
+        ('edited', '편집됨'),
+        ('scheduled', '스케줄됨'),
+        ('exported', '내보냄'),
+    ]
+
+    batch = models.ForeignKey(MultiSeriesBatch, on_delete=models.CASCADE, related_name='items', verbose_name="배치")
+    series_index = models.IntegerField(verbose_name="시리즈 번호")
+    persona_settings = JSONField(default=dict, blank=True, verbose_name="페르소나 설정")
+    situation_settings = JSONField(default=dict, blank=True, verbose_name="상황 설정")
+    temperature = models.FloatField(default=0.85, verbose_name="Temperature")
+    pieces = JSONField(default=list, verbose_name="컨텐츠 피스 목록")
+    naturalness_score = models.FloatField(null=True, blank=True, verbose_name="자연스러움 점수")
+    score_feedback = models.TextField(blank=True, verbose_name="점수 피드백")
+    prompt_used = models.TextField(blank=True, verbose_name="사용된 프롬프트")
+    input_tokens = models.IntegerField(default=0, verbose_name="입력 토큰")
+    output_tokens = models.IntegerField(default=0, verbose_name="출력 토큰")
+    cost_usd = models.FloatField(default=0.0, verbose_name="비용 (USD)")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='generated', verbose_name="상태")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Multi 시리즈"
+        verbose_name_plural = "Multi 시리즈 목록"
+        ordering = ['batch', 'series_index']
+
+    def __str__(self):
+        return f"시리즈 #{self.series_index} (배치: {self.batch_id})"
+
+
+# =====================================================
+# 프롬프트 최적화 사이클 모델
+# =====================================================
+
+class PromptOptimizationSession(models.Model):
+    """프롬프트 검증 & 최적화 세션"""
+    STATUS_CHOICES = [
+        ('created', '생성됨'),
+        ('in_progress', '진행중'),
+        ('completed', '완료'),
+        ('paused', '일시정지'),
+    ]
+    MODE_CHOICES = [
+        ('semi_auto', '반자동'),
+        ('auto', '자동'),
+    ]
+
+    name = models.CharField(max_length=200, verbose_name="세션명")
+    description = models.TextField(blank=True, verbose_name="설명")
+    base_prompt_template = models.ForeignKey(
+        'PromptTemplate', on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name="기본 프롬프트 템플릿"
+    )
+    procedure = models.ForeignKey(
+        ProcedureInfo, on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name="시술 정보"
+    )
+    user_input = models.TextField(blank=True, verbose_name="사용자 입력",
+        help_text="시술/병원/상황 등 컨텍스트 정보")
+
+    # 설정
+    samples_per_round = models.IntegerField(default=50, verbose_name="라운드당 샘플 수")
+    target_rounds = models.IntegerField(default=5, verbose_name="목표 라운드 수")
+    mode = models.CharField(max_length=20, choices=MODE_CHOICES, default='semi_auto', verbose_name="실행 모드")
+    auto_approve_threshold = models.FloatField(default=8.0, verbose_name="자동 승인 점수",
+        help_text="자동 모드에서 이 점수 이상이면 자동 승인")
+    model_used = models.CharField(max_length=100, default='claude-sonnet-4-5-20250929', verbose_name="생성 모델")
+    analysis_model = models.CharField(max_length=100, default='claude-sonnet-4-5-20250929', verbose_name="분석 모델")
+
+    # 생성 설정 (상세)
+    temperature_min = models.FloatField(default=0.7, verbose_name="최소 온도")
+    temperature_max = models.FloatField(default=0.95, verbose_name="최대 온도")
+    max_tokens_generation = models.IntegerField(default=4000, verbose_name="생성 최대 토큰")
+    max_tokens_analysis = models.IntegerField(default=8000, verbose_name="분석 최대 토큰")
+
+    # 페르소나 옵션
+    persona_options = JSONField(default=dict, blank=True, verbose_name="페르소나 옵션",
+        help_text="age_groups, genders, tones, experiences 등")
+    style_options = JSONField(default=dict, blank=True, verbose_name="스타일 옵션",
+        help_text="이모지, 문장길이, 포맷 등")
+
+    # 분석 옵션
+    analyze_ai_detection = models.BooleanField(default=True, verbose_name="AI 탐지 회피 분석")
+    analyze_naturalness = models.BooleanField(default=True, verbose_name="자연스러움 분석")
+    analyze_diversity = models.BooleanField(default=True, verbose_name="다양성 분석")
+    analyze_accuracy = models.BooleanField(default=True, verbose_name="정보 정확도 분석")
+    analysis_depth = models.CharField(max_length=20, default='detailed', verbose_name="분석 깊이",
+        choices=[('basic', '기본'), ('detailed', '상세'), ('exhaustive', '정밀')])
+
+    # 상태
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='created', verbose_name="상태")
+    current_round = models.IntegerField(default=0, verbose_name="현재 라운드")
+
+    # 비용 통계
+    total_input_tokens = models.IntegerField(default=0, verbose_name="총 입력 토큰")
+    total_output_tokens = models.IntegerField(default=0, verbose_name="총 출력 토큰")
+    total_cost_usd = models.FloatField(default=0.0, verbose_name="총 비용 (USD)")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "최적화 세션"
+        verbose_name_plural = "최적화 세션 목록"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} (R{self.current_round}/{self.target_rounds})"
+
+
+class OptimizationRound(models.Model):
+    """최적화 라운드"""
+    STATUS_CHOICES = [
+        ('pending', '대기'),
+        ('generating', '생성중'),
+        ('generated', '생성완료'),
+        ('analyzing', '분석중'),
+        ('analyzed', '분석완료'),
+        ('approved', '승인됨'),
+        ('rejected', '거부됨'),
+    ]
+
+    session = models.ForeignKey(
+        PromptOptimizationSession, on_delete=models.CASCADE,
+        related_name='rounds', verbose_name="세션"
+    )
+    round_number = models.IntegerField(verbose_name="라운드 번호")
+    prompt_content = models.TextField(verbose_name="이 라운드의 프롬프트")
+    prompt_changes = models.TextField(blank=True, verbose_name="이전 대비 변경사항")
+
+    # 분석 결과
+    analysis_result = JSONField(default=dict, blank=True, verbose_name="분석 결과 상세")
+    score_ai_detection = models.FloatField(null=True, blank=True, verbose_name="AI탐지 회피 점수")
+    score_naturalness = models.FloatField(null=True, blank=True, verbose_name="자연스러움 점수")
+    score_diversity = models.FloatField(null=True, blank=True, verbose_name="다양성 점수")
+    score_accuracy = models.FloatField(null=True, blank=True, verbose_name="정보 정확도 점수")
+    score_overall = models.FloatField(null=True, blank=True, verbose_name="종합 점수")
+    analysis_feedback = models.TextField(blank=True, verbose_name="분석 피드백")
+
+    # 프롬프트 개선 제안
+    suggested_prompt = models.TextField(blank=True, verbose_name="AI 제안 프롬프트")
+    suggested_changes = models.TextField(blank=True, verbose_name="제안 변경 설명")
+    approved_prompt = models.TextField(blank=True, verbose_name="승인된 프롬프트")
+
+    # 상태
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name="상태")
+    generated_count = models.IntegerField(default=0, verbose_name="생성된 샘플 수")
+
+    # 비용 통계
+    input_tokens = models.IntegerField(default=0, verbose_name="입력 토큰")
+    output_tokens = models.IntegerField(default=0, verbose_name="출력 토큰")
+    cost_usd = models.FloatField(default=0.0, verbose_name="비용 (USD)")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "최적화 라운드"
+        verbose_name_plural = "최적화 라운드 목록"
+        ordering = ['session', 'round_number']
+        unique_together = ['session', 'round_number']
+
+    def __str__(self):
+        return f"R{self.round_number} - {self.session.name}"
+
+
+class OptimizationSample(models.Model):
+    """최적화 샘플"""
+    round = models.ForeignKey(
+        OptimizationRound, on_delete=models.CASCADE,
+        related_name='samples', verbose_name="라운드"
+    )
+    sample_index = models.IntegerField(verbose_name="샘플 번호")
+    persona_settings = JSONField(default=dict, blank=True, verbose_name="페르소나 설정")
+    generated_content = models.TextField(verbose_name="생성된 컨텐츠")
+    individual_scores = JSONField(default=dict, blank=True, verbose_name="개별 점수",
+        help_text="{'ai_detection': 8.5, 'naturalness': 9.0, ...}")
+
+    # 토큰 사용량
+    input_tokens = models.IntegerField(default=0, verbose_name="입력 토큰")
+    output_tokens = models.IntegerField(default=0, verbose_name="출력 토큰")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "최적화 샘플"
+        verbose_name_plural = "최적화 샘플 목록"
+        ordering = ['round', 'sample_index']
+
+    def __str__(self):
+        return f"샘플 #{self.sample_index} (R{self.round.round_number})"
+
+
+class OptimizationLog(models.Model):
+    """최적화 로그"""
+    LOG_TYPE_CHOICES = [
+        ('info', '정보'),
+        ('generation', '생성'),
+        ('analysis', '분석'),
+        ('approval', '승인'),
+        ('error', '오류'),
+    ]
+
+    session = models.ForeignKey(
+        PromptOptimizationSession, on_delete=models.CASCADE,
+        related_name='logs', verbose_name="세션"
+    )
+    round = models.ForeignKey(
+        OptimizationRound, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='logs', verbose_name="라운드"
+    )
+    log_type = models.CharField(max_length=20, choices=LOG_TYPE_CHOICES, default='info', verbose_name="로그 타입")
+    message = models.TextField(verbose_name="메시지")
+    details = JSONField(default=dict, blank=True, verbose_name="상세 데이터")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "최적화 로그"
+        verbose_name_plural = "최적화 로그 목록"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.log_type}] {self.message[:50]}"

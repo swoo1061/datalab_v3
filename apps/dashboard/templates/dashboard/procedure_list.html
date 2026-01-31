@@ -1,0 +1,86 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}시술 정보 DB{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">시술 정보 DB</h1>
+    <p class="page-subtitle">Basic Multi에서 사용할 시술 정보를 관리합니다.</p>
+  </div>
+  <a href="{% url 'dashboard:procedure_new' %}" class="btn btn-primary">+ 시술 추가</a>
+</div>
+
+<div class="card">
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>시술명</th>
+          <th>카테고리</th>
+          <th>통증</th>
+          <th>가격 범위</th>
+          <th>회복 기간</th>
+          <th>상태</th>
+          <th>관리</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in procedures %}
+        <tr id="row-{{ p.id }}">
+          <td><a href="{% url 'dashboard:procedure_edit' p.id %}" style="color:var(--brand);font-weight:600;text-decoration:none;">{{ p.name }}</a></td>
+          <td><span class="tag tag-primary">{{ p.get_category_display }}</span></td>
+          <td>{{ p.get_pain_level_display }}</td>
+          <td>{{ p.price_range|default:"-" }}</td>
+          <td>{{ p.recovery_time|default:"-" }}</td>
+          <td>
+            <span class="tag {% if p.is_active %}tag-success{% else %}tag-muted{% endif %}" style="cursor:pointer" onclick="toggleProcedure({{ p.id }}, this)">
+              {{ p.is_active|yesno:"활성,비활성" }}
+            </span>
+          </td>
+          <td>
+            <button class="btn btn-ghost btn-sm" onclick="deleteProcedure({{ p.id }})">삭제</button>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted" style="padding:40px">등록된 시술 정보가 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCookie(name) {
+  let v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+
+async function toggleProcedure(id, el) {
+  const res = await fetch(`/dashboard/api/procedures/${id}/toggle/`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken')}
+  });
+  const data = await res.json();
+  if (data.success) {
+    el.textContent = data.is_active ? '활성' : '비활성';
+    el.className = 'tag ' + (data.is_active ? 'tag-success' : 'tag-muted');
+    el.style.cursor = 'pointer';
+  }
+}
+
+async function deleteProcedure(id) {
+  if (!confirm('정말 삭제하시겠습니까?')) return;
+  const res = await fetch(`/dashboard/api/procedures/${id}/delete/`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken')}
+  });
+  const data = await res.json();
+  if (data.success) {
+    document.getElementById('row-' + id).remove();
+  }
+}
+</script>
+{% endblock %}

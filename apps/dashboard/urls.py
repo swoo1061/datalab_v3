@@ -26,6 +26,9 @@ urlpatterns = [
     path("generate/pro/", views.review_generate_v2, name="generate_review_pro"),
     path("generate/v2/", views.review_generate_v2, name="generate_review_v2"),  # 호환용
 
+    # Basic Multi
+    path("generate/basic-multi/", views.review_generate_basic_multi, name="generate_review_basic_multi"),
+
     # 앱 리뷰 생성
     path("generate/app/gangnam/", views.app_review_gangnam, name="app_review_gangnam"),
     
@@ -55,6 +58,28 @@ urlpatterns = [
     path("api/generate-from-prompt/", views.api_generate_review_from_prompt, name="api_generate_review_from_prompt"),
     path("api/import-clinic/", views.api_import_clinic_md, name="api_import_clinic"),
     
+    # Basic Multi API
+    path("api/generate-multi-series/", views.api_generate_multi_series, name="api_generate_multi_series"),
+    path("api/generate-multi-batch/", views.api_generate_multi_batch, name="api_generate_multi_batch"),
+    path("api/generate-multi-batch-next/", views.api_generate_multi_batch_next, name="api_generate_multi_batch_next"),
+    path("api/score-naturalness/", views.api_score_naturalness, name="api_score_naturalness"),
+    path("api/regenerate-piece/", views.api_regenerate_piece, name="api_regenerate_piece"),
+    path("api/save-multi-edits/", views.api_save_multi_edits, name="api_save_multi_edits"),
+    path("api/save-schedule/", views.api_save_schedule, name="api_save_schedule"),
+    path("api/export-multi/", views.api_export_multi, name="api_export_multi"),
+    path("api/procedures/search/", views.api_procedures_search, name="api_procedures_search"),
+
+    # 시술 정보 관리
+    path("procedures/", views.procedure_list, name="procedure_list"),
+    path("procedures/new/", views.procedure_edit, name="procedure_new"),
+    path("procedures/<int:pk>/", views.procedure_edit, name="procedure_edit"),
+    path("api/procedures/<int:pk>/delete/", views.api_procedure_delete, name="api_procedure_delete"),
+    path("api/procedures/<int:pk>/toggle/", views.api_procedure_toggle, name="api_procedure_toggle"),
+    path("api/procedures/sisool-search/", views.api_sisool_list_search, name="api_sisool_list_search"),
+    path("api/procedures/collect-knowledge/", views.api_collect_procedure_knowledge, name="api_collect_procedure_knowledge"),
+    path("api/procedures/save-knowledge/", views.api_save_procedure_knowledge, name="api_save_procedure_knowledge"),
+    path("api/procedures/parse-raw-knowledge/", views.api_parse_raw_knowledge, name="api_parse_raw_knowledge"),
+
     # 프리셋 추출 (스타일 분석)
     path("preset-extractor/", views.style_analyzer, name="preset_extractor"),
     path("style-analyzer/", views.style_analyzer, name="style_analyzer"),  # 호환용
@@ -118,4 +143,31 @@ urlpatterns = [
     path("api/prompt-templates/<int:pk>/toggle/", views.api_prompt_template_toggle, name="api_prompt_template_toggle"),
     path("api/prompt-templates/<int:pk>/versions/", views.api_prompt_template_versions, name="api_prompt_template_versions"),
     path("api/prompt-templates/<int:pk>/restore/<int:version>/", views.api_prompt_template_restore, name="api_prompt_template_restore"),
+
+    # 프롬프트 최적화 세션
+    path("optimization/", views.optimization_list, name="optimization_list"),
+    path("optimization/new/", views.optimization_new, name="optimization_new"),
+    path("optimization/<int:pk>/", views.optimization_session, name="optimization_session"),
+    path("optimization/<int:pk>/auto/", views.optimization_session_auto, name="optimization_session_auto"),
+    path("optimization/<int:pk>/delete/", views.optimization_delete, name="optimization_delete"),
+
+    # 최적화 API - 세션 관리
+    path("api/optimization/sessions/", views.api_optimization_sessions, name="api_optimization_sessions"),
+    path("api/optimization/sessions/<int:pk>/", views.api_optimization_session_detail, name="api_optimization_session_detail"),
+
+    # 최적화 API - 라운드 실행
+    path("api/optimization/sessions/<int:pk>/start-round/", views.api_optimization_start_round, name="api_optimization_start_round"),
+    path("api/optimization/sessions/<int:pk>/generate-next/", views.api_optimization_generate_next, name="api_optimization_generate_next"),
+    path("api/optimization/rounds/<int:pk>/analyze/", views.api_optimization_analyze, name="api_optimization_analyze"),
+
+    # 최적화 API - 프롬프트 개선
+    path("api/optimization/rounds/<int:pk>/suggestions/", views.api_optimization_suggestions, name="api_optimization_suggestions"),
+    path("api/optimization/rounds/<int:pk>/approve/", views.api_optimization_approve, name="api_optimization_approve"),
+    path("api/optimization/rounds/<int:pk>/modify/", views.api_optimization_modify, name="api_optimization_modify"),
+
+    # 최적화 API - 비교 & 내보내기
+    path("api/optimization/sessions/<int:pk>/compare/", views.api_optimization_compare, name="api_optimization_compare"),
+    path("api/optimization/sessions/<int:pk>/export/", views.api_optimization_export, name="api_optimization_export"),
+    path("api/optimization/sessions/<int:pk>/logs/", views.api_optimization_logs, name="api_optimization_logs"),
+    path("api/optimization/rounds/<int:pk>/samples/", views.api_optimization_round_samples, name="api_optimization_round_samples"),
 ]

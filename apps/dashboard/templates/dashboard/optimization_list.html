@@ -1,0 +1,133 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}프롬프트 최적화{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">프롬프트 최적화</h1>
+    <p class="page-subtitle">대량 샘플 생성 → AI 분석 → 프롬프트 개선 사이클</p>
+  </div>
+  <a href="{% url 'dashboard:optimization_new' %}" class="btn btn-primary">
+    + 새 세션
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">세션 목록</span>
+    <span class="text-muted text-sm">총 {{ sessions.count }}개</span>
+  </div>
+
+  {% if sessions %}
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>세션명</th>
+          <th>시술</th>
+          <th>상태</th>
+          <th>진행</th>
+          <th>종합점수</th>
+          <th>비용</th>
+          <th>생성일</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sessions %}
+        <tr>
+          <td>
+            <a href="{% url 'dashboard:optimization_session' pk=s.id %}" style="text-decoration: none; font-weight: 600; color: var(--brand);">
+              {{ s.name }}
+            </a>
+            {% if s.description %}
+            <div class="text-sm text-muted">{{ s.description|truncatewords:10 }}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if s.procedure %}
+            <span class="tag tag-primary">{{ s.procedure.name }}</span>
+            {% else %}
+            <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if s.status == 'created' %}
+            <span class="tag tag-muted">생성됨</span>
+            {% elif s.status == 'in_progress' %}
+            <span class="tag tag-warning">진행중</span>
+            {% elif s.status == 'completed' %}
+            <span class="tag tag-success">완료</span>
+            {% elif s.status == 'paused' %}
+            <span class="tag tag-muted">일시정지</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="text-sm">R{{ s.current_round }}/{{ s.target_rounds }}</span>
+            <div style="width: 60px; height: 4px; background: var(--border); border-radius: 2px; margin-top: 4px;">
+              <div style="width: {% widthratio s.current_round s.target_rounds 100 %}%; height: 100%; background: var(--brand); border-radius: 2px;"></div>
+            </div>
+          </td>
+          <td>
+            {% with last_round=s.rounds.last %}
+            {% if last_round and last_round.score_overall %}
+            <span style="font-weight: 600; color: {% if last_round.score_overall >= 8 %}var(--success){% elif last_round.score_overall >= 6 %}var(--warning){% else %}var(--danger){% endif %};">
+              {{ last_round.score_overall|floatformat:1 }}
+            </span>
+            {% else %}
+            <span class="text-muted">-</span>
+            {% endif %}
+            {% endwith %}
+          </td>
+          <td>
+            <span class="text-sm">${{ s.total_cost_usd|floatformat:4 }}</span>
+          </td>
+          <td>
+            <span class="text-sm text-muted">{{ s.created_at|date:"m/d H:i" }}</span>
+          </td>
+          <td>
+            <div class="flex gap-2">
+              <a href="{% url 'dashboard:optimization_session' pk=s.id %}" class="btn btn-ghost btn-sm">수동</a>
+              <a href="{% url 'dashboard:optimization_session_auto' pk=s.id %}" class="btn btn-ghost btn-sm" style="color: var(--brand);">자동</a>
+              <button class="btn btn-ghost btn-sm" style="color: var(--danger);" onclick="deleteSession({{ s.id }})">삭제</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center" style="padding: 60px 20px; color: var(--muted);">
+    <p style="font-size: 3rem; margin-bottom: 16px;">🔄</p>
+    <p>아직 최적화 세션이 없습니다.</p>
+    <p class="text-sm">새 세션을 만들어 프롬프트 검증을 시작하세요.</p>
+    <a href="{% url 'dashboard:optimization_new' %}" class="btn btn-primary" style="margin-top: 20px;">+ 새 세션 만들기</a>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+async function deleteSession(id) {
+  if (!confirm('이 세션과 모든 데이터를 삭제하시겠습니까?')) return;
+
+  try {
+    const resp = await fetch(`/dashboard/optimization/${id}/delete/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}'
+      }
+    });
+
+    if (resp.ok) {
+      location.reload();
+    } else {
+      alert('삭제에 실패했습니다.');
+    }
+  } catch (e) {
+    alert('오류: ' + e.message);
+  }
+}
+</script>
+{% endblock %}

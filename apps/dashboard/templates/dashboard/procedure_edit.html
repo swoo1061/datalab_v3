@@ -1,0 +1,1136 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}{% if procedure %}시술 수정{% else %}시술 추가{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .kb-section {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 2px solid var(--border);
+  }
+  .kb-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  .kb-header h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+  }
+  .kb-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .collect-panel {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .collect-mode-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+  .collect-mode-tab {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .collect-mode-tab:hover { border-color: var(--brand); }
+  .collect-mode-tab.active {
+    background: var(--brand);
+    color: white;
+    border-color: var(--brand);
+  }
+  .kb-category {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+  .kb-category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    cursor: pointer;
+  }
+  .kb-category-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--brand);
+  }
+  .kb-category-toggle {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .kb-list-items {
+    list-style: none;
+    padding: 0;
+  }
+  .kb-list-items li {
+    padding: 8px 12px;
+    background: var(--bg);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .kb-list-items li .item-text {
+    flex: 1;
+  }
+  .kb-list-items li .item-remove {
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+  .kb-dict-value {
+    padding: 8px 12px;
+    background: var(--bg);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+  }
+  .kb-dict-value strong {
+    color: var(--brand);
+    font-size: 0.85rem;
+  }
+  .kb-add-input {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .kb-add-input input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.85rem;
+  }
+  .usage-info {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .usage-info span {
+    background: var(--bg);
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+  .spinner-sm {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(0,0,0,0.15);
+    border-radius: 50%;
+    border-top-color: var(--brand);
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 시술 검색 자동완성 */
+  .sisool-search-container {
+    position: relative;
+  }
+  .sisool-search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    max-height: 350px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+  }
+  .sisool-search-dropdown.show { display: block; }
+  .sisool-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .sisool-item:last-child { border-bottom: none; }
+  .sisool-item:hover { background: var(--bg); }
+  .sisool-item.selected { background: var(--brand); color: white; }
+  .sisool-item .name { font-weight: 600; font-size: 0.95rem; }
+  .sisool-item .english { font-size: 0.8rem; color: var(--muted); margin-left: 8px; }
+  .sisool-item.selected .english { color: rgba(255,255,255,0.7); }
+  .sisool-item .category { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+  .sisool-item.selected .category { color: rgba(255,255,255,0.7); }
+  .sisool-item .effects { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+  .sisool-item .effects .tag { font-size: 0.7rem; padding: 2px 6px; }
+  .sisool-search-hint {
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    color: var(--muted);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .model-select-row {
+    display: flex;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 16px;
+  }
+  .model-select-row .form-group {
+    margin-bottom: 0;
+    flex: 1;
+  }
+  .category-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .category-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+  .category-check input { accent-color: var(--brand); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{% if procedure %}시술 수정: {{ procedure.name }}{% else %}시술 추가{% endif %}</h1>
+    <p class="page-subtitle">시술 정보를 입력하세요. Basic Multi에서 자동 참조됩니다.</p>
+  </div>
+  <a href="{% url 'dashboard:procedure_list' %}" class="btn btn-secondary">목록으로</a>
+</div>
+
+{% if error %}
+<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px 16px;margin-bottom:20px;color:#dc2626;">
+  {{ error }}
+</div>
+{% endif %}
+
+<form method="post" class="card" id="procedureForm">
+  {% csrf_token %}
+
+  <div class="grid-2">
+    <div class="form-group">
+      <label class="form-label">시술명 * <span class="text-sm text-muted">(검색하여 선택 가능)</span></label>
+      <div class="sisool-search-container">
+        <input type="text" name="name" id="procNameInput" class="form-input" value="{{ procedure.name|default:'' }}" required placeholder="시술명 검색... (예: 피코, 울쎄라, 보톡스)" autocomplete="off">
+        <div class="sisool-search-dropdown" id="sisoolDropdown">
+          <div class="sisool-search-hint">시술명을 입력하면 DB에서 검색합니다</div>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">카테고리</label>
+      <select name="category" id="categorySelect" class="form-select">
+        <option value="skin" {% if procedure.category == 'skin' %}selected{% endif %}>피부 시술</option>
+        <option value="injection" {% if procedure.category == 'injection' %}selected{% endif %}>주사/필러</option>
+        <option value="laser" {% if procedure.category == 'laser' %}selected{% endif %}>레이저</option>
+        <option value="lifting" {% if procedure.category == 'lifting' %}selected{% endif %}>리프팅</option>
+        <option value="body" {% if procedure.category == 'body' %}selected{% endif %}>바디</option>
+        <option value="hair" {% if procedure.category == 'hair' %}selected{% endif %}>모발</option>
+        <option value="etc" {% if procedure.category == 'etc' %}selected{% endif %}>기타</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">시술 설명</label>
+    <textarea name="description" class="form-textarea" rows="3" placeholder="시술에 대한 간단한 설명">{{ procedure.description|default:'' }}</textarea>
+  </div>
+
+  <div class="grid-2">
+    <div class="form-group">
+      <label class="form-label">통증 레벨</label>
+      <select name="pain_level" class="form-select">
+        <option value="none" {% if procedure.pain_level == 'none' %}selected{% endif %}>거의 없음</option>
+        <option value="mild" {% if procedure.pain_level == 'mild' %}selected{% endif %}>약간</option>
+        <option value="moderate" {% if not procedure or procedure.pain_level == 'moderate' %}selected{% endif %}>보통</option>
+        <option value="high" {% if procedure.pain_level == 'high' %}selected{% endif %}>높음</option>
+        <option value="very_high" {% if procedure.pain_level == 'very_high' %}selected{% endif %}>매우 높음</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">회복 기간</label>
+      <input type="text" name="recovery_time" class="form-input" value="{{ procedure.recovery_time|default:'' }}" placeholder="예: 3~7일">
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="form-group">
+      <label class="form-label">시술 시간</label>
+      <input type="text" name="duration" class="form-input" value="{{ procedure.duration|default:'' }}" placeholder="예: 30분~1시간">
+    </div>
+    <div class="form-group">
+      <label class="form-label">마취 방법</label>
+      <input type="text" name="anesthesia_type" class="form-input" value="{{ procedure.anesthesia_type|default:'' }}" placeholder="예: 마취크림, 수면마취">
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="form-group">
+      <label class="form-label">가격 범위</label>
+      <input type="text" name="price_range" class="form-input" value="{{ procedure.price_range|default:'' }}" placeholder="예: 10만~30만원">
+    </div>
+    <div class="form-group">
+      <label class="form-label">권장 회차</label>
+      <input type="text" name="sessions_recommended" class="form-input" value="{{ procedure.sessions_recommended|default:'' }}" placeholder="예: 3~5회">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">일반적 결과</label>
+    <textarea name="typical_results" class="form-textarea" rows="2" placeholder="시술 후 일반적으로 기대할 수 있는 결과">{{ procedure.typical_results|default:'' }}</textarea>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">일반적 부작용 (쉼표 구분)</label>
+    <input type="text" name="common_side_effects" class="form-input" value="{% if procedure and procedure.common_side_effects %}{{ procedure.common_side_effects|join:', ' }}{% endif %}" placeholder="예: 붓기, 멍, 붉어짐">
+    <div class="form-hint">쉼표(,)로 구분하여 입력</div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">주의사항 (쉼표 구분)</label>
+    <input type="text" name="precautions" class="form-input" value="{% if procedure and procedure.precautions %}{{ procedure.precautions|join:', ' }}{% endif %}" placeholder="예: 자외선 차단, 음주 금지, 사우나 금지">
+    <div class="form-hint">쉼표(,)로 구분하여 입력</div>
+  </div>
+
+  <div style="display:flex;gap:12px;margin-top:24px;">
+    <button type="submit" class="btn btn-primary btn-lg">{% if procedure %}수정{% else %}추가{% endif %}</button>
+    <a href="{% url 'dashboard:procedure_list' %}" class="btn btn-secondary btn-lg">취소</a>
+  </div>
+</form>
+
+<!-- ===== 체험 지식 DB 섹션 ===== -->
+<div class="kb-section">
+  <div class="kb-header">
+    <div>
+      <h2>체험 지식 DB</h2>
+      <p class="text-sm text-muted">AI가 수집한 체험 기반 지식. 리뷰 생성 시 디테일 포인트로 활용됩니다.</p>
+    </div>
+  </div>
+
+  <!-- 수집 패널 -->
+  <div class="collect-panel">
+    <div class="collect-mode-tabs">
+      <button class="collect-mode-tab active" data-mode="auto" onclick="setCollectMode('auto', this)">전체 자동 수집</button>
+      <button class="collect-mode-tab" data-mode="category" onclick="setCollectMode('category', this)">카테고리 선택</button>
+      <button class="collect-mode-tab" data-mode="custom" onclick="setCollectMode('custom', this)">커스텀 프롬프트</button>
+      <button class="collect-mode-tab" data-mode="raw" onclick="setCollectMode('raw', this)" style="background: #fef3c7; border-color: #f59e0b;">원본 저장</button>
+    </div>
+
+    <!-- 원본 저장 모드 설명 -->
+    <div id="rawModePanel" style="display:none; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+      <strong style="color: #92400e;">원본 저장 모드</strong>
+      <p style="font-size: 0.85rem; color: #78350f; margin-top: 4px;">
+        AI 응답을 파싱하지 않고 원본 텍스트 그대로 저장합니다.<br>
+        수집된 원본은 나중에 일괄 파싱하거나 수동으로 정리할 수 있습니다.
+      </p>
+    </div>
+
+    <!-- 카테고리 선택 (mode=category일 때) -->
+    <div id="categorySelectPanel" style="display:none">
+      <div class="category-checks">
+        <label class="category-check"><input type="checkbox" value="sensory" checked> 감각 정보</label>
+        <label class="category-check"><input type="checkbox" value="emotional_journey" checked> 감정 흐름</label>
+        <label class="category-check"><input type="checkbox" value="real_expressions" checked> 실제 표현</label>
+        <label class="category-check"><input type="checkbox" value="unexpected"> 예상 못한 점</label>
+        <label class="category-check"><input type="checkbox" value="community_tips"> 커뮤니티 팁</label>
+        <label class="category-check"><input type="checkbox" value="common_concerns"> 흔한 걱정</label>
+        <label class="category-check"><input type="checkbox" value="satisfaction_patterns"> 만족 패턴</label>
+        <label class="category-check"><input type="checkbox" value="detail_points" checked> 디테일 포인트</label>
+      </div>
+    </div>
+
+    <!-- 커스텀 프롬프트 (mode=custom일 때) -->
+    <div id="customPromptPanel" style="display:none">
+      <div class="form-group">
+        <label class="form-label">커스텀 요청</label>
+        <textarea id="customPrompt" class="form-textarea" rows="4" placeholder="예: 피코레이저 시술 후 일주일간 피부 변화를 일별로 상세히 수집해줘. 특히 각질, 붉은기, 세안할 때 느낌 위주로."></textarea>
+      </div>
+    </div>
+
+    <div class="model-select-row">
+      <div class="form-group">
+        <label class="form-label">시술명</label>
+        <input type="text" id="collectProcName" class="form-input" value="{{ procedure.name|default:'' }}" placeholder="수집할 시술명">
+      </div>
+      <div class="form-group">
+        <label class="form-label">모델</label>
+        <select id="collectModel" class="form-select">
+          <option value="claude-sonnet-4-5-20250929">Claude Sonnet 4.5</option>
+          <option value="gpt-5-mini">GPT-5 Mini</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="collectBtn" onclick="collectKnowledge()">
+        수집 시작
+      </button>
+    </div>
+
+    <div id="collectUsage" class="usage-info" style="display:none"></div>
+  </div>
+
+  <!-- 원본 수집 데이터 (파싱 전) -->
+  {% if procedure and procedure.raw_knowledge_entries %}
+  <div class="card" style="margin-bottom: 20px; border: 2px solid #f59e0b;">
+    <div class="card-header" style="background: #fef3c7;">
+      <span class="card-title" style="color: #92400e;">📦 원본 수집 데이터 ({{ procedure.raw_knowledge_entries|length }}건)</span>
+      <div class="flex gap-2">
+        <button class="btn btn-secondary btn-sm" onclick="toggleRawEntries()">펼치기/접기</button>
+        <button class="btn btn-primary btn-sm" onclick="parseAllRawEntries()">일괄 파싱</button>
+      </div>
+    </div>
+    <div id="rawEntriesContainer" style="display:none; max-height: 500px; overflow-y: auto;">
+      <!-- JS에서 렌더링 -->
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 수집된 지식 표시 / 편집 (파싱됨) -->
+  <div id="knowledgeDisplay">
+    {% if procedure and procedure.knowledge_base %}
+    <!-- 서버 렌더링 (초기 로드) - JS에서 덮어씀 -->
+    <div class="text-center text-muted" style="padding:20px">로딩 중...</div>
+    {% else %}
+    <div class="text-center text-muted" style="padding:40px">
+      수집된 체험 지식이 없습니다. 위에서 수집을 시작하세요.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCookie(name) {
+  let v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+const CSRF = getCookie('csrftoken');
+
+// ===== State =====
+let collectMode = 'auto';
+let knowledgeData = {};
+const PROCEDURE_ID = {{ procedure.id|default:'null' }};
+
+const CATEGORY_LABELS = {
+  sensory: '감각 정보',
+  emotional_journey: '감정 흐름',
+  real_expressions: '실제 커뮤니티 표현',
+  unexpected: '예상 못한 점',
+  community_tips: '커뮤니티 팁',
+  common_concerns: '흔한 걱정거리',
+  satisfaction_patterns: '만족/아쉬움 패턴',
+  seasonal_notes: '계절별 고려사항',
+  comparison_notes: '비슷한 시술 비교',
+  detail_points: '디테일 포인트',
+  wrong_info_corrections: '잘못된 정보 교정',
+};
+
+// ===== Raw Entries =====
+let rawEntries = [];
+{% if procedure and procedure.raw_knowledge_entries %}
+try {
+  rawEntries = JSON.parse('{{ procedure.raw_knowledge_entries|escapejs }}');
+} catch(e) { rawEntries = []; }
+{% endif %}
+
+function toggleRawEntries() {
+  const container = document.getElementById('rawEntriesContainer');
+  if (container.style.display === 'none') {
+    container.style.display = 'block';
+    renderRawEntries();
+  } else {
+    container.style.display = 'none';
+  }
+}
+
+function renderRawEntries() {
+  const container = document.getElementById('rawEntriesContainer');
+  if (!rawEntries || rawEntries.length === 0) {
+    container.innerHTML = '<div class="text-center text-muted" style="padding:20px">원본 데이터가 없습니다.</div>';
+    return;
+  }
+
+  let html = '';
+  rawEntries.forEach((entry, i) => {
+    const date = entry.collected_at ? new Date(entry.collected_at).toLocaleString('ko-KR') : '날짜 없음';
+    html += `
+      <div style="border-bottom:1px solid var(--border);padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div>
+            <span class="tag ${entry.parse_failed ? 'tag-warning' : 'tag-muted'}">#${i+1}</span>
+            <span class="text-sm text-muted" style="margin-left:8px">${date}</span>
+            <span class="text-sm text-muted" style="margin-left:8px">${entry.model || ''}</span>
+            ${entry.parse_failed ? '<span class="tag tag-warning" style="margin-left:8px">파싱 실패</span>' : ''}
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" onclick="copyRawEntry(${i})">복사</button>
+            <button class="btn btn-secondary btn-sm" onclick="parseRawEntry(${i})">파싱</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteRawEntry(${i})">삭제</button>
+          </div>
+        </div>
+        <div style="font-size:0.8rem;color:var(--muted);margin-bottom:8px">프롬프트: ${escapeHtml(entry.prompt || '')}</div>
+        <details>
+          <summary style="cursor:pointer;font-size:0.85rem;color:var(--brand)">내용 보기 (${entry.content?.length || 0}자)</summary>
+          <pre style="white-space:pre-wrap;font-size:0.8rem;line-height:1.5;background:var(--bg);padding:12px;border-radius:8px;margin-top:8px;max-height:300px;overflow-y:auto">${escapeHtml(entry.content || '')}</pre>
+        </details>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function copyRawEntry(index) {
+  const entry = rawEntries[index];
+  if (entry) {
+    navigator.clipboard.writeText(entry.content || '').then(() => alert('복사되었습니다.'));
+  }
+}
+
+async function deleteRawEntry(index) {
+  if (!confirm(`#${index+1} 원본 데이터를 삭제하시겠습니까?`)) return;
+
+  rawEntries.splice(index, 1);
+
+  // 서버에 저장
+  try {
+    await fetch('/dashboard/api/procedures/save-knowledge/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+      body: JSON.stringify({
+        procedure_id: PROCEDURE_ID,
+        procedure_name: document.getElementById('procNameInput').value,
+        raw_entries: rawEntries,
+      })
+    });
+    renderRawEntries();
+  } catch(e) {
+    alert('삭제 실패: ' + e.message);
+  }
+}
+
+async function parseRawEntry(index) {
+  const entry = rawEntries[index];
+  if (!entry) return;
+
+  if (!confirm(`#${index+1} 항목을 파싱하시겠습니까? JSON 구조를 추출하여 체험 지식 DB에 병합합니다.`)) return;
+
+  try {
+    const res = await fetch('/dashboard/api/procedures/parse-raw-knowledge/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+      body: JSON.stringify({
+        procedure_id: PROCEDURE_ID,
+        entry_index: index,
+      })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      alert(`파싱 완료! (성공: ${data.parsed_count}, 실패: ${data.failed_count})`);
+      location.reload();
+    } else {
+      alert('파싱 실패: ' + (data.error || ''));
+    }
+  } catch(e) {
+    alert('오류: ' + e.message);
+  }
+}
+
+async function parseAllRawEntries() {
+  if (!confirm(`모든 원본 데이터(${rawEntries.length}건)를 일괄 파싱하시겠습니까?\nJSON 구조를 추출하여 체험 지식 DB에 병합합니다.`)) return;
+
+  try {
+    const res = await fetch('/dashboard/api/procedures/parse-raw-knowledge/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+      body: JSON.stringify({
+        procedure_id: PROCEDURE_ID,
+        // entry_index 없으면 전체 파싱
+      })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      alert(`일괄 파싱 완료!\n- 성공: ${data.parsed_count}건\n- 실패: ${data.failed_count}건\n- 카테고리: ${data.knowledge_categories.join(', ')}`);
+      location.reload();
+    } else {
+      alert('파싱 실패: ' + (data.error || ''));
+    }
+  } catch(e) {
+    alert('오류: ' + e.message);
+  }
+}
+
+function loadRawEntries() {
+  // 페이지 새로고침 후 원본 데이터 표시
+  location.reload();
+}
+
+// ===== Init =====
+{% if procedure and procedure.knowledge_base %}
+try {
+  knowledgeData = JSON.parse('{{ procedure.knowledge_base|escapejs }}');
+  renderKnowledge(knowledgeData);
+} catch(e) {
+  document.getElementById('knowledgeDisplay').innerHTML = '<div class="text-center text-muted" style="padding:40px">파싱 오류</div>';
+}
+{% endif %}
+
+// ===== Collect Mode =====
+function setCollectMode(mode, btn) {
+  collectMode = mode;
+  document.querySelectorAll('.collect-mode-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('categorySelectPanel').style.display = mode === 'category' ? 'block' : 'none';
+  document.getElementById('customPromptPanel').style.display = mode === 'custom' || mode === 'raw' ? 'block' : 'none';
+  document.getElementById('rawModePanel').style.display = mode === 'raw' ? 'block' : 'none';
+}
+
+// ===== Collect =====
+async function collectKnowledge() {
+  const procName = document.getElementById('collectProcName').value.trim();
+  if (!procName) return alert('시술명을 입력하세요.');
+
+  const btn = document.getElementById('collectBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span> 수집 중...';
+
+  const payload = {
+    procedure_name: procName,
+    procedure_id: PROCEDURE_ID,
+    model: document.getElementById('collectModel').value,
+  };
+
+  // 모드별 페이로드 설정
+  console.log('[수집] 모드:', collectMode);
+
+  if (collectMode === 'raw') {
+    payload.save_raw_only = true;
+    // 원본 저장 모드에서는 custom_prompt를 메타데이터로만 사용
+    const customText = document.getElementById('customPrompt').value.trim();
+    if (customText) {
+      payload.custom_prompt = customText;
+    }
+  } else if (collectMode === 'custom') {
+    payload.custom_prompt = document.getElementById('customPrompt').value.trim();
+    if (!payload.custom_prompt) {
+      btn.disabled = false;
+      btn.textContent = '수집 시작';
+      return alert('커스텀 프롬프트를 입력하세요.');
+    }
+  } else if (collectMode === 'category') {
+    const cats = [];
+    document.querySelectorAll('#categorySelectPanel input:checked').forEach(cb => cats.push(cb.value));
+    payload.categories = cats;
+  }
+  // auto 모드는 추가 설정 없음
+
+  console.log('[수집] 페이로드:', payload);
+
+  try {
+    const res = await fetch('/dashboard/api/procedures/collect-knowledge/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+      body: JSON.stringify(payload)
+    });
+
+    console.log('[수집] 응답 상태:', res.status);
+    const data = await res.json();
+    console.log('[수집] 응답 데이터:', data);
+
+    if (data.error) {
+      console.error('[수집] 에러:', data.error);
+      // raw 텍스트가 있으면 표시
+      if (data.raw) {
+        showRawResponse(data.error, data.raw, data.hint, data.raw_saved);
+      } else {
+        alert('수집 실패: ' + data.error);
+      }
+      return;
+    }
+
+    // 원본 저장 모드 응답 처리
+    if (data.mode === 'raw_saved') {
+      console.log('[수집] 원본 저장 성공');
+      showRawSavedSuccess(data);
+      return;
+    }
+
+    console.log('[수집] 파싱된 지식:', data.knowledge);
+    knowledgeData = data.knowledge;
+    renderKnowledge(knowledgeData);
+
+    if (data.usage) {
+      const u = document.getElementById('collectUsage');
+      u.style.display = 'flex';
+      u.innerHTML = `
+        <span>입력: ${data.usage.input_tokens}</span>
+        <span>출력: ${data.usage.output_tokens}</span>
+        <span>$${data.usage.cost_usd}</span>
+        <span>~${data.usage.cost_krw}원</span>
+      `;
+    }
+  } catch(e) {
+    alert('오류: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '수집 시작';
+  }
+}
+
+// 원본 저장 성공 표시
+function showRawSavedSuccess(data) {
+  const container = document.getElementById('knowledgeDisplay');
+  container.innerHTML = `
+    <div style="background:#d1fae5;border:1px solid #10b981;border-radius:8px;padding:16px;margin-bottom:16px">
+      <div style="font-weight:600;color:#065f46;margin-bottom:8px">✅ 원본 저장 완료!</div>
+      <div style="font-size:0.85rem;color:#047857">
+        시술: ${data.procedure_name} | 저장된 항목: ${data.entries_count}개
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <strong>저장된 원본 내용:</strong>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;max-height:400px;overflow-y:auto">
+      <pre style="white-space:pre-wrap;font-size:0.85rem;line-height:1.6">${escapeHtml(data.raw_content)}</pre>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button class="btn btn-primary btn-sm" onclick="loadRawEntries()">전체 원본 보기</button>
+      <button class="btn btn-secondary btn-sm" onclick="location.reload()">새로고침</button>
+    </div>
+  `;
+
+  if (data.usage) {
+    const u = document.getElementById('collectUsage');
+    u.style.display = 'flex';
+    u.innerHTML = `
+      <span>입력: ${data.usage.input_tokens}</span>
+      <span>출력: ${data.usage.output_tokens}</span>
+      <span>$${data.usage.cost_usd}</span>
+      <span>~${data.usage.cost_krw}원</span>
+    `;
+  }
+}
+
+// Raw 응답 표시 (JSON 파싱 실패 시)
+function showRawResponse(error, raw, hint, rawSaved) {
+  const container = document.getElementById('knowledgeDisplay');
+  container.innerHTML = `
+    <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:16px;margin-bottom:16px">
+      <div style="font-weight:600;color:#92400e;margin-bottom:8px">⚠️ ${error}</div>
+      ${rawSaved ? '<div style="color:#065f46;font-size:13px;margin-bottom:4px">✅ 원본은 자동 저장되었습니다.</div>' : ''}
+      ${hint ? `<div style="color:#78350f;font-size:13px">${hint}</div>` : ''}
+    </div>
+    <div style="margin-bottom:12px">
+      <strong>AI 원본 응답:</strong>
+      <button class="btn btn-outline-secondary btn-sm" style="margin-left:8px" onclick="copyRawResponse()">복사</button>
+      <button class="btn btn-outline-primary btn-sm" onclick="tryManualParse()">수동 파싱</button>
+    </div>
+    <textarea id="rawResponseText" style="width:100%;height:400px;font-family:monospace;font-size:12px;border:1px solid #d1d5db;border-radius:4px;padding:12px">${escapeHtml(raw)}</textarea>
+  `;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function copyRawResponse() {
+  const text = document.getElementById('rawResponseText').value;
+  navigator.clipboard.writeText(text).then(() => alert('복사되었습니다.'));
+}
+
+function tryManualParse() {
+  const text = document.getElementById('rawResponseText').value;
+  try {
+    // JSON 블록 추출 시도
+    let jsonStr = text;
+    const jsonBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonBlockMatch) {
+      jsonStr = jsonBlockMatch[1];
+    } else {
+      // { } 사이 추출
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start !== -1 && end > start) {
+        jsonStr = text.substring(start, end + 1);
+      }
+    }
+    // 클리닝
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1'); // 후행 쉼표 제거
+    const parsed = JSON.parse(jsonStr);
+    knowledgeData = parsed;
+    renderKnowledge(parsed);
+    alert('파싱 성공!');
+  } catch(e) {
+    alert('수동 파싱 실패: ' + e.message + '\n\n텍스트를 직접 수정 후 다시 시도해 주세요.');
+  }
+}
+
+// ===== Render Knowledge =====
+function renderKnowledge(data) {
+  const container = document.getElementById('knowledgeDisplay');
+  if (!data || Object.keys(data).length === 0) {
+    container.innerHTML = '<div class="text-center text-muted" style="padding:40px">수집된 체험 지식이 없습니다.</div>';
+    return;
+  }
+
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <span class="text-sm text-muted">${Object.keys(data).length}개 카테고리</span>
+    <button class="btn btn-primary btn-sm" onclick="saveKnowledge()">DB에 저장</button>
+  </div>`;
+
+  for (const [key, value] of Object.entries(data)) {
+    const label = CATEGORY_LABELS[key] || key;
+    html += `<div class="kb-category" id="kb-${key}">
+      <div class="kb-category-header" onclick="toggleCategory('${key}')">
+        <span class="kb-category-title">${label}</span>
+        <span class="kb-category-toggle">접기/펼치기</span>
+      </div>
+      <div class="kb-category-body" id="kbb-${key}">
+        ${renderValue(key, value)}
+      </div>
+    </div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function renderValue(parentKey, value) {
+  if (Array.isArray(value)) {
+    return renderList(parentKey, value);
+  } else if (typeof value === 'object' && value !== null) {
+    return renderDict(parentKey, value);
+  } else {
+    return `<div class="kb-dict-value">
+      <span>${escapeHtml(String(value))}</span>
+      <input type="text" class="form-input" style="margin-top:6px;font-size:0.85rem" value="${escapeAttr(String(value))}" onchange="updateScalar('${parentKey}', this.value)">
+    </div>`;
+  }
+}
+
+function renderList(key, items) {
+  let html = '<ul class="kb-list-items">';
+  items.forEach((item, i) => {
+    html += `<li>
+      <span class="item-text">${escapeHtml(String(item))}</span>
+      <span class="item-remove" onclick="removeItem('${key}', ${i})">삭제</span>
+    </li>`;
+  });
+  html += '</ul>';
+  html += `<div class="kb-add-input">
+    <input type="text" id="add-${key}" placeholder="항목 추가..." onkeypress="if(event.key==='Enter'){event.preventDefault();addItem('${key}')}">
+    <button class="btn btn-ghost btn-sm" onclick="addItem('${key}')">추가</button>
+  </div>`;
+  return html;
+}
+
+function renderDict(parentKey, obj) {
+  let html = '';
+  for (const [k, v] of Object.entries(obj)) {
+    if (Array.isArray(v)) {
+      html += `<div style="margin-bottom:12px">
+        <strong style="font-size:0.85rem;color:var(--brand)">${k}</strong>
+        ${renderList(parentKey + '.' + k, v)}
+      </div>`;
+    } else if (typeof v === 'object' && v !== null) {
+      html += `<div style="margin-bottom:12px">
+        <strong style="font-size:0.85rem;color:var(--brand)">${k}</strong>
+        ${renderDict(parentKey + '.' + k, v)}
+      </div>`;
+    } else {
+      html += `<div class="kb-dict-value">
+        <strong>${k}:</strong>
+        <input type="text" class="form-input" style="margin-top:4px;font-size:0.85rem" value="${escapeAttr(String(v))}" onchange="updateNestedScalar('${parentKey}', '${k}', this.value)">
+      </div>`;
+    }
+  }
+  return html;
+}
+
+function toggleCategory(key) {
+  const body = document.getElementById('kbb-' + key);
+  body.style.display = body.style.display === 'none' ? 'block' : 'none';
+}
+
+// ===== Edit operations =====
+function getNestedRef(path) {
+  const parts = path.split('.');
+  let ref = knowledgeData;
+  for (const p of parts) {
+    if (ref[p] === undefined) return null;
+    ref = ref[p];
+  }
+  return ref;
+}
+
+function setNestedValue(path, value) {
+  const parts = path.split('.');
+  let ref = knowledgeData;
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (ref[parts[i]] === undefined) ref[parts[i]] = {};
+    ref = ref[parts[i]];
+  }
+  ref[parts[parts.length - 1]] = value;
+}
+
+function removeItem(path, index) {
+  const arr = getNestedRef(path);
+  if (Array.isArray(arr)) {
+    arr.splice(index, 1);
+    renderKnowledge(knowledgeData);
+  }
+}
+
+function addItem(path) {
+  const input = document.getElementById('add-' + path);
+  if (!input) {
+    // nested path
+    const el = document.querySelector(`input[id="add-${path}"]`);
+    if (!el || !el.value.trim()) return;
+    const arr = getNestedRef(path);
+    if (Array.isArray(arr)) {
+      arr.push(el.value.trim());
+      renderKnowledge(knowledgeData);
+    }
+    return;
+  }
+  if (!input.value.trim()) return;
+  const arr = getNestedRef(path);
+  if (Array.isArray(arr)) {
+    arr.push(input.value.trim());
+    renderKnowledge(knowledgeData);
+  }
+}
+
+function updateScalar(key, value) {
+  knowledgeData[key] = value;
+}
+
+function updateNestedScalar(parentPath, childKey, value) {
+  const parent = getNestedRef(parentPath);
+  if (parent && typeof parent === 'object') {
+    parent[childKey] = value;
+  }
+}
+
+// ===== Save =====
+async function saveKnowledge() {
+  const procName = document.getElementById('collectProcName').value.trim() ||
+                   document.getElementById('procNameInput').value.trim();
+
+  const payload = {
+    procedure_id: PROCEDURE_ID,
+    procedure_name: procName,
+    knowledge: knowledgeData,
+  };
+
+  try {
+    const res = await fetch('/dashboard/api/procedures/save-knowledge/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      alert(`저장 완료! (${data.procedure_name}, ${data.knowledge_categories.length}개 카테고리)`);
+      // 새로 생성된 경우 리다이렉트
+      if (!PROCEDURE_ID && data.procedure_id) {
+        window.location.href = `/dashboard/procedures/${data.procedure_id}/`;
+      }
+    } else {
+      alert('저장 실패: ' + (data.error || ''));
+    }
+  } catch(e) {
+    alert('오류: ' + e.message);
+  }
+}
+
+// ===== Util =====
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+function escapeAttr(text) {
+  return text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ===== 시술 검색 자동완성 =====
+const sisoolInput = document.getElementById('procNameInput');
+const sisoolDropdown = document.getElementById('sisoolDropdown');
+let sisoolResults = [];
+let selectedIndex = -1;
+let searchTimeout = null;
+
+sisoolInput.addEventListener('input', function() {
+  const query = this.value.trim();
+  clearTimeout(searchTimeout);
+
+  if (query.length < 1) {
+    sisoolDropdown.classList.remove('show');
+    return;
+  }
+
+  searchTimeout = setTimeout(() => searchSisool(query), 200);
+});
+
+sisoolInput.addEventListener('keydown', function(e) {
+  if (!sisoolDropdown.classList.contains('show')) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    selectedIndex = Math.min(selectedIndex + 1, sisoolResults.length - 1);
+    updateSelection();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    selectedIndex = Math.max(selectedIndex - 1, 0);
+    updateSelection();
+  } else if (e.key === 'Enter' && selectedIndex >= 0) {
+    e.preventDefault();
+    selectSisool(sisoolResults[selectedIndex]);
+  } else if (e.key === 'Escape') {
+    sisoolDropdown.classList.remove('show');
+  }
+});
+
+sisoolInput.addEventListener('focus', function() {
+  if (sisoolResults.length > 0) {
+    sisoolDropdown.classList.add('show');
+  }
+});
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.sisool-search-container')) {
+    sisoolDropdown.classList.remove('show');
+  }
+});
+
+async function searchSisool(query) {
+  try {
+    const res = await fetch(`/dashboard/api/procedures/sisool-search/?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+
+    sisoolResults = data.results || [];
+    selectedIndex = -1;
+    renderSisoolResults();
+  } catch(e) {
+    console.error('시술 검색 오류:', e);
+  }
+}
+
+function renderSisoolResults() {
+  if (sisoolResults.length === 0) {
+    sisoolDropdown.innerHTML = '<div class="sisool-search-hint">검색 결과가 없습니다. 직접 입력하세요.</div>';
+  } else {
+    let html = `<div class="sisool-search-hint">${sisoolResults.length}개 결과 (↑↓ 선택, Enter 확정)</div>`;
+    sisoolResults.forEach((item, i) => {
+      const effects = (item.effect || []).slice(0, 3);
+      html += `<div class="sisool-item ${i === selectedIndex ? 'selected' : ''}" onclick="selectSisool(sisoolResults[${i}])">
+        <div><span class="name">${escapeHtml(item.name)}</span>${item.english ? `<span class="english">${escapeHtml(item.english)}</span>` : ''}</div>
+        <div class="category">${escapeHtml(item.category)}</div>
+        ${effects.length > 0 ? `<div class="effects">${effects.map(e => `<span class="tag tag-muted">${escapeHtml(e)}</span>`).join('')}</div>` : ''}
+      </div>`;
+    });
+    sisoolDropdown.innerHTML = html;
+  }
+  sisoolDropdown.classList.add('show');
+}
+
+function updateSelection() {
+  const items = sisoolDropdown.querySelectorAll('.sisool-item');
+  items.forEach((item, i) => {
+    item.classList.toggle('selected', i === selectedIndex);
+  });
+  // 선택된 항목이 보이도록 스크롤
+  if (selectedIndex >= 0 && items[selectedIndex]) {
+    items[selectedIndex].scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function selectSisool(item) {
+  // 시술명 입력
+  sisoolInput.value = item.name;
+
+  // 카테고리 자동 설정
+  const catMap = {
+    '피부과': 'skin',
+    '레이저시술': 'laser',
+    '필링시술': 'skin',
+    '리프팅시술': 'lifting',
+    '쁘띠시술_주사': 'injection',
+    '보톡스': 'injection',
+    '필러': 'injection',
+    '스킨부스터': 'injection',
+    '성형외과': 'body',
+    '눈성형': 'body',
+    '코성형': 'body',
+    '안면윤곽수술': 'body',
+    '리프팅수술': 'lifting',
+    '지방관련수술': 'body',
+    '가슴성형': 'body',
+    '체형성형': 'body',
+    '탈모치료': 'hair',
+  };
+
+  const catParts = item.category.split(' > ');
+  let selectedCat = 'etc';
+  for (const part of catParts) {
+    if (catMap[part]) {
+      selectedCat = catMap[part];
+      break;
+    }
+  }
+  document.getElementById('categorySelect').value = selectedCat;
+
+  // 회복 기간 자동 입력
+  if (item.data) {
+    if (item.data['회복기간']) {
+      document.querySelector('input[name="recovery_time"]').value = item.data['회복기간'];
+    }
+    if (item.data['시술주기']) {
+      document.querySelector('input[name="sessions_recommended"]').value = item.data['시술주기'];
+    }
+    if (item.data['지속기간']) {
+      document.querySelector('input[name="duration"]').value = item.data['지속기간'];
+    }
+  }
+
+  // 지식 수집 필드에도 반영
+  document.getElementById('collectProcName').value = item.name;
+
+  sisoolDropdown.classList.remove('show');
+}
+</script>
+{% endblock %}

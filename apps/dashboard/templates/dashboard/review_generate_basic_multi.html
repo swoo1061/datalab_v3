@@ -1,0 +1,1259 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}AI 생성 Basic Multi{% endblock %}
+
+{% block extra_css %}
+<style>
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid var(--border);
+  }
+  .tab-btn {
+    padding: 12px 24px;
+    background: none;
+    border: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { color: var(--brand); }
+  .tab-btn.active { color: var(--brand); border-bottom-color: var(--brand); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .two-col-wide { display: grid; grid-template-columns: 2fr 3fr; gap: 24px; }
+
+  .content-type-list { display: flex; flex-direction: column; gap: 8px; }
+  .content-type-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; background: var(--bg); border-radius: 8px;
+  }
+  .content-type-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--brand); }
+  .content-type-row label { flex: 1; font-size: 0.9rem; cursor: pointer; }
+  .len-input {
+    width: 70px; padding: 6px 8px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 0.85rem; text-align: center;
+  }
+  .len-label { font-size: 0.8rem; color: var(--muted); }
+
+  .series-item {
+    margin-bottom: 20px; padding: 16px; background: var(--bg);
+    border-radius: 12px; border: 1px solid var(--border);
+  }
+  .series-item-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+  }
+  .series-item-type { font-weight: 700; color: var(--brand); font-size: 0.95rem; }
+  .series-item-count { font-size: 0.8rem; color: var(--muted); }
+  .series-item-content {
+    white-space: pre-wrap; line-height: 1.8; font-size: 0.93rem;
+    max-height: 200px; overflow-y: auto;
+  }
+
+  .title-panel { margin-top: 8px; }
+  .title-option {
+    display: block; padding: 10px 16px; margin: 4px 0;
+    background: var(--surface); border-radius: 8px; font-size: 0.9rem;
+    cursor: pointer; transition: all 0.2s; border: 1px solid var(--border);
+  }
+  .title-option:hover { border-color: var(--brand); background: var(--brand-bg); }
+  .title-option.selected { background: var(--brand); color: white; border-color: var(--brand); }
+
+  .prompt-preview {
+    background: #1e293b; border-radius: 10px; padding: 16px;
+    margin-bottom: 16px; max-height: 300px; overflow-y: auto;
+  }
+  .prompt-preview pre { color: #e2e8f0; font-size: 0.8rem; white-space: pre-wrap; line-height: 1.6; margin: 0; }
+
+  .slider-container { display: flex; align-items: center; gap: 12px; }
+  .slider-container input[type="range"] { flex: 1; height: 6px; accent-color: var(--brand); }
+  .slider-container span { min-width: 40px; font-weight: 600; color: var(--brand); }
+
+  .diversity-settings {
+    margin-top: 12px; padding: 16px; background: var(--bg);
+    border-radius: 10px; border: 1px solid var(--border);
+  }
+  .setting-row { margin-bottom: 16px; }
+  .setting-row label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+  .setting-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .setting-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-weight: 600; font-size: 0.9rem; }
+  .setting-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .setting-grid > div label { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+  .setting-grid .form-select { padding: 8px 10px; font-size: 0.8rem; }
+  .collapse-btn {
+    width: 100%; text-align: left; padding: 12px 16px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem;
+    font-weight: 600; color: var(--text); cursor: pointer; transition: all 0.2s;
+  }
+  .collapse-btn:hover { background: var(--brand-bg); border-color: var(--brand); }
+
+  .usage-info { display: flex; gap: 16px; margin-top: 12px; font-size: 0.85rem; color: var(--muted); }
+  .usage-info span { background: var(--bg); padding: 4px 10px; border-radius: 6px; }
+
+  .autocomplete-wrap { position: relative; }
+  .autocomplete-list {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    max-height: 240px; overflow-y: auto; box-shadow: var(--shadow-lg); display: none;
+  }
+  .autocomplete-item {
+    padding: 10px 16px; cursor: pointer; font-size: 0.9rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .autocomplete-item:hover { background: var(--brand-bg); }
+  .autocomplete-item small { color: var(--muted); font-size: 0.8rem; }
+
+  /* Batch */
+  .progress-bar-wrap {
+    background: var(--bg); border-radius: 20px; height: 24px; overflow: hidden;
+    margin: 16px 0; border: 1px solid var(--border);
+  }
+  .progress-bar-fill {
+    height: 100%; background: linear-gradient(90deg, var(--brand), #7c3aed);
+    border-radius: 20px; transition: width 0.3s; display: flex;
+    align-items: center; justify-content: center; font-size: 0.75rem;
+    color: white; font-weight: 600; min-width: 30px;
+  }
+  .mini-card {
+    padding: 10px 14px; background: var(--bg); border-radius: 8px;
+    margin-bottom: 8px; font-size: 0.85rem; display: flex;
+    justify-content: space-between; align-items: center;
+    border: 1px solid var(--border);
+  }
+  .mini-card .persona-tag {
+    font-size: 0.75rem; background: var(--brand-bg); color: var(--brand);
+    padding: 2px 8px; border-radius: 10px;
+  }
+
+  /* Score grid */
+  .score-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .score-card {
+    background: var(--surface); border-radius: 12px; padding: 16px;
+    border: 2px solid var(--border); transition: all 0.2s;
+  }
+  .score-card.score-high { border-color: var(--success); }
+  .score-card.score-mid { border-color: var(--warning); }
+  .score-card.score-low { border-color: var(--danger); }
+  .score-badge {
+    display: inline-block; padding: 4px 12px; border-radius: 20px;
+    font-weight: 700; font-size: 0.9rem;
+  }
+  .score-high .score-badge { background: #d1fae5; color: #059669; }
+  .score-mid .score-badge { background: #fef3c7; color: #d97706; }
+  .score-low .score-badge { background: #fee2e2; color: #dc2626; }
+
+  /* Edit tab */
+  .edit-textarea {
+    width: 100%; min-height: 200px; padding: 12px; border: 1px solid var(--border);
+    border-radius: 10px; font-size: 0.93rem; line-height: 1.8; resize: vertical;
+  }
+  .timeline {
+    border-left: 3px solid var(--brand); padding-left: 20px; margin-top: 20px;
+  }
+  .timeline-item {
+    margin-bottom: 20px; position: relative;
+  }
+  .timeline-item::before {
+    content: ''; position: absolute; left: -27px; top: 6px;
+    width: 12px; height: 12px; background: var(--brand);
+    border-radius: 50%; border: 2px solid var(--surface);
+  }
+  .timeline-date {
+    font-size: 0.8rem; color: var(--muted); margin-bottom: 4px;
+  }
+  .timeline-title { font-weight: 600; font-size: 0.9rem; }
+
+  /* Export tab */
+  .log-table { font-size: 0.85rem; }
+  .log-table th { font-size: 0.75rem; }
+
+  .spinner-sm {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(0,0,0,0.15); border-radius: 50%;
+    border-top-color: var(--brand); animation: spin 0.8s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+
+  @media (max-width: 1024px) {
+    .two-col, .two-col-wide { grid-template-columns: 1fr; }
+    .setting-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Basic Multi</h1>
+    <p class="page-subtitle">시리즈 대량 생성 & 비교 & 편집 & 내보내기</p>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="tab1">시리즈 생성</button>
+  <button class="tab-btn" data-tab="tab2">배치 생성</button>
+  <button class="tab-btn" data-tab="tab3">비교 & 점수</button>
+  <button class="tab-btn" data-tab="tab4">편집 & 스케줄</button>
+  <button class="tab-btn" data-tab="tab5">내보내기 & 로그</button>
+</div>
+
+<!-- ========== TAB 1: 시리즈 생성 ========== -->
+<div id="tab1" class="tab-content active">
+  <div class="two-col-wide">
+    <!-- 좌측: 입력 -->
+    <div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><h3 class="card-title">시술 선택</h3></div>
+        <div class="autocomplete-wrap">
+          <input type="text" id="procedureSearch" class="form-input" placeholder="시술명 검색 (예: 피코레이저, 보톡스)..." autocomplete="off">
+          <input type="hidden" id="procedureId">
+          <div id="procedureDropdown" class="autocomplete-list"></div>
+        </div>
+        <div id="procedureInfo" style="margin-top:12px;display:none">
+          <div style="padding:10px 14px;background:var(--brand-bg);border-radius:8px;font-size:0.85rem">
+            <strong id="procName"></strong>
+            <span id="procCategory" class="tag tag-primary" style="margin-left:8px"></span>
+            <div id="procDesc" style="margin-top:6px;color:var(--muted)"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><h3 class="card-title">기본 정보</h3></div>
+        <textarea id="userInput" class="form-textarea" rows="5" placeholder="시술 정보, 병원명, 원장님, 가격, 느낌 등 기본 정보를 입력하세요..."></textarea>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><h3 class="card-title">컨텐츠 타입 선택</h3></div>
+        <div class="content-type-list">
+          <div class="content-type-row" style="background: var(--brand-bg);">
+            <input type="checkbox" id="ct_title" value="title">
+            <label for="ct_title">📝 제목 생성</label>
+            <input type="number" class="len-input" id="len_title" value="5" min="1" max="20" step="1" style="width:50px;">
+            <span class="len-label">개</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_question" value="question" checked>
+            <label for="ct_question">고민 & 질문</label>
+            <input type="number" class="len-input" id="len_question" value="500" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_research" value="research" checked>
+            <label for="ct_research">발품/손품</label>
+            <input type="number" class="len-input" id="len_research" value="600" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_consultation" value="consultation" checked>
+            <label for="ct_consultation">방문상담 후기</label>
+            <input type="number" class="len-input" id="len_consultation" value="700" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_day0" value="day0" checked>
+            <label for="ct_day0">시술 당일 후기</label>
+            <input type="number" class="len-input" id="len_day0" value="800" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_month1" value="month1" checked>
+            <label for="ct_month1">시술 후 1개월</label>
+            <input type="number" class="len-input" id="len_month1" value="600" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_month2" value="month2">
+            <label for="ct_month2">시술 후 2개월</label>
+            <input type="number" class="len-input" id="len_month2" value="600" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_month3" value="month3">
+            <label for="ct_month3">시술 후 3개월</label>
+            <input type="number" class="len-input" id="len_month3" value="500" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_week1" value="week1">
+            <label for="ct_week1">시술 후 1주일</label>
+            <input type="number" class="len-input" id="len_week1" value="500" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_week2" value="week2">
+            <label for="ct_week2">시술 후 2주일</label>
+            <input type="number" class="len-input" id="len_week2" value="500" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+          <div class="content-type-row">
+            <input type="checkbox" id="ct_week3" value="week3">
+            <label for="ct_week3">시술 후 3주일</label>
+            <input type="number" class="len-input" id="len_week3" value="500" min="100" max="2000" step="50">
+            <span class="len-label">자</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">모델</label>
+            <select id="modelSelect" class="form-select">
+              {% for m in models %}
+              <option value="{{ m.id }}" {% if m.id == 'claude-sonnet-4-5-20250929' %}selected{% endif %}>{{ m.name }} ({{ m.provider }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">프롬프트 템플릿</label>
+            <select id="templateSelect" class="form-select">
+              <option value="">기본 템플릿</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="collapse-btn" onclick="toggleDiversity()">
+          다양성 설정 (페르소나 & 상황) ▼
+        </button>
+        <div id="diversityPanel" class="diversity-settings" style="display:none">
+          <div class="setting-row">
+            <label>Temperature (다양성)</label>
+            <div class="slider-container">
+              <input type="range" id="temperature" min="0.5" max="1.0" step="0.05" value="0.85">
+              <span id="tempValue">0.85</span>
+            </div>
+          </div>
+
+          <div class="setting-section">
+            <div class="setting-header">
+              <span>페르소나 설정</span>
+              <button class="btn btn-ghost btn-sm" onclick="randomizePersona()">🎲 랜덤</button>
+            </div>
+            <div class="setting-grid">
+              <div><label>연령대</label><select id="pAge" class="form-select"><option value="미지정" selected>미지정</option><option value="">랜덤</option><option>20대 초반</option><option>20대 중반</option><option>20대 후반</option><option>30대 초반</option><option>30대 중반</option><option>30대 후반</option><option>40대</option><option>50대</option></select></div>
+              <div><label>성별</label><select id="pGender" class="form-select"><option value="미지정" selected>미지정</option><option value="">랜덤</option><option>여성</option><option>남성</option></select></div>
+              <div><label>직업</label><select id="pJob" class="form-select"><option value="미지정" selected>미지정</option><option value="">랜덤</option><option>직장인</option><option>대학생</option><option>주부</option><option>자영업</option><option>프리랜서</option></select></div>
+              <div><label>성격</label><select id="pPersonality" class="form-select"><option value="미지정" selected>미지정</option><option value="">랜덤</option><option>활발함</option><option>소심함</option><option>꼼꼼함</option><option>털털함</option></select></div>
+              <div><label>말투</label><select id="pTone" class="form-select"><option value="미지정" selected>미지정</option><option value="">랜덤</option><option>존댓말 위주</option><option>반말 위주</option><option>혼용</option><option>살짝 격식체</option></select></div>
+              <div><label>시술 경험</label><select id="pExperience" class="form-select"><option value="미지정" selected>미지정</option><option value="">랜덤</option><option>첫 시술</option><option>2~3회차</option><option>5회 이상</option><option>단골</option></select></div>
+            </div>
+          </div>
+
+          <div class="setting-section">
+            <div class="setting-header"><span>상황 변수</span></div>
+            <div class="setting-grid">
+              <div><label>상담 분위기</label><select id="sConsult" class="form-select"><option value="">미지정</option><option>매우 친절</option><option>친절</option><option>보통</option><option>사무적</option></select></div>
+              <div><label>시술 통증</label><select id="sPain" class="form-select"><option value="">미지정</option><option>거의 없음</option><option>약간</option><option>보통</option><option>좀 아팠음</option></select></div>
+              <div><label>다운타임</label><select id="sDowntime" class="form-select"><option value="">미지정</option><option>없음</option><option>1~2일</option><option>3~5일</option><option>1주일 이상</option></select></div>
+              <div><label>만족도</label><select id="sSatisfaction" class="form-select"><option value="">미지정</option><option>매우 만족</option><option>만족</option><option>보통</option><option>약간 아쉬움</option></select></div>
+              <div><label>가격 느낌</label><select id="sPrice" class="form-select"><option value="">미지정</option><option>매우 합리적</option><option>적당</option><option>좀 비쌈</option><option>비쌈</option></select></div>
+              <div><label>재방문 의향</label><select id="sRevisit" class="form-select"><option value="">미지정</option><option>꼭 다시 감</option><option>아마 갈 듯</option><option>모르겠음</option><option>안 갈 듯</option></select></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button id="generateBtn" class="btn btn-primary btn-lg" style="width:100%" onclick="generateSeries()">
+        시리즈 생성
+      </button>
+    </div>
+
+    <!-- 우측: 결과 -->
+    <div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <h3 class="card-title">생성 결과</h3>
+          <button class="btn btn-ghost btn-sm" onclick="togglePrompt()">프롬프트 보기</button>
+        </div>
+        <div id="promptPreview" class="prompt-preview" style="display:none">
+          <pre id="promptText"></pre>
+        </div>
+        <div id="seriesResult">
+          <div class="text-center text-muted" style="padding:60px">시리즈를 생성해주세요</div>
+        </div>
+        <div id="usageInfo" class="usage-info" style="display:none"></div>
+      </div>
+
+      <div class="card" id="titlePanel" style="display:none">
+        <div class="card-header"><h3 class="card-title">제목 추천</h3></div>
+        <div id="titleList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== TAB 2: 배치 생성 ========== -->
+<div id="tab2" class="tab-content">
+  <div class="two-col">
+    <!-- 좌측: 설정 -->
+    <div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><h3 class="card-title">배치 생성 설정</h3></div>
+        <p class="text-sm text-muted" style="margin-bottom:16px">Tab 1의 설정을 공유합니다. 목표 생성 수만 추가로 설정하세요.</p>
+
+        <div class="form-group">
+          <label class="form-label">목표 생성 수</label>
+          <div class="slider-container">
+            <input type="range" id="batchCount" min="5" max="50" step="1" value="30">
+            <span id="batchCountValue">30</span>
+          </div>
+          <div class="form-hint">5~50개 시리즈를 순차 생성합니다.</div>
+        </div>
+      </div>
+
+      <button id="batchBtn" class="btn btn-primary btn-lg" style="width:100%" onclick="startBatch()">
+        배치 생성 시작
+      </button>
+
+      <div id="batchStatus" style="margin-top:20px;display:none">
+        <div class="card">
+          <h4 style="margin-bottom:12px">진행 상태</h4>
+          <div class="progress-bar-wrap">
+            <div id="batchProgress" class="progress-bar-fill" style="width:0%">0%</div>
+          </div>
+          <div id="batchInfo" class="text-sm text-muted"></div>
+          <button id="batchStopBtn" class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="stopBatch()">중지</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 우측: 완료된 시리즈 -->
+    <div>
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">완료된 시리즈</h3></div>
+        <div id="batchItemsList" style="max-height:600px;overflow-y:auto">
+          <div class="text-center text-muted" style="padding:40px">배치 생성을 시작하세요</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== TAB 3: 비교 & 점수 ========== -->
+<div id="tab3" class="tab-content">
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header">
+      <h3 class="card-title">비교 & 점수</h3>
+      <div style="display:flex;gap:8px">
+        <select id="scoreSourceSelect" class="form-select" style="width:auto">
+          <option value="tab1">Tab 1 결과</option>
+          <option value="batch">배치 결과</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="scoreAll()">전체 점수 평가</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="scoreGrid" class="score-grid">
+    <div class="text-center text-muted" style="padding:40px;grid-column:1/-1">시리즈를 먼저 생성하세요 (Tab 1 또는 Tab 2)</div>
+  </div>
+</div>
+
+<!-- ========== TAB 4: 편집 & 스케줄 ========== -->
+<div id="tab4" class="tab-content">
+  <div class="two-col">
+    <!-- 좌측: 편집 -->
+    <div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <h3 class="card-title">편집</h3>
+          <select id="editSeriesSelect" class="form-select" style="width:auto" onchange="loadEditSeries()">
+            <option value="">시리즈 선택...</option>
+          </select>
+        </div>
+        <div id="editPiecesContainer">
+          <div class="text-center text-muted" style="padding:40px">시리즈를 선택하세요</div>
+        </div>
+        <div id="editActions" style="display:none;margin-top:16px">
+          <button class="btn btn-primary" onclick="saveEdits()">편집 저장</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 우측: 타임라인 -->
+    <div>
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">스케줄 & 타임라인</h3></div>
+        <div id="timelineContainer">
+          <div class="text-center text-muted" style="padding:40px">편집 후 스케줄을 설정하세요</div>
+        </div>
+        <div id="scheduleActions" style="display:none;margin-top:16px">
+          <button class="btn btn-primary" onclick="saveSchedule()">스케줄 저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== TAB 5: 내보내기 & 로그 ========== -->
+<div id="tab5" class="tab-content">
+  <div class="two-col">
+    <div>
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">내보내기</h3></div>
+        <div class="form-group">
+          <label class="form-label">대상</label>
+          <select id="exportSource" class="form-select">
+            <option value="tab1">Tab 1 결과</option>
+            <option value="batch">배치 전체</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">형식</label>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary" onclick="exportData('text')">Text</button>
+            <button class="btn btn-secondary" onclick="exportData('csv')">CSV</button>
+            <button class="btn btn-secondary" onclick="exportData('json')">JSON</button>
+          </div>
+        </div>
+        <div id="exportPreview" style="display:none;margin-top:16px">
+          <textarea id="exportContent" class="form-textarea" rows="12" readonly></textarea>
+          <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="downloadExport()">다운로드</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">생성 로그</h3></div>
+        <div class="table-container">
+          <table class="log-table">
+            <thead>
+              <tr><th>배치</th><th>시술</th><th>수량</th><th>상태</th><th>비용</th><th>생성일</th></tr>
+            </thead>
+            <tbody id="logTableBody">
+              {% for b in batches %}
+              <tr>
+                <td>{{ b.name|truncatechars:20 }}</td>
+                <td>{{ b.procedure.name|default:"-" }}</td>
+                <td>{{ b.completed_count }}/{{ b.target_count }}</td>
+                <td><span class="tag {% if b.status == 'completed' %}tag-success{% elif b.status == 'in_progress' %}tag-warning{% else %}tag-muted{% endif %}">{{ b.get_status_display }}</span></td>
+                <td>${{ b.total_cost_usd|floatformat:4 }}</td>
+                <td>{{ b.created_at|date:"m/d H:i" }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="6" class="text-center text-muted">로그 없음</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ==================== Utility ====================
+function getCookie(name) {
+  let v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+const CSRF = getCookie('csrftoken');
+
+function apiPost(url, data) {
+  return fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+    body: JSON.stringify(data)
+  }).then(r => r.json());
+}
+
+// ==================== Tab Switching ====================
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ==================== Globals ====================
+let currentSeries = [];       // Tab 1 result
+let currentPrompt = '';
+let batchId = null;
+let batchItems = [];          // batch results
+let batchRunning = false;
+let currentEditItemId = null;
+
+const TYPE_NAMES = {
+  'title': '📝 제목',
+  'question': '고민 & 질문', 'research': '발품/손품',
+  'consultation': '방문상담 후기', 'day0': '시술 당일 후기',
+  'week1': '시술 후 1주일', 'week2': '시술 후 2주일', 'week3': '시술 후 3주일',
+  'month1': '시술 후 1개월', 'month2': '시술 후 2개월',
+  'month3': '시술 후 3개월',
+};
+
+// ==================== Procedure Autocomplete ====================
+const procSearch = document.getElementById('procedureSearch');
+const procDropdown = document.getElementById('procedureDropdown');
+let procTimeout;
+
+procSearch.addEventListener('input', () => {
+  clearTimeout(procTimeout);
+  procTimeout = setTimeout(async () => {
+    const q = procSearch.value.trim();
+    const res = await fetch(`/dashboard/api/procedures/search/?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (data.results.length > 0) {
+      procDropdown.innerHTML = data.results.map(p =>
+        `<div class="autocomplete-item" onclick="selectProcedure(${p.id}, '${p.name}', '${p.category}', '${p.description.replace(/'/g, "\\'")}')">
+          <div>${p.name} <small>${p.category} · ${p.pain_level}</small></div>
+          ${p.price_range ? `<small>${p.price_range}</small>` : ''}
+        </div>`
+      ).join('');
+      procDropdown.style.display = 'block';
+    } else {
+      procDropdown.style.display = 'none';
+    }
+  }, 300);
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.autocomplete-wrap')) procDropdown.style.display = 'none';
+});
+
+function selectProcedure(id, name, category, desc) {
+  document.getElementById('procedureId').value = id;
+  procSearch.value = name;
+  procDropdown.style.display = 'none';
+  document.getElementById('procName').textContent = name;
+  document.getElementById('procCategory').textContent = category;
+  document.getElementById('procDesc').textContent = desc;
+  document.getElementById('procedureInfo').style.display = 'block';
+}
+
+// ==================== UI Helpers ====================
+function toggleDiversity() {
+  const panel = document.getElementById('diversityPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function togglePrompt() {
+  const p = document.getElementById('promptPreview');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+document.getElementById('temperature').addEventListener('input', (e) => {
+  document.getElementById('tempValue').textContent = e.target.value;
+});
+
+document.getElementById('batchCount').addEventListener('input', (e) => {
+  document.getElementById('batchCountValue').textContent = e.target.value;
+});
+
+function randomizePersona() {
+  const selects = ['pAge', 'pGender', 'pJob', 'pPersonality', 'pTone', 'pExperience'];
+  selects.forEach(id => {
+    const el = document.getElementById(id);
+    const opts = [...el.options].filter(o => o.value);
+    if (opts.length) el.value = opts[Math.floor(Math.random() * opts.length)].value;
+  });
+}
+
+// ==================== Collect Settings ====================
+function getContentTypes() {
+  const types = [];
+  const lengths = {};
+  ['question', 'research', 'consultation', 'day0', 'month1', 'month2', 'month3'].forEach(t => {
+    if (document.getElementById('ct_' + t).checked) {
+      types.push(t);
+      lengths[t] = parseInt(document.getElementById('len_' + t).value) || 500;
+    }
+  });
+  return { types, lengths };
+}
+
+function getPersona() {
+  const p = {};
+  if (document.getElementById('pAge').value) p.age = document.getElementById('pAge').value;
+  if (document.getElementById('pGender').value) p.gender = document.getElementById('pGender').value;
+  if (document.getElementById('pJob').value) p.job = document.getElementById('pJob').value;
+  if (document.getElementById('pPersonality').value) p.personality = document.getElementById('pPersonality').value;
+  if (document.getElementById('pTone').value) p.tone = document.getElementById('pTone').value;
+  if (document.getElementById('pExperience').value) p.experience = document.getElementById('pExperience').value;
+  return p;
+}
+
+function getSituation() {
+  const s = {};
+  if (document.getElementById('sConsult').value) s.consult = document.getElementById('sConsult').value;
+  if (document.getElementById('sPain').value) s.pain = document.getElementById('sPain').value;
+  if (document.getElementById('sDowntime').value) s.downtime = document.getElementById('sDowntime').value;
+  if (document.getElementById('sSatisfaction').value) s.satisfaction = document.getElementById('sSatisfaction').value;
+  if (document.getElementById('sPrice').value) s.price = document.getElementById('sPrice').value;
+  if (document.getElementById('sRevisit').value) s.revisit = document.getElementById('sRevisit').value;
+  return s;
+}
+
+// ==================== TAB 1: Generate Series ====================
+async function generateSeries() {
+  const userInput = document.getElementById('userInput').value.trim();
+  if (!userInput) return alert('기본 정보를 입력해주세요.');
+
+  const { types, lengths } = getContentTypes();
+  if (types.length === 0) return alert('최소 하나의 컨텐츠를 선택해주세요.');
+
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span> 시리즈 생성 중...';
+
+  document.getElementById('seriesResult').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+  try {
+    const data = await apiPost('/dashboard/api/generate-multi-series/', {
+      user_input: userInput,
+      procedure_id: document.getElementById('procedureId').value || null,
+      content_types: types,
+      content_lengths: lengths,
+      model: document.getElementById('modelSelect').value,
+      template_id: document.getElementById('templateSelect').value || null,
+      temperature: parseFloat(document.getElementById('temperature').value),
+      persona: getPersona(),
+      situation: getSituation(),
+    });
+
+    if (data.error) {
+      document.getElementById('seriesResult').innerHTML = `<div style="color:var(--danger);padding:20px">${data.error}</div>`;
+      return;
+    }
+
+    currentSeries = data.series;
+    currentPrompt = data.prompt;
+    renderSeries(data.series);
+    renderTitles(data.series);
+
+    document.getElementById('promptText').textContent = data.prompt;
+
+    if (data.usage) {
+      document.getElementById('usageInfo').style.display = 'flex';
+      document.getElementById('usageInfo').innerHTML = `
+        <span>입력: ${data.usage.input_tokens}</span>
+        <span>출력: ${data.usage.output_tokens}</span>
+        <span>$${data.usage.cost_usd}</span>
+        <span>₩${data.usage.cost_krw}</span>
+      `;
+    }
+
+    // Update edit dropdown
+    updateEditDropdown();
+  } catch (e) {
+    document.getElementById('seriesResult').innerHTML = `<div style="color:var(--danger);padding:20px">오류: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '시리즈 생성';
+  }
+}
+
+function renderSeries(series) {
+  const container = document.getElementById('seriesResult');
+
+  // 제목과 나머지 컨텐츠 분리
+  const titles = series.filter(s => s.type === 'title');
+  const contents = series.filter(s => s.type !== 'title');
+
+  let html = '';
+
+  // 제목 섹션 (있는 경우)
+  if (titles.length > 0) {
+    html += `<div class="series-item" style="background: var(--brand-bg); border: 2px solid var(--brand); border-radius: 12px;">
+      <div class="series-item-header">
+        <span class="series-item-type" style="color: var(--brand);">📝 추천 제목</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        ${titles.map(t => {
+          const titleLines = t.content.split('\n').filter(line => line.trim());
+          return titleLines.map((line, idx) => `
+            <div class="title-option" onclick="copyTitle(this, '${escapeAttr(line)}')" data-title="${escapeAttr(line)}">
+              ${idx + 1}. ${line.replace(/^\d+[\.\)]\s*/, '')}
+            </div>
+          `).join('');
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  // 나머지 컨텐츠
+  html += contents.map((s, i) => `
+    <div class="series-item" data-index="${i}">
+      <div class="series-item-header">
+        <span class="series-item-type">${TYPE_NAMES[s.type] || s.type}</span>
+        <span class="series-item-count">${s.char_count}자</span>
+      </div>
+      <div class="series-item-content">${escapeHtml(s.content)}</div>
+    </div>
+  `).join('');
+
+  container.innerHTML = html;
+}
+
+function copyTitle(el, title) {
+  // 이전 선택 해제
+  document.querySelectorAll('.title-option.selected').forEach(opt => opt.classList.remove('selected'));
+  // 현재 선택
+  el.classList.add('selected');
+  // 클립보드 복사
+  navigator.clipboard.writeText(title).then(() => {
+    const originalBg = el.style.background;
+    el.style.background = 'var(--success)';
+    el.style.color = 'white';
+    setTimeout(() => {
+      el.style.background = '';
+      el.style.color = '';
+    }, 500);
+  });
+}
+
+function renderTitles(series) {
+  const panel = document.getElementById('titlePanel');
+  const list = document.getElementById('titleList');
+
+  const hasTitles = series.some(s => s.titles && s.titles.length > 0);
+  if (!hasTitles) { panel.style.display = 'none'; return; }
+
+  panel.style.display = 'block';
+  list.innerHTML = series.map((s, i) => {
+    if (!s.titles || s.titles.length === 0) return '';
+    return `
+      <div style="margin-bottom:16px">
+        <div style="font-weight:600;font-size:0.85rem;margin-bottom:6px;color:var(--brand)">${TYPE_NAMES[s.type] || s.type}</div>
+        <div class="title-panel">
+          ${s.titles.map((t, j) => `<span class="title-option" onclick="selectTitle(${i}, ${j}, this)" data-title="${escapeAttr(t)}">${t}</span>`).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function selectTitle(seriesIdx, titleIdx, el) {
+  // Toggle selected
+  el.parentElement.querySelectorAll('.title-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  if (currentSeries[seriesIdx]) {
+    currentSeries[seriesIdx].selected_title = el.dataset.title;
+  }
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function escapeAttr(text) {
+  return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ==================== TAB 2: Batch ====================
+async function startBatch() {
+  const userInput = document.getElementById('userInput').value.trim();
+  if (!userInput) return alert('Tab 1에서 기본 정보를 입력해주세요.');
+
+  const { types, lengths } = getContentTypes();
+  if (types.length === 0) return alert('Tab 1에서 컨텐츠 타입을 선택해주세요.');
+
+  const targetCount = parseInt(document.getElementById('batchCount').value);
+
+  batchRunning = true;
+  batchItems = [];
+  document.getElementById('batchStatus').style.display = 'block';
+  document.getElementById('batchBtn').disabled = true;
+  document.getElementById('batchItemsList').innerHTML = '';
+  updateProgress(0, targetCount);
+
+  try {
+    // 1. Create batch
+    const batchData = await apiPost('/dashboard/api/generate-multi-batch/', {
+      user_input: userInput,
+      procedure_id: document.getElementById('procedureId').value || null,
+      content_types: types,
+      content_lengths: lengths,
+      model: document.getElementById('modelSelect').value,
+      target_count: targetCount,
+    });
+
+    if (batchData.error) {
+      alert(batchData.error);
+      batchRunning = false;
+      document.getElementById('batchBtn').disabled = false;
+      return;
+    }
+
+    batchId = batchData.batch_id;
+
+    // 2. Sequential generation
+    for (let i = 0; i < targetCount && batchRunning; i++) {
+      try {
+        const nextData = await apiPost('/dashboard/api/generate-multi-batch-next/', {
+          batch_id: batchId,
+          content_lengths: lengths,
+        });
+
+        if (nextData.error) {
+          addBatchMiniCard(i + 1, null, nextData.error);
+          continue;
+        }
+
+        batchItems.push(nextData);
+        addBatchMiniCard(i + 1, nextData);
+        updateProgress(i + 1, targetCount);
+        document.getElementById('batchInfo').textContent =
+          `${i + 1}/${targetCount} 완료 · $${(nextData.usage?.cost_usd || 0).toFixed(4)}`;
+
+        if (nextData.completed) break;
+      } catch (e) {
+        addBatchMiniCard(i + 1, null, e.message);
+      }
+    }
+
+    batchRunning = false;
+    document.getElementById('batchBtn').disabled = false;
+    document.getElementById('batchInfo').textContent += ' (완료)';
+    updateEditDropdown();
+  } catch (e) {
+    alert('배치 생성 실패: ' + e.message);
+    batchRunning = false;
+    document.getElementById('batchBtn').disabled = false;
+  }
+}
+
+function stopBatch() {
+  batchRunning = false;
+  document.getElementById('batchBtn').disabled = false;
+  document.getElementById('batchInfo').textContent += ' (중지됨)';
+}
+
+function updateProgress(current, total) {
+  const pct = Math.round((current / total) * 100);
+  const bar = document.getElementById('batchProgress');
+  bar.style.width = pct + '%';
+  bar.textContent = pct + '%';
+}
+
+function addBatchMiniCard(idx, data, error) {
+  const list = document.getElementById('batchItemsList');
+  if (idx === 1) list.innerHTML = '';
+
+  if (error) {
+    list.innerHTML += `<div class="mini-card" style="border-color:var(--danger)">
+      <span>#${idx} 실패: ${error}</span>
+    </div>`;
+    return;
+  }
+
+  const persona = data.persona || {};
+  const personaStr = [persona.age, persona.gender, persona.job].filter(Boolean).join(' · ');
+  const piecesCount = data.series ? data.series.length : 0;
+
+  list.innerHTML += `<div class="mini-card">
+    <span>#${idx} · ${piecesCount}피스</span>
+    <span class="persona-tag">${personaStr}</span>
+  </div>`;
+  list.scrollTop = list.scrollHeight;
+}
+
+// ==================== TAB 3: Score ====================
+async function scoreAll() {
+  const source = document.getElementById('scoreSourceSelect').value;
+  const grid = document.getElementById('scoreGrid');
+
+  let itemsToScore = [];
+
+  if (source === 'tab1' && currentSeries.length > 0) {
+    itemsToScore = [{ pieces: currentSeries, index: 0, item_id: null }];
+  } else if (source === 'batch' && batchItems.length > 0) {
+    itemsToScore = batchItems.map((b, i) => ({
+      pieces: b.series,
+      index: i,
+      item_id: b.item_id,
+    }));
+  } else {
+    grid.innerHTML = '<div class="text-center text-muted" style="padding:40px;grid-column:1/-1">시리즈가 없습니다.</div>';
+    return;
+  }
+
+  grid.innerHTML = '<div class="text-center" style="padding:40px;grid-column:1/-1"><div class="spinner"></div><p class="text-muted" style="margin-top:12px">점수 평가 중...</p></div>';
+
+  const results = [];
+  for (const item of itemsToScore) {
+    try {
+      const data = await apiPost('/dashboard/api/score-naturalness/', {
+        item_id: item.item_id,
+        pieces: item.pieces,
+        model: document.getElementById('modelSelect').value,
+      });
+      results.push({ ...item, scoreData: data.score_data || {}, error: data.error });
+    } catch (e) {
+      results.push({ ...item, scoreData: {}, error: e.message });
+    }
+  }
+
+  renderScoreGrid(results);
+}
+
+function renderScoreGrid(results) {
+  const grid = document.getElementById('scoreGrid');
+  grid.innerHTML = results.map((r, i) => {
+    const score = r.scoreData?.score || 0;
+    const cls = score >= 7 ? 'score-high' : score >= 5 ? 'score-mid' : 'score-low';
+    const feedback = r.scoreData?.feedback || r.error || '';
+    const strengths = (r.scoreData?.strengths || []).join(', ');
+    const weaknesses = (r.scoreData?.weaknesses || []).join(', ');
+
+    return `
+      <div class="score-card ${cls}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span style="font-weight:700">시리즈 #${i + 1}</span>
+          <span class="score-badge">${score.toFixed(1)}</span>
+        </div>
+        <p style="font-size:0.85rem;margin-bottom:8px">${feedback}</p>
+        ${strengths ? `<p style="font-size:0.8rem;color:var(--success)">+ ${strengths}</p>` : ''}
+        ${weaknesses ? `<p style="font-size:0.8rem;color:var(--danger)">- ${weaknesses}</p>` : ''}
+        <div style="margin-top:12px">
+          <button class="btn btn-ghost btn-sm" onclick="regenerateItem(${i})">재생성</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function regenerateItem(idx) {
+  // For now just re-trigger Tab1 generation
+  alert('Tab 1에서 설정을 조정하고 다시 생성해주세요.');
+}
+
+// ==================== TAB 4: Edit & Schedule ====================
+function updateEditDropdown() {
+  const sel = document.getElementById('editSeriesSelect');
+  sel.innerHTML = '<option value="">시리즈 선택...</option>';
+
+  if (currentSeries.length > 0) {
+    sel.innerHTML += '<option value="tab1_0">Tab 1 결과</option>';
+  }
+  batchItems.forEach((b, i) => {
+    sel.innerHTML += `<option value="batch_${i}">배치 #${i + 1} (ID: ${b.item_id})</option>`;
+  });
+}
+
+function loadEditSeries() {
+  const val = document.getElementById('editSeriesSelect').value;
+  if (!val) return;
+
+  let pieces, itemId;
+  if (val === 'tab1_0') {
+    pieces = currentSeries;
+    itemId = null;
+  } else if (val.startsWith('batch_')) {
+    const idx = parseInt(val.split('_')[1]);
+    pieces = batchItems[idx]?.series || [];
+    itemId = batchItems[idx]?.item_id;
+  }
+
+  currentEditItemId = itemId;
+  renderEditPieces(pieces);
+  renderTimeline(pieces);
+}
+
+function renderEditPieces(pieces) {
+  const container = document.getElementById('editPiecesContainer');
+  container.innerHTML = pieces.map((p, i) => `
+    <div style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-weight:700;color:var(--brand)">${TYPE_NAMES[p.type] || p.type}</span>
+        <span class="text-sm text-muted">${p.char_count}자</span>
+      </div>
+      ${p.titles && p.titles.length > 0 ? `
+        <div style="margin-bottom:8px">
+          <label class="form-label" style="font-size:0.8rem">제목 선택</label>
+          <select class="form-select edit-title-select" data-idx="${i}" style="font-size:0.85rem">
+            <option value="">제목 미선택</option>
+            ${p.titles.map(t => `<option value="${escapeAttr(t)}" ${p.selected_title === t ? 'selected' : ''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      ` : ''}
+      <textarea class="edit-textarea" data-idx="${i}" rows="8">${p.edited_content || p.content}</textarea>
+      <div style="margin-top:8px">
+        <label class="form-label" style="font-size:0.8rem">스케줄 날짜</label>
+        <input type="date" class="form-input edit-date-input" data-idx="${i}" value="${p.scheduled_date || ''}" style="width:200px">
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('editActions').style.display = 'block';
+}
+
+function renderTimeline(pieces) {
+  const container = document.getElementById('timelineContainer');
+  const scheduled = pieces.filter(p => p.scheduled_date);
+  if (scheduled.length === 0) {
+    container.innerHTML = '<div class="text-center text-muted" style="padding:20px">날짜를 설정하면 타임라인이 표시됩니다</div>';
+    document.getElementById('scheduleActions').style.display = 'none';
+    return;
+  }
+
+  const sorted = [...pieces].filter(p => p.scheduled_date).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
+  container.innerHTML = '<div class="timeline">' + sorted.map(p => `
+    <div class="timeline-item">
+      <div class="timeline-date">${p.scheduled_date}</div>
+      <div class="timeline-title">${TYPE_NAMES[p.type] || p.type}</div>
+      <div class="text-sm text-muted">${p.selected_title || ''}</div>
+    </div>
+  `).join('') + '</div>';
+  document.getElementById('scheduleActions').style.display = 'block';
+}
+
+async function saveEdits() {
+  if (!currentEditItemId) {
+    alert('배치에서 생성된 시리즈만 DB 저장 가능합니다. Tab 1 결과는 로컬에 반영됩니다.');
+    // Update local currentSeries
+    document.querySelectorAll('.edit-textarea').forEach(el => {
+      const idx = parseInt(el.dataset.idx);
+      if (currentSeries[idx]) currentSeries[idx].edited_content = el.value;
+    });
+    document.querySelectorAll('.edit-title-select').forEach(el => {
+      const idx = parseInt(el.dataset.idx);
+      if (currentSeries[idx]) currentSeries[idx].selected_title = el.value;
+    });
+    return;
+  }
+
+  const pieces = [];
+  document.querySelectorAll('.edit-textarea').forEach(el => {
+    const idx = parseInt(el.dataset.idx);
+    const titleEl = document.querySelector(`.edit-title-select[data-idx="${idx}"]`);
+    pieces.push({
+      index: idx,
+      edited_content: el.value,
+      selected_title: titleEl ? titleEl.value : '',
+    });
+  });
+
+  const data = await apiPost('/dashboard/api/save-multi-edits/', {
+    item_id: currentEditItemId,
+    pieces: pieces,
+  });
+
+  if (data.success) alert('편집 저장 완료!');
+  else alert('저장 실패: ' + (data.error || ''));
+}
+
+async function saveSchedule() {
+  if (!currentEditItemId) {
+    alert('배치에서 생성된 시리즈만 스케줄 저장 가능합니다.');
+    return;
+  }
+
+  const schedules = [];
+  document.querySelectorAll('.edit-date-input').forEach(el => {
+    if (el.value) {
+      schedules.push({ index: parseInt(el.dataset.idx), date: el.value });
+    }
+  });
+
+  const data = await apiPost('/dashboard/api/save-schedule/', {
+    item_id: currentEditItemId,
+    schedules: schedules,
+  });
+
+  if (data.success) alert('스케줄 저장 완료!');
+  else alert('저장 실패: ' + (data.error || ''));
+}
+
+// ==================== TAB 5: Export ====================
+async function exportData(format) {
+  const source = document.getElementById('exportSource').value;
+  let payload = { format };
+
+  if (source === 'batch' && batchId) {
+    payload.batch_id = batchId;
+  } else if (source === 'tab1' && currentSeries.length > 0) {
+    // For tab1, we send items directly since no DB record
+    payload.item_ids = [];
+    // Build a local export
+    localExport(format);
+    return;
+  } else {
+    alert('내보낼 데이터가 없습니다.');
+    return;
+  }
+
+  try {
+    const data = await apiPost('/dashboard/api/export-multi/', payload);
+    if (data.success) {
+      const content = typeof data.data === 'string' ? data.data : JSON.stringify(data.data, null, 2);
+      document.getElementById('exportContent').value = content;
+      document.getElementById('exportPreview').style.display = 'block';
+      window._exportFormat = format;
+      window._exportContent = content;
+    } else {
+      alert('내보내기 실패: ' + (data.error || ''));
+    }
+  } catch (e) {
+    alert('오류: ' + e.message);
+  }
+}
+
+function localExport(format) {
+  let content = '';
+  if (format === 'text') {
+    content = currentSeries.map((s, i) => {
+      const title = s.selected_title ? ` ${s.selected_title}` : '';
+      return `--- [${TYPE_NAMES[s.type] || s.type}]${title} ---\n${s.edited_content || s.content}`;
+    }).join('\n\n=======\n\n');
+  } else if (format === 'json') {
+    content = JSON.stringify(currentSeries, null, 2);
+  } else {
+    content = 'type,title,content,char_count\n' + currentSeries.map(s => {
+      const c = (s.edited_content || s.content).replace(/"/g, '""');
+      return `"${s.type}","${(s.selected_title || '').replace(/"/g, '""')}","${c}",${s.char_count}`;
+    }).join('\n');
+  }
+  document.getElementById('exportContent').value = content;
+  document.getElementById('exportPreview').style.display = 'block';
+  window._exportFormat = format;
+  window._exportContent = content;
+}
+
+function downloadExport() {
+  const format = window._exportFormat || 'txt';
+  const content = window._exportContent || '';
+  const ext = format === 'json' ? 'json' : format === 'csv' ? 'csv' : 'txt';
+  const mime = format === 'json' ? 'application/json' : format === 'csv' ? 'text/csv' : 'text/plain';
+
+  const blob = new Blob(['\ufeff' + content], { type: mime + ';charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `multi_series_export.${ext}`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ==================== Load Templates ====================
+(async function loadTemplates() {
+  try {
+    const res = await fetch('/dashboard/api/prompt-templates/?mode=basic_multi');
+    const data = await res.json();
+    const sel = document.getElementById('templateSelect');
+    if (data.templates) {
+      data.templates.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = `${t.name} v${t.version}${t.is_default ? ' (기본)' : ''}`;
+        sel.appendChild(opt);
+      });
+    }
+  } catch(e) {}
+})();
+</script>
+{% endblock %}

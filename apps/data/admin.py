@@ -4,7 +4,9 @@ Django Admin 설정 - presetss.txt 기반 144개 항목 반영
 from django.contrib import admin
 from .models import (
     Campaign, Review, ImageAsset,
-    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile
+    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile,
+    ProcedureInfo, MultiSeriesBatch, MultiSeriesItem,
+    PromptOptimizationSession, OptimizationRound, OptimizationSample, OptimizationLog
 )
 
 
@@ -194,6 +196,107 @@ class GeneratedReviewAdmin(admin.ModelAdmin):
     def char_count(self, obj):
         return len(obj.generated_text) if obj.generated_text else 0
     char_count.short_description = '글자수'
+
+
+@admin.register(ProcedureInfo)
+class ProcedureInfoAdmin(admin.ModelAdmin):
+    list_display = ['name', 'category', 'pain_level', 'price_range', 'is_active', 'updated_at']
+    list_filter = ['category', 'pain_level', 'is_active']
+    search_fields = ['name', 'description']
+    fieldsets = (
+        ('기본 정보', {
+            'fields': ('name', 'category', 'description')
+        }),
+        ('시술 상세', {
+            'fields': ('pain_level', 'recovery_time', 'typical_results', 'duration', 'anesthesia_type', 'sessions_recommended')
+        }),
+        ('가격 & 부작용', {
+            'fields': ('price_range', 'common_side_effects', 'precautions'),
+            'classes': ('collapse',)
+        }),
+        ('체험 지식 DB', {
+            'fields': ('knowledge_base',),
+            'classes': ('collapse',)
+        }),
+        ('상태', {
+            'fields': ('is_active',)
+        }),
+    )
+
+
+@admin.register(MultiSeriesBatch)
+class MultiSeriesBatchAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name', 'procedure', 'target_count', 'completed_count', 'status', 'total_cost_usd', 'created_at']
+    list_filter = ['status', 'model_used', 'created_at']
+    search_fields = ['name', 'user_input']
+    readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(MultiSeriesItem)
+class MultiSeriesItemAdmin(admin.ModelAdmin):
+    list_display = ['id', 'batch', 'series_index', 'naturalness_score', 'status', 'cost_usd', 'created_at']
+    list_filter = ['status', 'created_at']
+    readonly_fields = ['created_at']
+
+
+# =====================================================
+# 프롬프트 최적화 관리
+# =====================================================
+
+@admin.register(PromptOptimizationSession)
+class PromptOptimizationSessionAdmin(admin.ModelAdmin):
+    list_display = ['name', 'procedure', 'status', 'current_round', 'target_rounds', 'mode', 'total_cost_usd', 'created_at']
+    list_filter = ['status', 'mode', 'created_at']
+    search_fields = ['name', 'description']
+    readonly_fields = ['created_at', 'updated_at', 'current_round', 'total_input_tokens', 'total_output_tokens', 'total_cost_usd']
+    fieldsets = (
+        ('기본 정보', {
+            'fields': ('name', 'description', 'base_prompt_template', 'procedure', 'user_input')
+        }),
+        ('설정', {
+            'fields': ('samples_per_round', 'target_rounds', 'mode', 'auto_approve_threshold', 'model_used', 'analysis_model')
+        }),
+        ('분석 옵션', {
+            'fields': ('analyze_ai_detection', 'analyze_naturalness', 'analyze_diversity', 'analyze_accuracy')
+        }),
+        ('상태 & 통계', {
+            'fields': ('status', 'current_round', 'total_input_tokens', 'total_output_tokens', 'total_cost_usd')
+        }),
+        ('메타', {
+            'fields': ('created_at', 'updated_at')
+        }),
+    )
+
+
+@admin.register(OptimizationRound)
+class OptimizationRoundAdmin(admin.ModelAdmin):
+    list_display = ['id', 'session', 'round_number', 'status', 'score_overall', 'generated_count', 'cost_usd', 'created_at']
+    list_filter = ['status', 'created_at']
+    search_fields = ['session__name', 'prompt_changes']
+    readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(OptimizationSample)
+class OptimizationSampleAdmin(admin.ModelAdmin):
+    list_display = ['id', 'round', 'sample_index', 'content_preview', 'created_at']
+    list_filter = ['created_at']
+    readonly_fields = ['created_at']
+
+    def content_preview(self, obj):
+        return obj.generated_content[:100] + '...' if len(obj.generated_content) > 100 else obj.generated_content
+    content_preview.short_description = '내용 미리보기'
+
+
+@admin.register(OptimizationLog)
+class OptimizationLogAdmin(admin.ModelAdmin):
+    list_display = ['id', 'session', 'round', 'log_type', 'message_preview', 'created_at']
+    list_filter = ['log_type', 'created_at']
+    search_fields = ['message']
+    readonly_fields = ['created_at']
+
+    def message_preview(self, obj):
+        return obj.message[:80] + '...' if len(obj.message) > 80 else obj.message
+    message_preview.short_description = '메시지'
 
 
 # Admin 사이트 설정

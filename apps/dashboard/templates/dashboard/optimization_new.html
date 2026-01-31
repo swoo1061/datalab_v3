@@ -1,0 +1,179 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}새 최적화 세션{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">새 최적화 세션</h1>
+    <p class="page-subtitle">프롬프트 검증 & 최적화 사이클 설정</p>
+  </div>
+  <a href="{% url 'dashboard:optimization_list' %}" class="btn btn-secondary">취소</a>
+</div>
+
+<form method="POST" action="">
+  {% csrf_token %}
+
+  <div class="grid-2">
+    <!-- 기본 정보 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">기본 정보</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">세션명 *</label>
+        <input type="text" name="name" class="form-input" placeholder="예: 쥬베룩 후기 프롬프트 v1" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">설명</label>
+        <textarea name="description" class="form-textarea" rows="2" placeholder="세션에 대한 설명 (선택)"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">기본 프롬프트 템플릿</label>
+        <select name="template_id" class="form-select">
+          <option value="">-- 선택 (선택사항) --</option>
+          {% for t in templates %}
+          <option value="{{ t.id }}">{{ t.name }} ({{ t.get_mode_display }})</option>
+          {% endfor %}
+        </select>
+        <p class="form-hint">선택하지 않으면 기본 프롬프트로 시작합니다.</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">시술 정보</label>
+        <select name="procedure_id" class="form-select">
+          <option value="">-- 선택 (선택사항) --</option>
+          {% for p in procedures %}
+          <option value="{{ p.id }}">{{ p.name }} ({{ p.get_category_display }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">사용자 입력 (컨텍스트)</label>
+        <textarea name="user_input" class="form-textarea" rows="4" placeholder="시술명, 병원, 상황 등 후기 생성에 필요한 정보를 입력하세요."></textarea>
+        <p class="form-hint">프롬프트의 {user_input} 위치에 삽입됩니다.</p>
+      </div>
+    </div>
+
+    <!-- 실행 설정 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">실행 설정</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">라운드당 샘플 수</label>
+          <input type="number" name="samples_per_round" class="form-input" value="50" min="5" max="200">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">목표 라운드 수</label>
+          <input type="number" name="target_rounds" class="form-input" value="5" min="1" max="20">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">실행 모드</label>
+        <select name="mode" class="form-select">
+          <option value="semi_auto">반자동 - 각 라운드 후 수동 승인</option>
+          <option value="auto">자동 - 목표 점수 도달까지 자동 진행</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">자동 승인 점수 (자동 모드)</label>
+        <input type="number" name="auto_approve_threshold" class="form-input" value="8.0" min="5" max="10" step="0.1">
+        <p class="form-hint">자동 모드에서 이 점수 이상이면 자동으로 세션을 완료합니다.</p>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">생성 모델</label>
+          <select name="model_used" class="form-select">
+            {% for m in models %}
+            <option value="{{ m.id }}" {% if 'sonnet' in m.id %}selected{% endif %}>{{ m.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">분석 모델</label>
+          <select name="analysis_model" class="form-select">
+            {% for m in models %}
+            <option value="{{ m.id }}" {% if 'sonnet' in m.id %}selected{% endif %}>{{ m.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- 상세 생성 설정 -->
+      <div style="margin-top: 16px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px;">
+        <h4 style="margin-bottom: 12px; font-size: 14px; color: var(--text-secondary);">생성 상세 설정</h4>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">온도 범위 (최소)</label>
+            <input type="number" name="temperature_min" class="form-input" value="0.7" min="0.1" max="1.0" step="0.05">
+          </div>
+          <div class="form-group">
+            <label class="form-label">온도 범위 (최대)</label>
+            <input type="number" name="temperature_max" class="form-input" value="0.95" min="0.1" max="1.0" step="0.05">
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">생성 최대 토큰</label>
+            <input type="number" name="max_tokens_generation" class="form-input" value="4000" min="500" max="16000" step="500">
+          </div>
+          <div class="form-group">
+            <label class="form-label">분석 최대 토큰</label>
+            <input type="number" name="max_tokens_analysis" class="form-input" value="8000" min="1000" max="32000" step="500">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">분석 깊이</label>
+          <select name="analysis_depth" class="form-select">
+            <option value="basic">기본 (20개 샘플, 빠른 분석)</option>
+            <option value="detailed" selected>상세 (40개 샘플, 권장)</option>
+            <option value="exhaustive">정밀 (50개 샘플, 가장 정확)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top: 16px;">
+        <label class="form-label">분석 옵션</label>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" name="analyze_ai_detection" checked style="width: 18px; height: 18px;">
+            <span>AI 탐지 회피 분석</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" name="analyze_naturalness" checked style="width: 18px; height: 18px;">
+            <span>자연스러움 분석</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" name="analyze_diversity" checked style="width: 18px; height: 18px;">
+            <span>다양성 분석</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" name="analyze_accuracy" checked style="width: 18px; height: 18px;">
+            <span>정보 정확도 분석</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
+    <a href="{% url 'dashboard:optimization_list' %}" class="btn btn-secondary">취소</a>
+    <button type="submit" class="btn btn-primary">세션 생성</button>
+  </div>
+</form>
+{% endblock %}

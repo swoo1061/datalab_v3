@@ -10,7 +10,8 @@ import re
 
 from apps.data.models import (
     Review, Campaign, ImageAsset,
-    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile, AccessLog
+    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile, AccessLog,
+    ProcedureInfo, MultiSeriesBatch, MultiSeriesItem
 )
 from apps.ml.services.llm_service import generate_review, generate_review_advanced
 from apps.ml.services.prompt_generator import build_review_prompt, build_prompt_from_models
@@ -1699,9 +1700,13 @@ def api_generate_series(request):
         'research': '발품/손품',
         'consultation': '방문상담 후기',
         'day0': '시술 당일 후기',
+        'week1': '시술 후 1주일 후기',
+        'week2': '시술 후 2주일 후기',
+        'week3': '시술 후 3주일 후기',
         'month1': '시술 후 1개월 후기',
         'month2': '시술 후 2개월 후기',
         'month3': '시술 후 3개월 후기',
+        'title': '제목',
     }
 
     type_descriptions = {
@@ -1709,32 +1714,40 @@ def api_generate_series(request):
         'research': '병원 비교, 검색 과정 공유. 여러 병원을 알아보고 비교하는 과정.',
         'consultation': '상담 받고 온 후기. 병원 방문 후 느낌, 상담 내용 공유.',
         'day0': '시술 직후 생생한 후기. 당일의 긴장감, 시술 과정, 직후 상태.',
-        'month1': '시술 후 1개월 경과. 회복 과정, 변화 느낌.',
+        'week1': '시술 후 1주일 경과. 초기 회복 단계, 붓기/멍 변화, 일상 복귀.',
+        'week2': '시술 후 2주일 경과. 회복 중반, 효과 나타나기 시작.',
+        'week3': '시술 후 3주일 경과. 거의 회복, 효과 안정화 진행중.',
+        'month1': '시술 후 1개월 경과. 회복 완료, 본격적인 효과 체감.',
         'month2': '시술 후 2개월 경과. 안정화 단계, 주변 반응.',
         'month3': '시술 후 3개월 경과. 최종 결과, 만족도, 재방문 의향.',
+        'title': '카페/블로그에 올릴 제목. 클릭을 유도하면서 자연스러운 제목.',
     }
 
     # 생성할 컨텐츠 목록 (길이 포함)
     content_list = []
     for ct in content_types:
         length = content_lengths.get(ct, 500)
-        content_list.append(f"- [{type_names.get(ct, ct)}] ({length}자 내외): {type_descriptions.get(ct, '')}")
+        # 제목은 개수로 처리
+        if ct == 'title':
+            content_list.append(f"- [{type_names.get(ct, ct)}] ({length}개): {type_descriptions.get(ct, '')}")
+        else:
+            content_list.append(f"- [{type_names.get(ct, ct)}] ({length}자 내외): {type_descriptions.get(ct, '')}")
 
-    # 페르소나 정보 구성
+    # 페르소나 정보 구성 ("미지정"인 항목은 제외)
     persona_desc = ""
     if persona:
         persona_parts = []
-        if persona.get("age"):
+        if persona.get("age") and persona["age"] != "미지정":
             persona_parts.append(persona["age"])
-        if persona.get("gender"):
+        if persona.get("gender") and persona["gender"] != "미지정":
             persona_parts.append(persona["gender"])
-        if persona.get("job"):
+        if persona.get("job") and persona["job"] != "미지정":
             persona_parts.append(persona["job"])
-        if persona.get("personality"):
+        if persona.get("personality") and persona["personality"] != "미지정":
             persona_parts.append(f"성격: {persona['personality']}")
-        if persona.get("tone"):
+        if persona.get("tone") and persona["tone"] != "미지정":
             persona_parts.append(f"말투: {persona['tone']}")
-        if persona.get("experience"):
+        if persona.get("experience") and persona["experience"] != "미지정":
             persona_parts.append(f"시술 경험: {persona['experience']}")
         if persona_parts:
             persona_desc = f"\n## 글쓴이 페르소나 (반드시 반영)\n" + ", ".join(persona_parts)
@@ -2469,3 +2482,2722 @@ JSON 출력:"""
         }, status=500)
     except Exception as e:
         return JsonResponse({"error": f"생성 실패: {str(e)}"}, status=500)
+
+
+# =====================================================
+# Basic Multi
+# =====================================================
+
+def review_generate_basic_multi(request):
+    """Basic Multi 리뷰 생성 페이지"""
+    from apps.ml.services.llm_service import AVAILABLE_MODELS
+
+    models_list = []
+    for provider, models in AVAILABLE_MODELS.items():
+        for model_id, info in models.items():
+            models_list.append({
+                "id": model_id,
+                "provider": provider,
+                "name": info["name"],
+                "desc": info["desc"],
+            })
+
+    batches = MultiSeriesBatch.objects.all()[:20]
+
+    return render(request, "dashboard/review_generate_basic_multi.html", {
+        "models": models_list,
+        "batches": batches,
+    })
+
+
+@require_http_methods(["POST"])
+def api_generate_multi_series(request):
+    """단일 시리즈 + 제목 생성 API"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    user_input = data.get("user_input", "").strip()
+    procedure_id = data.get("procedure_id")
+    content_types = data.get("content_types", [])
+    content_lengths = data.get("content_lengths", {})
+    model = data.get("model", "claude-sonnet-4-5-20250929")
+    template_id = data.get("template_id")
+    temperature = data.get("temperature", 0.85)
+    persona = data.get("persona", {})
+    situation = data.get("situation", {})
+
+    if not user_input:
+        return JsonResponse({"error": "기본 정보를 입력해주세요."}, status=400)
+    if not content_types:
+        return JsonResponse({"error": "최소 하나의 컨텐츠를 선택해주세요."}, status=400)
+
+    # 시술 정보 자동 주입
+    procedure_desc = ""
+    if procedure_id:
+        proc = ProcedureInfo.objects.filter(pk=procedure_id, is_active=True).first()
+        if proc:
+            proc_parts = [f"시술명: {proc.name}"]
+            if proc.description:
+                proc_parts.append(f"시술 설명: {proc.description}")
+            if proc.pain_level:
+                proc_parts.append(f"통증 레벨: {proc.get_pain_level_display()}")
+            if proc.recovery_time:
+                proc_parts.append(f"회복 기간: {proc.recovery_time}")
+            if proc.typical_results:
+                proc_parts.append(f"일반적 결과: {proc.typical_results}")
+            if proc.common_side_effects:
+                proc_parts.append(f"일반적 부작용: {', '.join(proc.common_side_effects)}")
+            if proc.precautions:
+                proc_parts.append(f"주의사항: {', '.join(proc.precautions)}")
+            if proc.price_range:
+                proc_parts.append(f"가격 범위: {proc.price_range}")
+            if proc.duration:
+                proc_parts.append(f"시술 시간: {proc.duration}")
+            if proc.anesthesia_type:
+                proc_parts.append(f"마취 방법: {proc.anesthesia_type}")
+            if proc.sessions_recommended:
+                proc_parts.append(f"권장 회차: {proc.sessions_recommended}")
+            procedure_desc = "\n## 시술 정보 (자연스럽게 반영)\n" + "\n".join(proc_parts)
+
+            # 체험 지식 DB 주입
+            if proc.knowledge_base:
+                kb = proc.knowledge_base
+                kb_parts = []
+                if kb.get("sensory"):
+                    sensory = kb["sensory"]
+                    if isinstance(sensory, dict):
+                        for phase, items in sensory.items():
+                            if isinstance(items, list):
+                                kb_parts.append(f"  [{phase}] " + ", ".join(items))
+                    elif isinstance(sensory, list):
+                        kb_parts.append("  " + ", ".join(sensory))
+                if kb.get("emotional_journey"):
+                    ej = kb["emotional_journey"]
+                    if isinstance(ej, dict):
+                        for phase, items in ej.items():
+                            if isinstance(items, list):
+                                kb_parts.append(f"  감정({phase}): " + ", ".join(items))
+                            elif isinstance(items, str):
+                                kb_parts.append(f"  감정({phase}): {items}")
+                if kb.get("real_expressions") and isinstance(kb["real_expressions"], list):
+                    kb_parts.append("  커뮤니티 표현: " + ", ".join(kb["real_expressions"][:10]))
+                if kb.get("unexpected") and isinstance(kb["unexpected"], list):
+                    kb_parts.append("  예상 못한 점: " + ", ".join(kb["unexpected"][:5]))
+                if kb.get("detail_points") and isinstance(kb["detail_points"], list):
+                    kb_parts.append("  디테일 포인트: " + ", ".join(kb["detail_points"][:10]))
+                if kb.get("community_tips") and isinstance(kb["community_tips"], list):
+                    kb_parts.append("  커뮤니티 팁: " + ", ".join(kb["community_tips"][:5]))
+                if kb_parts:
+                    procedure_desc += "\n\n## 체험 지식 (자연스럽게 활용 - 전부 쓸 필요 없음, 해당 시점에 맞는 것만)\n" + "\n".join(kb_parts)
+
+    type_names = {
+        'question': '고민 & 질문',
+        'research': '발품/손품',
+        'consultation': '방문상담 후기',
+        'day0': '시술 당일 후기',
+        'week1': '시술 후 1주일 후기',
+        'week2': '시술 후 2주일 후기',
+        'week3': '시술 후 3주일 후기',
+        'month1': '시술 후 1개월 후기',
+        'month2': '시술 후 2개월 후기',
+        'month3': '시술 후 3개월 후기',
+        'title': '제목',
+    }
+
+    type_descriptions = {
+        'question': '시술 전 커뮤니티에 올리는 고민/질문글. 아직 시술을 받기 전이라 결과를 모름.',
+        'research': '병원 비교, 검색 과정 공유. 여러 병원을 알아보고 비교하는 과정.',
+        'consultation': '상담 받고 온 후기. 병원 방문 후 느낌, 상담 내용 공유.',
+        'day0': '시술 직후 생생한 후기. 당일의 긴장감, 시술 과정, 직후 상태.',
+        'week1': '시술 후 1주일 경과. 초기 회복 단계, 붓기/멍 변화, 일상 복귀.',
+        'week2': '시술 후 2주일 경과. 회복 중반, 효과 나타나기 시작.',
+        'week3': '시술 후 3주일 경과. 거의 회복, 효과 안정화 진행중.',
+        'month1': '시술 후 1개월 경과. 회복 완료, 본격적인 효과 체감.',
+        'month2': '시술 후 2개월 경과. 안정화 단계, 주변 반응.',
+        'month3': '시술 후 3개월 경과. 최종 결과, 만족도, 재방문 의향.',
+        'title': '카페/블로그에 올릴 제목. 클릭을 유도하면서 자연스러운 제목.',
+    }
+
+    content_list = []
+    for ct in content_types:
+        length = content_lengths.get(ct, 500)
+        # 제목은 개수로 처리
+        if ct == 'title':
+            content_list.append(f"- [{type_names.get(ct, ct)}] ({length}개): {type_descriptions.get(ct, '')}")
+        else:
+            content_list.append(f"- [{type_names.get(ct, ct)}] ({length}자 내외): {type_descriptions.get(ct, '')}")
+
+    # 페르소나 정보 ("미지정"인 항목은 제외)
+    persona_desc = ""
+    if persona:
+        persona_parts = []
+        if persona.get("age") and persona["age"] != "미지정":
+            persona_parts.append(persona["age"])
+        if persona.get("gender") and persona["gender"] != "미지정":
+            persona_parts.append(persona["gender"])
+        if persona.get("job") and persona["job"] != "미지정":
+            persona_parts.append(persona["job"])
+        if persona.get("personality") and persona["personality"] != "미지정":
+            persona_parts.append(f"성격: {persona['personality']}")
+        if persona.get("tone") and persona["tone"] != "미지정":
+            persona_parts.append(f"말투: {persona['tone']}")
+        if persona.get("experience") and persona["experience"] != "미지정":
+            persona_parts.append(f"시술 경험: {persona['experience']}")
+        if persona_parts:
+            persona_desc = f"\n## 글쓴이 페르소나 (반드시 반영)\n" + ", ".join(persona_parts)
+
+    situation_desc = ""
+    if situation:
+        sit_parts = []
+        if situation.get("consult"):
+            sit_parts.append(f"상담 분위기: {situation['consult']}")
+        if situation.get("pain"):
+            sit_parts.append(f"시술 통증: {situation['pain']}")
+        if situation.get("downtime"):
+            sit_parts.append(f"다운타임: {situation['downtime']}")
+        if situation.get("satisfaction"):
+            sit_parts.append(f"만족도: {situation['satisfaction']}")
+        if situation.get("price"):
+            sit_parts.append(f"가격 느낌: {situation['price']}")
+        if situation.get("revisit"):
+            sit_parts.append(f"재방문 의향: {situation['revisit']}")
+        if sit_parts:
+            situation_desc = f"\n## 상황 변수 (해당 시점 글에 반영)\n" + "\n".join(sit_parts)
+
+    # DB 프롬프트 템플릿
+    from apps.data.models import PromptTemplate
+    if template_id:
+        template = PromptTemplate.objects.filter(pk=template_id, mode='basic_multi').first()
+    else:
+        template = PromptTemplate.objects.filter(mode='basic_multi', is_default=True).first()
+
+    DEFAULT_MULTI_PROMPT = """당신은 실제로 미용 시술을 받는 사람의 관점에서 시간 순서대로 일련의 글을 작성합니다.
+한 사람이 시술을 결심하고, 알아보고, 상담받고, 시술받고, 회복하는 전 과정을 자연스럽게 기록합니다.
+
+## 핵심 원칙
+1. **일관된 페르소나**: 모든 글에서 동일한 사람의 말투, 성격, 걱정, 기대가 느껴져야 합니다.
+2. **시간적 연속성**: 앞선 글에서 언급한 내용이 이후 글에 자연스럽게 연결됩니다.
+3. **감정의 흐름**: 처음 걱정/기대 → 상담 후 안심 → 시술 당일 긴장 → 회복 과정의 변화
+4. **시점 준수**: 각 글은 해당 시점에서만 알 수 있는 정보만 포함. 미래 결과 언급 금지.
+5. **자연스러운 문체**: 광고가 아닌 실제 경험담, 카페/커뮤니티 글처럼.
+
+## AI 탐지 방지 원칙
+- 같은 문장 구조 반복 금지 (주어+서술어 패턴 다양화)
+- "~것 같아요", "~한 것 같습니다" 같은 AI 전형적 표현 최소화
+- 단문 위주, 때로는 비문/줄임말 허용 ("걍", "좀", "넘")
+- 과한 논리적 연결 (따라서, 그러므로, 결과적으로) 금지
+- 자연스러운 오타/탈자 가능 (단, 과하지 않게)
+- 감정 표현이 갑자기 바뀌는 것도 자연스러움
+
+## 표현 다양화 가이드
+- 문장 시작 다양하게: "솔직히", "진짜", "근데", "아", "흠", "일단", "뭔가", "사실" 등
+- 감탄/추임새: "헐", "오", "와", "대박", "ㅋㅋ", "ㅎㅎ", "ㅠㅠ", "..." 활용
+- 불필요한 수식어 빼기: 간결하고 직관적인 표현
+- 구어체 표현: "~거든요", "~잖아요", "~같아요", "~더라고요" 자연스럽게
+- 개인적 감정: "솔직히 좀 무서웠는데", "은근 기대됨", "약간 후회될뻔" 등
+{procedure_desc}{persona_desc}{situation_desc}
+
+## 사용자 제공 정보
+{user_input}
+
+## 생성할 컨텐츠 (순서대로, 지정된 글자수 준수!)
+{content_list}
+
+## 출력 형식 (반드시 준수)
+각 컨텐츠를 아래 형식으로 구분하여 작성:
+
+[고민 & 질문]
+(해당 글자수에 맞는 내용)
+
+=======
+
+[발품/손품]
+(해당 글자수에 맞는 내용)
+
+=======
+
+(이하 동일한 형식으로 계속)
+
+## 주의사항
+- 각 컨텐츠의 지정된 글자수를 최대한 맞춰주세요
+- 구분선은 반드시 ======= (등호 7개 이상) 사용
+- 이모지는 적당히 (과하지 않게)
+- 자연스러운 구어체, 오타 가능
+- 줄바꿈(엔터)은 최소화: 문단 사이는 한 줄만 띄우기. 연속 빈 줄 금지.
+
+지금부터 시리즈를 작성해주세요:"""
+
+    prompt_template = template.content if template else DEFAULT_MULTI_PROMPT
+    series_prompt = prompt_template.format(
+        procedure_desc=procedure_desc,
+        persona_desc=persona_desc,
+        situation_desc=situation_desc,
+        user_input=user_input,
+        content_list=chr(10).join(content_list)
+    )
+
+    try:
+        from apps.ml.services.llm_service import generate_review_with_prompt
+        result = generate_review_with_prompt(
+            series_prompt,
+            model=model,
+            max_tokens=8000,
+            return_usage=True,
+            temperature=temperature
+        )
+        generated_text = result["text"]
+
+        # 파싱
+        parts = re.split(r'\n=+\n', generated_text)
+        series = []
+        for i, part in enumerate(parts):
+            part = part.strip()
+            if not part:
+                continue
+            type_match = re.match(r'\[([^\]]+)\]', part)
+            if type_match:
+                detected_type = type_match.group(1)
+                content = part[type_match.end():].strip()
+            else:
+                detected_type = content_types[i] if i < len(content_types) else f"part_{i}"
+                content = part
+
+            type_code = None
+            for code, name in type_names.items():
+                if code in detected_type.lower() or name in detected_type:
+                    type_code = code
+                    break
+            if not type_code and i < len(content_types):
+                type_code = content_types[i]
+            elif not type_code:
+                type_code = f"content_{i}"
+
+            series.append({
+                "type": type_code,
+                "content": content,
+                "char_count": len(content),
+            })
+
+        # 제목 생성
+        titles = _generate_multi_titles(series, model, type_names)
+
+        # 시리즈에 제목 정보 추가
+        for i, s in enumerate(series):
+            s["titles"] = titles.get(i, [])
+
+        cost_krw = result["cost_usd"] * 1450
+
+        return JsonResponse({
+            "success": True,
+            "series": series,
+            "prompt": series_prompt,
+            "usage": {
+                "input_tokens": result["input_tokens"],
+                "output_tokens": result["output_tokens"],
+                "cost_usd": round(result["cost_usd"], 6),
+                "cost_krw": round(cost_krw, 2),
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({"error": f"시리즈 생성 실패: {str(e)}"}, status=500)
+
+
+def _generate_multi_titles(series, model, type_names):
+    """시리즈 각 피스별 제목 3개 생성"""
+    from apps.data.models import PromptTemplate
+
+    template = PromptTemplate.objects.filter(mode='basic_multi_title', is_default=True).first()
+
+    pieces_desc = []
+    for i, s in enumerate(series):
+        type_label = type_names.get(s["type"], s["type"])
+        preview = s["content"][:100]
+        pieces_desc.append(f"피스 {i}: [{type_label}] {preview}...")
+
+    DEFAULT_TITLE_PROMPT = """아래 각 피스에 대해 카페/커뮤니티에 올리기 좋은 자연스러운 제목을 3개씩 추천해주세요.
+
+## 제목 스타일
+- 카페/커뮤니티 글 제목처럼 자연스러운 스타일
+- 너무 꾸미지 않은, 실제 작성자가 쓸법한 제목
+- 괄호, 이모지 선택적 사용 가능
+
+## 피스 목록
+{pieces}
+
+## 출력 형식 (반드시 JSON)
+```json
+{{
+  "0": ["제목1", "제목2", "제목3"],
+  "1": ["제목1", "제목2", "제목3"]
+}}
+```
+
+JSON만 출력하세요:"""
+
+    prompt = (template.content if template else DEFAULT_TITLE_PROMPT).format(
+        pieces=chr(10).join(pieces_desc)
+    )
+
+    try:
+        from apps.ml.services.llm_service import generate_review_with_prompt
+        result = generate_review_with_prompt(prompt, model=model, max_tokens=2000, return_usage=True, temperature=0.8)
+        text = result["text"]
+        json_match = re.search(r'\{[\s\S]*\}', text)
+        if json_match:
+            titles_data = json.loads(json_match.group())
+            return {int(k): v for k, v in titles_data.items()}
+    except Exception:
+        pass
+    return {}
+
+
+@require_http_methods(["POST"])
+def api_generate_multi_batch(request):
+    """배치 생성 시작 (DB 레코드 생성)"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    user_input = data.get("user_input", "").strip()
+    procedure_id = data.get("procedure_id")
+    content_types = data.get("content_types", [])
+    content_lengths = data.get("content_lengths", {})
+    model = data.get("model", "claude-sonnet-4-5-20250929")
+    target_count = data.get("target_count", 30)
+
+    if not user_input:
+        return JsonResponse({"error": "기본 정보를 입력해주세요."}, status=400)
+    if not content_types:
+        return JsonResponse({"error": "최소 하나의 컨텐츠를 선택해주세요."}, status=400)
+
+    target_count = max(1, min(50, target_count))
+
+    procedure = None
+    if procedure_id:
+        procedure = ProcedureInfo.objects.filter(pk=procedure_id, is_active=True).first()
+
+    batch = MultiSeriesBatch.objects.create(
+        name=f"{procedure.name if procedure else '시술'} 시리즈 x{target_count}",
+        procedure=procedure,
+        user_input=user_input,
+        content_types=content_types,
+        model_used=model,
+        target_count=target_count,
+        status='in_progress',
+    )
+
+    return JsonResponse({
+        "success": True,
+        "batch_id": batch.id,
+        "target_count": target_count,
+        "content_types": content_types,
+        "content_lengths": content_lengths,
+    })
+
+
+@require_http_methods(["POST"])
+def api_generate_multi_batch_next(request):
+    """배치 내 다음 시리즈 생성"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    batch_id = data.get("batch_id")
+    if not batch_id:
+        return JsonResponse({"error": "batch_id 필요"}, status=400)
+
+    batch = MultiSeriesBatch.objects.filter(pk=batch_id).first()
+    if not batch:
+        return JsonResponse({"error": "배치를 찾을 수 없습니다."}, status=404)
+
+    if batch.completed_count >= batch.target_count:
+        batch.status = 'completed'
+        batch.save()
+        return JsonResponse({"success": True, "completed": True, "batch_id": batch.id})
+
+    series_index = batch.completed_count + 1
+
+    import random
+    ages = ['20대 초반', '20대 중반', '20대 후반', '30대 초반', '30대 중반', '30대 후반', '40대']
+    genders = ['여성', '남성']
+    jobs = ['직장인', '대학생', '주부', '자영업', '프리랜서']
+    tones = ['존댓말 위주', '반말 위주', '혼용', '살짝 격식체']
+    experiences = ['첫 시술', '2~3회차', '5회 이상', '단골']
+
+    persona = {
+        "age": random.choice(ages),
+        "gender": random.choice(genders),
+        "job": random.choice(jobs),
+        "tone": random.choice(tones),
+        "experience": random.choice(experiences),
+    }
+
+    satisfaction_opts = ['매우 만족', '만족', '보통', '약간 아쉬움']
+    pain_opts = ['거의 없음', '약간', '보통', '좀 아팠음']
+    situation = {
+        "satisfaction": random.choice(satisfaction_opts),
+        "pain": random.choice(pain_opts),
+    }
+
+    temperature = round(random.uniform(0.7, 0.95), 2)
+    content_lengths = data.get("content_lengths", {})
+
+    from django.test import RequestFactory
+    factory = RequestFactory()
+    internal_data = {
+        "user_input": batch.user_input,
+        "procedure_id": batch.procedure_id,
+        "content_types": batch.content_types,
+        "content_lengths": content_lengths,
+        "model": batch.model_used,
+        "temperature": temperature,
+        "persona": persona,
+        "situation": situation,
+    }
+    fake_request = factory.post(
+        '/dashboard/api/generate-multi-series/',
+        data=json.dumps(internal_data),
+        content_type='application/json'
+    )
+    response = api_generate_multi_series(fake_request)
+    response_data = json.loads(response.content)
+
+    if response_data.get("success"):
+        series_data = response_data["series"]
+        usage = response_data.get("usage", {})
+
+        item = MultiSeriesItem.objects.create(
+            batch=batch,
+            series_index=series_index,
+            persona_settings=persona,
+            situation_settings=situation,
+            temperature=temperature,
+            pieces=series_data,
+            prompt_used=response_data.get("prompt", ""),
+            input_tokens=usage.get("input_tokens", 0),
+            output_tokens=usage.get("output_tokens", 0),
+            cost_usd=usage.get("cost_usd", 0),
+        )
+
+        batch.completed_count = series_index
+        batch.total_input_tokens += usage.get("input_tokens", 0)
+        batch.total_output_tokens += usage.get("output_tokens", 0)
+        batch.total_cost_usd += usage.get("cost_usd", 0)
+        if batch.completed_count >= batch.target_count:
+            batch.status = 'completed'
+        batch.save()
+
+        return JsonResponse({
+            "success": True,
+            "completed": batch.completed_count >= batch.target_count,
+            "batch_id": batch.id,
+            "series_index": series_index,
+            "item_id": item.id,
+            "series": series_data,
+            "persona": persona,
+            "completed_count": batch.completed_count,
+            "target_count": batch.target_count,
+            "usage": usage,
+        })
+    else:
+        return JsonResponse({
+            "error": response_data.get("error", "생성 실패"),
+            "batch_id": batch.id,
+            "series_index": series_index,
+        }, status=500)
+
+
+@require_http_methods(["POST"])
+def api_score_naturalness(request):
+    """자연스러움 점수 평가 API"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    item_id = data.get("item_id")
+    pieces = data.get("pieces", [])
+
+    if not pieces:
+        if item_id:
+            item = MultiSeriesItem.objects.filter(pk=item_id).first()
+            if item:
+                pieces = item.pieces
+        if not pieces:
+            return JsonResponse({"error": "평가할 컨텐츠가 없습니다."}, status=400)
+
+    from apps.data.models import PromptTemplate
+    template = PromptTemplate.objects.filter(mode='basic_multi_score', is_default=True).first()
+
+    pieces_text = []
+    for i, p in enumerate(pieces):
+        content = p.get("edited_content") or p.get("content", "")
+        pieces_text.append(f"--- 피스 {i+1} [{p.get('type', '')}] ---\n{content}")
+
+    DEFAULT_SCORE_PROMPT = """아래 시리즈 컨텐츠의 자연스러움을 평가해주세요.
+
+## 평가 기준
+1. AI가 아닌 실제 사람이 쓴 것처럼 보이는가
+2. 반복되는 문장 구조나 패턴이 있는가
+3. 과도하게 논리적이거나 정리된 느낌이 드는가
+4. 자연스러운 구어체, 감정 표현이 잘 살아있는가
+5. 카페/커뮤니티 글로서 적절한가
+
+## 시리즈 컨텐츠
+{pieces_text}
+
+## 출력 형식 (반드시 JSON)
+```json
+{{
+  "score": 7.5,
+  "feedback": "전반적으로 자연스럽지만...",
+  "strengths": ["구어체 표현이 자연스러움", "..."],
+  "weaknesses": ["일부 문장 구조 반복", "..."],
+  "suggestions": ["~부분을 ~로 수정하면 더 자연스러움", "..."]
+}}
+```
+
+JSON만 출력하세요:"""
+
+    prompt = (template.content if template else DEFAULT_SCORE_PROMPT).format(
+        pieces_text=chr(10).join(pieces_text)
+    )
+
+    model = data.get("model", "claude-sonnet-4-5-20250929")
+
+    try:
+        from apps.ml.services.llm_service import generate_review_with_prompt
+        result = generate_review_with_prompt(prompt, model=model, max_tokens=2000, return_usage=True, temperature=0.5)
+        text = result["text"]
+
+        json_match = re.search(r'\{[\s\S]*\}', text)
+        if json_match:
+            score_data = json.loads(json_match.group())
+        else:
+            score_data = {"score": 0, "feedback": text}
+
+        if item_id:
+            item = MultiSeriesItem.objects.filter(pk=item_id).first()
+            if item:
+                item.naturalness_score = score_data.get("score", 0)
+                item.score_feedback = json.dumps(score_data, ensure_ascii=False)
+                item.status = 'scored'
+                item.save()
+
+        cost_krw = result["cost_usd"] * 1450
+
+        return JsonResponse({
+            "success": True,
+            "score_data": score_data,
+            "usage": {
+                "input_tokens": result["input_tokens"],
+                "output_tokens": result["output_tokens"],
+                "cost_usd": round(result["cost_usd"], 6),
+                "cost_krw": round(cost_krw, 2),
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({"error": f"평가 실패: {str(e)}"}, status=500)
+
+
+@require_http_methods(["POST"])
+def api_regenerate_piece(request):
+    """특정 피스 재생성 API"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    item_id = data.get("item_id")
+    piece_index = data.get("piece_index", 0)
+    model = data.get("model", "claude-sonnet-4-5-20250929")
+
+    item = MultiSeriesItem.objects.filter(pk=item_id).first()
+    if not item:
+        return JsonResponse({"error": "시리즈를 찾을 수 없습니다."}, status=404)
+
+    if piece_index < 0 or piece_index >= len(item.pieces):
+        return JsonResponse({"error": "유효하지 않은 피스 인덱스"}, status=400)
+
+    piece = item.pieces[piece_index]
+    type_names = {
+        'question': '고민 & 질문', 'research': '발품/손품',
+        'consultation': '방문상담 후기', 'day0': '시술 당일 후기',
+        'week1': '시술 후 1주일 후기', 'week2': '시술 후 2주일 후기', 'week3': '시술 후 3주일 후기',
+        'month1': '시술 후 1개월 후기', 'month2': '시술 후 2개월 후기',
+        'month3': '시술 후 3개월 후기', 'title': '제목',
+    }
+
+    prompt = f"""아래 컨텐츠를 더 자연스럽게 다시 작성해주세요.
+동일한 주제와 시점을 유지하되, 표현과 문체를 완전히 새롭게 바꿔주세요.
+
+## 컨텐츠 타입: {type_names.get(piece.get('type', ''), piece.get('type', ''))}
+## 글자수: {piece.get('char_count', 500)}자 내외
+## 기존 내용:
+{piece.get('content', '')}
+
+## 원칙
+- AI 탐지 방지를 위한 자연스러운 문체
+- 단문 위주, 구어체 표현
+- 반복 패턴 금지
+- 카페/커뮤니티 글 스타일
+
+새로운 버전을 작성해주세요:"""
+
+    try:
+        from apps.ml.services.llm_service import generate_review_with_prompt
+        result = generate_review_with_prompt(prompt, model=model, max_tokens=3000, return_usage=True, temperature=0.9)
+        new_content = result["text"].strip()
+
+        item.pieces[piece_index]["content"] = new_content
+        item.pieces[piece_index]["char_count"] = len(new_content)
+        item.save()
+
+        cost_krw = result["cost_usd"] * 1450
+
+        return JsonResponse({
+            "success": True,
+            "piece_index": piece_index,
+            "content": new_content,
+            "char_count": len(new_content),
+            "usage": {
+                "input_tokens": result["input_tokens"],
+                "output_tokens": result["output_tokens"],
+                "cost_usd": round(result["cost_usd"], 6),
+                "cost_krw": round(cost_krw, 2),
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({"error": f"재생성 실패: {str(e)}"}, status=500)
+
+
+@require_http_methods(["POST"])
+def api_save_multi_edits(request):
+    """편집 내용 저장 API"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    item_id = data.get("item_id")
+    pieces = data.get("pieces", [])
+
+    item = MultiSeriesItem.objects.filter(pk=item_id).first()
+    if not item:
+        return JsonResponse({"error": "시리즈를 찾을 수 없습니다."}, status=404)
+
+    for p_update in pieces:
+        idx = p_update.get("index", -1)
+        if 0 <= idx < len(item.pieces):
+            if "edited_content" in p_update:
+                item.pieces[idx]["edited_content"] = p_update["edited_content"]
+            if "selected_title" in p_update:
+                item.pieces[idx]["selected_title"] = p_update["selected_title"]
+
+    item.status = 'edited'
+    item.save()
+
+    return JsonResponse({"success": True, "item_id": item.id})
+
+
+@require_http_methods(["POST"])
+def api_save_schedule(request):
+    """스케줄 저장 API"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    item_id = data.get("item_id")
+    schedules = data.get("schedules", [])
+
+    item = MultiSeriesItem.objects.filter(pk=item_id).first()
+    if not item:
+        return JsonResponse({"error": "시리즈를 찾을 수 없습니다."}, status=404)
+
+    for sched in schedules:
+        idx = sched.get("index", -1)
+        if 0 <= idx < len(item.pieces):
+            item.pieces[idx]["scheduled_date"] = sched.get("date", "")
+
+    item.status = 'scheduled'
+    item.save()
+
+    return JsonResponse({"success": True, "item_id": item.id})
+
+
+@require_http_methods(["POST"])
+def api_export_multi(request):
+    """내보내기 API (text/CSV/JSON)"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    batch_id = data.get("batch_id")
+    item_ids = data.get("item_ids", [])
+    export_format = data.get("format", "json")
+
+    if batch_id:
+        items = MultiSeriesItem.objects.filter(batch_id=batch_id).order_by('series_index')
+    elif item_ids:
+        items = MultiSeriesItem.objects.filter(pk__in=item_ids).order_by('series_index')
+    else:
+        return JsonResponse({"error": "batch_id 또는 item_ids 필요"}, status=400)
+
+    type_names = {
+        'question': '고민 & 질문', 'research': '발품/손품',
+        'consultation': '방문상담 후기', 'day0': '시술 당일 후기',
+        'week1': '시술 후 1주일 후기', 'week2': '시술 후 2주일 후기', 'week3': '시술 후 3주일 후기',
+        'month1': '시술 후 1개월 후기', 'month2': '시술 후 2개월 후기',
+        'month3': '시술 후 3개월 후기', 'title': '제목',
+    }
+
+    if export_format == 'text':
+        lines = []
+        for item in items:
+            lines.append(f"===== 시리즈 #{item.series_index} =====")
+            for i, p in enumerate(item.pieces):
+                title = p.get("selected_title", "")
+                content = p.get("edited_content") or p.get("content", "")
+                type_label = type_names.get(p.get("type", ""), p.get("type", ""))
+                if title:
+                    lines.append(f"\n--- [{type_label}] {title} ---")
+                else:
+                    lines.append(f"\n--- [{type_label}] ---")
+                lines.append(content)
+            lines.append("")
+        return JsonResponse({"success": True, "data": "\n".join(lines), "format": "text"})
+
+    elif export_format == 'csv':
+        import csv
+        import io
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["시리즈", "피스", "타입", "제목", "내용", "글자수", "스케줄"])
+        for item in items:
+            for i, p in enumerate(item.pieces):
+                content = p.get("edited_content") or p.get("content", "")
+                writer.writerow([
+                    item.series_index,
+                    i + 1,
+                    type_names.get(p.get("type", ""), p.get("type", "")),
+                    p.get("selected_title", ""),
+                    content,
+                    len(content),
+                    p.get("scheduled_date", ""),
+                ])
+        return JsonResponse({"success": True, "data": output.getvalue(), "format": "csv"})
+
+    else:  # json
+        export_data = []
+        for item in items:
+            export_data.append({
+                "series_index": item.series_index,
+                "persona": item.persona_settings,
+                "situation": item.situation_settings,
+                "naturalness_score": item.naturalness_score,
+                "pieces": item.pieces,
+            })
+        return JsonResponse({"success": True, "data": export_data, "format": "json"})
+
+
+@require_http_methods(["GET"])
+def api_procedures_search(request):
+    """시술 정보 검색 (autocomplete)"""
+    q = request.GET.get("q", "").strip()
+    if not q:
+        procedures = ProcedureInfo.objects.filter(is_active=True)[:20]
+    else:
+        procedures = ProcedureInfo.objects.filter(
+            is_active=True,
+            name__icontains=q
+        )[:20]
+
+    results = []
+    for p in procedures:
+        results.append({
+            "id": p.id,
+            "name": p.name,
+            "category": p.get_category_display(),
+            "pain_level": p.get_pain_level_display(),
+            "price_range": p.price_range,
+            "description": p.description[:100] if p.description else "",
+        })
+
+    return JsonResponse({"results": results})
+
+
+# =====================================================
+# 시술 정보 CRUD
+# =====================================================
+
+def procedure_list(request):
+    """시술 정보 목록"""
+    procedures = ProcedureInfo.objects.all()
+    return render(request, "dashboard/procedure_list.html", {"procedures": procedures})
+
+
+def procedure_edit(request, pk=None):
+    """시술 정보 편집/생성"""
+    if pk:
+        procedure = get_object_or_404(ProcedureInfo, pk=pk)
+    else:
+        procedure = None
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if not name:
+            return render(request, "dashboard/procedure_edit.html", {
+                "procedure": procedure, "error": "시술명은 필수입니다."
+            })
+
+        if not procedure:
+            procedure = ProcedureInfo()
+
+        procedure.name = name
+        procedure.category = request.POST.get('category', 'skin')
+        procedure.description = request.POST.get('description', '')
+        procedure.pain_level = request.POST.get('pain_level', 'moderate')
+        procedure.recovery_time = request.POST.get('recovery_time', '')
+        procedure.typical_results = request.POST.get('typical_results', '')
+        procedure.price_range = request.POST.get('price_range', '')
+        procedure.duration = request.POST.get('duration', '')
+        procedure.anesthesia_type = request.POST.get('anesthesia_type', '')
+        procedure.sessions_recommended = request.POST.get('sessions_recommended', '')
+
+        side_effects = request.POST.get('common_side_effects', '')
+        procedure.common_side_effects = [s.strip() for s in side_effects.split(',') if s.strip()] if side_effects else []
+
+        precautions = request.POST.get('precautions', '')
+        procedure.precautions = [s.strip() for s in precautions.split(',') if s.strip()] if precautions else []
+
+        procedure.save()
+
+        from django.shortcuts import redirect
+        return redirect('dashboard:procedure_list')
+
+    return render(request, "dashboard/procedure_edit.html", {"procedure": procedure})
+
+
+@require_http_methods(["POST"])
+def api_procedure_delete(request, pk):
+    """시술 삭제"""
+    procedure = get_object_or_404(ProcedureInfo, pk=pk)
+    procedure.delete()
+    return JsonResponse({"success": True})
+
+
+@require_http_methods(["POST"])
+def api_procedure_toggle(request, pk):
+    """시술 활성/비활성"""
+    procedure = get_object_or_404(ProcedureInfo, pk=pk)
+    procedure.is_active = not procedure.is_active
+    procedure.save()
+    return JsonResponse({"success": True, "is_active": procedure.is_active})
+
+
+def api_sisool_list_search(request):
+    """SiSool_List.json에서 시술명 검색 API"""
+    import os
+    from django.conf import settings
+
+    query = request.GET.get("q", "").strip().lower()
+
+    # JSON 파일 로드
+    json_path = os.path.join(settings.BASE_DIR, "SiSool_List.json")
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            sisool_data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        return JsonResponse({"error": str(e), "results": []})
+
+    # 모든 시술명 평탄화
+    def flatten_procedures(data, path=""):
+        results = []
+        if isinstance(data, dict):
+            for key, value in data.items():
+                # 메타 정보 스킵
+                if key in ["미용시술_전체목록", "작성일", "총_카테고리수", "카테고리"]:
+                    continue
+                new_path = f"{path} > {key}" if path else key
+                results.extend(flatten_procedures(value, new_path))
+        elif isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    name = item.get("시술명") or item.get("성분명") or item.get("기술명", "")
+                    if name:
+                        results.append({
+                            "name": name,
+                            "category": path,
+                            "english": item.get("영문명", ""),
+                            "effect": item.get("효과", []) if isinstance(item.get("효과"), list) else [],
+                            "cycle": item.get("시술주기", item.get("지속기간", "")),
+                            "data": item,
+                        })
+        return results
+
+    all_procedures = flatten_procedures(sisool_data)
+
+    # 검색 필터링
+    if query:
+        filtered = []
+        for p in all_procedures:
+            # 시술명, 영문명, 카테고리에서 검색
+            if (query in p["name"].lower() or
+                query in p.get("english", "").lower() or
+                query in p["category"].lower()):
+                filtered.append(p)
+        results = filtered[:30]  # 최대 30개
+    else:
+        results = all_procedures[:50]  # 기본 50개
+
+    return JsonResponse({
+        "results": results,
+        "total": len(all_procedures),
+        "query": query,
+    })
+
+
+@require_http_methods(["POST"])
+def api_collect_procedure_knowledge(request):
+    """AI 시술 지식 수집 API"""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    procedure_name = data.get("procedure_name", "").strip()
+    procedure_id = data.get("procedure_id")
+    model = data.get("model", "claude-sonnet-4-5-20250929")
+    custom_prompt = data.get("custom_prompt", "").strip()
+    categories = data.get("categories", [])  # 특정 카테고리만 수집
+    save_raw_only = data.get("save_raw_only", False)  # 원본만 저장 모드
+
+    logger.info(f"[지식수집] 시술명={procedure_name}, ID={procedure_id}, 모델={model}, 원본저장={save_raw_only}")
+    print(f"[지식수집] 시술명={procedure_name}, ID={procedure_id}, 모델={model}, 원본저장={save_raw_only}")
+
+    if not procedure_name:
+        return JsonResponse({"error": "시술명을 입력해주세요."}, status=400)
+
+    # 기존 지식이 있으면 참조
+    existing_knowledge = {}
+    if procedure_id:
+        proc = ProcedureInfo.objects.filter(pk=procedure_id).first()
+        if proc and proc.knowledge_base:
+            existing_knowledge = proc.knowledge_base
+
+    # 수집 프롬프트 구성
+    # 원본 저장 모드에서는 custom_prompt가 메타데이터용이므로 자동 수집 프롬프트 사용
+    use_custom = custom_prompt and not save_raw_only
+    if use_custom:
+        # 커스텀 프롬프트 모드
+        prompt = f"""다음 시술에 대해 사용자의 질문/요청에 답변하고, 해당 내용을 knowledge_base JSON 형식에 맞춰 반환해주세요.
+
+시술명: {procedure_name}
+
+사용자 요청:
+{custom_prompt}
+
+기존 수집된 지식:
+{json.dumps(existing_knowledge, ensure_ascii=False, indent=2) if existing_knowledge else "없음"}
+
+## 출력 형식 (반드시 JSON)
+기존 지식에 새 내용을 병합(merge)하여 아래 구조로 반환하세요. 기존 내용은 유지하고 새 내용을 추가/보완합니다.
+```json
+{{
+  "sensory": {{
+    "during": ["시술 중 느끼는 감각들"],
+    "after": ["시술 직후 감각들"],
+    "healing": ["회복 중 감각 변화"]
+  }},
+  "emotional_journey": {{
+    "before": ["시술 전 감정/걱정/기대"],
+    "during": ["시술 중 감정 변화"],
+    "recovery": ["회복 과정 감정 변화"],
+    "after": ["최종 결과에 대한 감정"]
+  }},
+  "real_expressions": ["실제 커뮤니티에서 쓰이는 표현들 (시술 관련)"],
+  "unexpected": ["예상 못한 부분들, 의외의 경험"],
+  "community_tips": ["커뮤니티에서 공유되는 실용적 팁"],
+  "common_concerns": ["흔한 걱정거리와 실제 결과"],
+  "satisfaction_patterns": {{
+    "satisfied": "만족하는 경우의 패턴/이유",
+    "disappointed": "아쉬워하는 경우의 패턴/이유"
+  }},
+  "seasonal_notes": "계절별 고려사항",
+  "comparison_notes": "비슷한 시술과의 비교",
+  "detail_points": ["리뷰에서 디테일로 쓸 수 있는 구체적 포인트들"],
+  "wrong_info_corrections": ["흔히 잘못 알려진 정보 교정"]
+}}
+```
+
+JSON만 출력하세요:"""
+    else:
+        # 전체 자동 수집 모드
+        category_filter = ""
+        if categories:
+            category_filter = f"\n\n## 수집 범위\n다음 카테고리만 중점적으로 수집: {', '.join(categories)}"
+
+        prompt = f"""당신은 미용 시술 체험 정보를 수집하는 전문가입니다.
+다음 시술에 대해 **실제 시술을 받은 사람들의 관점**에서 체험 기반 지식을 수집해주세요.
+
+단순한 의료 정보(통증레벨, 회복기간 등)가 아니라,
+**실제 체험자만 알 수 있는 감각, 감정, 디테일, 커뮤니티 표현**을 중심으로 수집합니다.
+
+시술명: {procedure_name}
+{category_filter}
+
+기존 수집된 지식:
+{json.dumps(existing_knowledge, ensure_ascii=False, indent=2) if existing_knowledge else "없음"}
+
+## 수집 원칙
+1. 의료 교과서적 설명 금지 → 체험자가 실제로 느끼고 말하는 방식으로
+2. "통증이 있을 수 있습니다" 대신 → "고무줄로 톡톡 튕기는 느낌", "따끔+열감이 올라옴"
+3. 커뮤니티(카페, 블로그)에서 실제 사용되는 표현 위주
+4. 시술 전/중/후 시간 흐름에 따른 감정 변화 포착
+5. 잘 알려지지 않은 디테일 (대기시간, 마취 기다리는 지루함, 회복 중 불편한 순간 등)
+6. 기존 지식이 있으면 보완/확장 (중복 제거)
+
+## 출력 형식 (반드시 JSON)
+```json
+{{
+  "sensory": {{
+    "during": ["시술 중 느끼는 구체적 감각들"],
+    "after": ["시술 직후 감각들 (당일)"],
+    "healing": ["회복 중 감각 변화 (일주일간)"]
+  }},
+  "emotional_journey": {{
+    "before": ["시술 전 감정/걱정/기대"],
+    "during": ["시술 중 감정 흐름"],
+    "recovery": ["회복 과정 감정 변화"],
+    "after": ["최종 결과에 대한 감정"]
+  }},
+  "real_expressions": ["커뮤니티에서 실제 쓰이는 이 시술 관련 표현들 10개 이상"],
+  "unexpected": ["예상 못한 부분들, 아무도 안 알려준 것들"],
+  "community_tips": ["커뮤니티에서 공유되는 실용적 팁들"],
+  "common_concerns": ["흔한 걱정거리 + 실제로는 어떤지"],
+  "satisfaction_patterns": {{
+    "satisfied": "만족하는 경우의 패턴과 이유",
+    "disappointed": "아쉬워하는 경우의 패턴과 이유"
+  }},
+  "seasonal_notes": "계절별 고려사항 (있다면)",
+  "comparison_notes": "비슷한 시술과의 차이점 (체험자 관점)",
+  "detail_points": ["리뷰에서 디테일로 활용 가능한 구체적 포인트 10개 이상"],
+  "wrong_info_corrections": ["흔히 잘못 알려진 정보와 실제"]
+}}
+```
+
+JSON만 출력하세요:"""
+
+    try:
+        from apps.ml.services.llm_service import generate_review_with_prompt
+        from datetime import datetime
+
+        result = generate_review_with_prompt(
+            prompt,
+            model=model,
+            max_tokens=4000,
+            return_usage=True,
+            temperature=0.7
+        )
+        text = result["text"]
+        cost_krw = result["cost_usd"] * 1450
+
+        print(f"[지식수집] LLM 응답 길이: {len(text)}, 토큰: {result.get('input_tokens', 0)}+{result.get('output_tokens', 0)}")
+
+        # 원본만 저장 모드
+        if save_raw_only:
+            # 원본을 바로 DB에 저장
+            proc = None
+            if procedure_id:
+                proc = ProcedureInfo.objects.filter(pk=procedure_id).first()
+
+            # procedure_id가 없거나 찾지 못한 경우 이름으로 생성/조회
+            if not proc and procedure_name:
+                proc, created = ProcedureInfo.objects.get_or_create(
+                    name=procedure_name,
+                    defaults={"category": "etc"}
+                )
+
+            if not proc:
+                return JsonResponse({
+                    "error": "시술 정보를 저장할 수 없습니다. 시술명을 확인해주세요.",
+                    "raw_content": text,
+                }, status=400)
+
+            # 원본 저장
+            raw_entries = list(proc.raw_knowledge_entries or [])
+            raw_entries.append({
+                "collected_at": datetime.now().isoformat(),
+                "prompt": custom_prompt or "(자동 수집)",
+                "model": model,
+                "content": text,
+                "tokens": result["input_tokens"] + result["output_tokens"],
+                "cost_usd": result["cost_usd"],
+            })
+            proc.raw_knowledge_entries = raw_entries
+            proc.save()
+            print(f"[지식수집] 원본 저장 완료: 시술ID={proc.id}, 항목수={len(raw_entries)}")
+
+            return JsonResponse({
+                "success": True,
+                "mode": "raw_saved",
+                "procedure_id": proc.id,
+                "procedure_name": proc.name,
+                "raw_content": text,
+                "entries_count": len(raw_entries),
+                "usage": {
+                    "input_tokens": result["input_tokens"],
+                    "output_tokens": result["output_tokens"],
+                    "cost_usd": round(result["cost_usd"], 6),
+                    "cost_krw": round(cost_krw, 2),
+                }
+            })
+
+        # JSON 추출 - 여러 방법 시도 (기존 파싱 모드)
+        knowledge = None
+        parse_error = None
+        json_str = None
+        start_idx = -1
+        end_idx = -1
+
+        def clean_json_string(s):
+            """JSON 문자열 정제"""
+            cleaned = s
+            # 싱글 쿼트를 더블 쿼트로 변환 (문자열 내부 제외)
+            # 단순 변환 (문자열 내부의 싱글 쿼트는 유지)
+            cleaned = re.sub(r"(?<![\\])'", '"', cleaned)
+            # 후행 쉼표 제거
+            cleaned = re.sub(r',(\s*[}\]])', r'\1', cleaned)
+            # 제어 문자 처리 (줄바꿈, 탭 등)
+            # 먼저 이미 이스케이프된 것은 건드리지 않음
+            cleaned = re.sub(r'(?<!\\)\n', '\\n', cleaned)
+            cleaned = re.sub(r'(?<!\\)\t', '\\t', cleaned)
+            cleaned = re.sub(r'(?<!\\)\r', '\\r', cleaned)
+            return cleaned
+
+        # 방법 1: ```json 블록에서 추출
+        json_block_match = re.search(r'```json\s*([\s\S]*?)\s*```', text)
+        if json_block_match:
+            try:
+                json_str = json_block_match.group(1).strip()
+                knowledge = json.loads(json_str)
+            except json.JSONDecodeError as e:
+                parse_error = e
+                # 클리닝 후 재시도
+                try:
+                    knowledge = json.loads(clean_json_string(json_str))
+                except json.JSONDecodeError:
+                    pass
+
+        # 방법 2: 가장 바깥쪽 중괄호 찾기 (중첩 고려)
+        if knowledge is None:
+            try:
+                # 첫 번째 { 위치 찾기
+                start_idx = text.find('{')
+                if start_idx != -1:
+                    # 중첩된 중괄호 카운팅으로 마지막 } 찾기
+                    brace_count = 0
+                    end_idx = start_idx
+                    for i, char in enumerate(text[start_idx:], start_idx):
+                        if char == '{':
+                            brace_count += 1
+                        elif char == '}':
+                            brace_count -= 1
+                            if brace_count == 0:
+                                end_idx = i
+                                break
+
+                    json_str = text[start_idx:end_idx + 1]
+                    knowledge = json.loads(json_str)
+            except json.JSONDecodeError as e:
+                parse_error = e
+
+        # 방법 3: JSON 클리닝 후 재시도
+        if knowledge is None and start_idx != -1 and json_str:
+            try:
+                cleaned = clean_json_string(json_str)
+                knowledge = json.loads(cleaned)
+            except json.JSONDecodeError as e:
+                parse_error = e
+
+        # 방법 4: ast.literal_eval로 Python dict 파싱 시도
+        if knowledge is None and json_str:
+            try:
+                import ast
+                # Python dict 형태(싱글 쿼트)로 파싱
+                parsed = ast.literal_eval(json_str)
+                if isinstance(parsed, dict):
+                    knowledge = parsed
+            except (ValueError, SyntaxError) as e:
+                pass
+
+        # 방법 5: 모든 시도 실패 시 raw 텍스트와 함께 에러 반환
+        if knowledge is None:
+            # 파싱 실패해도 원본은 저장 (procedure_id 또는 procedure_name으로)
+            proc = None
+            if procedure_id:
+                proc = ProcedureInfo.objects.filter(pk=procedure_id).first()
+            if not proc and procedure_name:
+                proc, created = ProcedureInfo.objects.get_or_create(
+                    name=procedure_name,
+                    defaults={"category": "etc"}
+                )
+
+            raw_saved = False
+            if proc:
+                raw_entries = list(proc.raw_knowledge_entries or [])
+                raw_entries.append({
+                    "collected_at": datetime.now().isoformat(),
+                    "prompt": custom_prompt or "(자동 수집)",
+                    "model": model,
+                    "content": text,
+                    "tokens": result["input_tokens"] + result["output_tokens"],
+                    "cost_usd": result["cost_usd"],
+                    "parse_failed": True,
+                })
+                proc.raw_knowledge_entries = raw_entries
+                proc.save()
+                raw_saved = True
+                print(f"[지식수집] 파싱 실패했지만 원본 저장 완료: 시술ID={proc.id}")
+
+            error_msg = f"JSON 파싱 실패: {str(parse_error)}" if parse_error else "AI 응답에서 JSON을 추출하지 못했습니다."
+            return JsonResponse({
+                "error": error_msg,
+                "raw": text,
+                "raw_saved": raw_saved,
+                "procedure_id": proc.id if proc else None,
+                "hint": "AI 응답을 확인하고 필요한 부분을 수동으로 추출해 주세요. 원본은 저장되었습니다." if raw_saved else "원본 저장도 실패했습니다."
+            }, status=500)
+
+        return JsonResponse({
+            "success": True,
+            "knowledge": knowledge,
+            "usage": {
+                "input_tokens": result["input_tokens"],
+                "output_tokens": result["output_tokens"],
+                "cost_usd": round(result["cost_usd"], 6),
+                "cost_krw": round(cost_krw, 2),
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        return JsonResponse({
+            "error": f"수집 실패: {str(e)}",
+            "traceback": traceback.format_exc()
+        }, status=500)
+
+
+@require_http_methods(["POST"])
+def api_save_procedure_knowledge(request):
+    """수집된 지식을 시술 DB에 저장"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    procedure_id = data.get("procedure_id")
+    procedure_name = data.get("procedure_name", "").strip()
+    knowledge = data.get("knowledge", {})
+    raw_entries = data.get("raw_entries")  # 원본 데이터 업데이트용
+    basic_info = data.get("basic_info", {})  # 기본 정보도 함께 저장 가능
+
+    # raw_entries만 업데이트하는 경우
+    if raw_entries is not None and not knowledge:
+        if not procedure_id:
+            return JsonResponse({"error": "procedure_id 필요"}, status=400)
+        proc = ProcedureInfo.objects.filter(pk=procedure_id).first()
+        if not proc:
+            return JsonResponse({"error": "시술을 찾을 수 없습니다."}, status=404)
+        proc.raw_knowledge_entries = raw_entries
+        proc.save()
+        return JsonResponse({
+            "success": True,
+            "procedure_id": proc.id,
+            "raw_entries_count": len(raw_entries),
+        })
+
+    if not knowledge:
+        return JsonResponse({"error": "저장할 지식 데이터가 없습니다."}, status=400)
+
+    if procedure_id:
+        proc = ProcedureInfo.objects.filter(pk=procedure_id).first()
+        if not proc:
+            return JsonResponse({"error": "시술을 찾을 수 없습니다."}, status=404)
+    elif procedure_name:
+        # 이름으로 찾거나 새로 생성
+        proc, created = ProcedureInfo.objects.get_or_create(
+            name=procedure_name,
+            defaults={"category": basic_info.get("category", "etc")}
+        )
+    else:
+        return JsonResponse({"error": "procedure_id 또는 procedure_name 필요"}, status=400)
+
+    # 기본 정보 업데이트 (제공된 경우)
+    if basic_info:
+        if basic_info.get("category"):
+            proc.category = basic_info["category"]
+        if basic_info.get("description"):
+            proc.description = basic_info["description"]
+        if basic_info.get("pain_level"):
+            proc.pain_level = basic_info["pain_level"]
+        if basic_info.get("recovery_time"):
+            proc.recovery_time = basic_info["recovery_time"]
+        if basic_info.get("price_range"):
+            proc.price_range = basic_info["price_range"]
+        if basic_info.get("duration"):
+            proc.duration = basic_info["duration"]
+
+    # 지식 병합 (기존 + 새로운)
+    existing = proc.knowledge_base or {}
+    merged = _merge_knowledge(existing, knowledge)
+    proc.knowledge_base = merged
+    proc.save()
+
+    return JsonResponse({
+        "success": True,
+        "procedure_id": proc.id,
+        "procedure_name": proc.name,
+        "knowledge_categories": list(merged.keys()),
+    })
+
+
+@require_http_methods(["POST"])
+def api_parse_raw_knowledge(request):
+    """원본 데이터 일괄/개별 파싱 API"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    procedure_id = data.get("procedure_id")
+    entry_index = data.get("entry_index")  # 특정 항목만 파싱 (None이면 전체)
+
+    if not procedure_id:
+        return JsonResponse({"error": "procedure_id 필요"}, status=400)
+
+    proc = ProcedureInfo.objects.filter(pk=procedure_id).first()
+    if not proc:
+        return JsonResponse({"error": "시술을 찾을 수 없습니다."}, status=404)
+
+    raw_entries = list(proc.raw_knowledge_entries or [])
+    if not raw_entries:
+        return JsonResponse({"error": "파싱할 원본 데이터가 없습니다."}, status=400)
+
+    # 파싱 대상 결정
+    if entry_index is not None:
+        if entry_index < 0 or entry_index >= len(raw_entries):
+            return JsonResponse({"error": "잘못된 entry_index"}, status=400)
+        targets = [(entry_index, raw_entries[entry_index])]
+    else:
+        targets = list(enumerate(raw_entries))
+
+    parsed_count = 0
+    failed_count = 0
+    merged_knowledge = dict(proc.knowledge_base or {})
+
+    def clean_json_string(s):
+        """JSON 문자열 정제"""
+        cleaned = s
+        # 싱글 쿼트를 더블 쿼트로 변환
+        cleaned = re.sub(r"(?<![\\])'", '"', cleaned)
+        # 후행 쉼표 제거
+        cleaned = re.sub(r',(\s*[}\]])', r'\1', cleaned)
+        # 제어 문자 처리
+        cleaned = re.sub(r'(?<!\\)\n', '\\n', cleaned)
+        cleaned = re.sub(r'(?<!\\)\t', '\\t', cleaned)
+        cleaned = re.sub(r'(?<!\\)\r', '\\r', cleaned)
+        return cleaned
+
+    def extract_json_from_text(text):
+        """텍스트에서 JSON 추출"""
+        # 방법 1: ```json 블록
+        json_match = re.search(r'```json\s*([\s\S]*?)\s*```', text)
+        if json_match:
+            json_str = json_match.group(1).strip()
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                try:
+                    return json.loads(clean_json_string(json_str))
+                except json.JSONDecodeError:
+                    pass
+
+        # 방법 2: 중괄호 매칭
+        start_idx = text.find('{')
+        if start_idx != -1:
+            brace_count = 0
+            end_idx = start_idx
+            for i, char in enumerate(text[start_idx:], start_idx):
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        end_idx = i
+                        break
+            json_str = text[start_idx:end_idx + 1]
+
+            # 원본 시도
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                pass
+
+            # 클리닝 후 시도
+            try:
+                return json.loads(clean_json_string(json_str))
+            except json.JSONDecodeError:
+                pass
+
+            # ast.literal_eval 시도 (Python dict 형태)
+            try:
+                import ast
+                parsed = ast.literal_eval(json_str)
+                if isinstance(parsed, dict):
+                    return parsed
+            except (ValueError, SyntaxError):
+                pass
+
+        return None
+
+    for idx, entry in targets:
+        content = entry.get("content", "")
+        if not content:
+            continue
+
+        # JSON 추출 시도
+        extracted = extract_json_from_text(content)
+
+        if extracted and isinstance(extracted, dict):
+            # knowledge_base에 병합
+            merged_knowledge = _merge_knowledge(merged_knowledge, extracted)
+            # 원본에 파싱 완료 표시
+            raw_entries[idx]["parsed"] = True
+            raw_entries[idx]["parsed_at"] = __import__('datetime').datetime.now().isoformat()
+            parsed_count += 1
+        else:
+            raw_entries[idx]["parse_failed"] = True
+            failed_count += 1
+
+    # 저장
+    proc.knowledge_base = merged_knowledge
+    proc.raw_knowledge_entries = raw_entries
+    proc.save()
+
+    return JsonResponse({
+        "success": True,
+        "parsed_count": parsed_count,
+        "failed_count": failed_count,
+        "total_entries": len(raw_entries),
+        "knowledge_categories": list(merged_knowledge.keys()),
+    })
+
+
+def _merge_knowledge(existing, new_data):
+    """기존 지식과 새 지식을 병합"""
+    merged = dict(existing)
+    for key, value in new_data.items():
+        if key not in merged:
+            merged[key] = value
+        elif isinstance(value, dict) and isinstance(merged[key], dict):
+            # 딕셔너리면 재귀 병합
+            merged[key] = _merge_knowledge(merged[key], value)
+        elif isinstance(value, list) and isinstance(merged[key], list):
+            # 리스트면 중복 제거 후 합치기
+            existing_set = set(merged[key])
+            for item in value:
+                if item not in existing_set:
+                    merged[key].append(item)
+        else:
+            # 나머지는 새 값으로 덮어쓰기
+            merged[key] = value
+    return merged
+
+
+# =====================================================
+# 프롬프트 최적화 사이클
+# =====================================================
+
+def optimization_list(request):
+    """최적화 세션 목록"""
+    from apps.data.models import PromptOptimizationSession
+    sessions = PromptOptimizationSession.objects.all()
+    return render(request, "dashboard/optimization_list.html", {"sessions": sessions})
+
+
+def optimization_new(request):
+    """새 최적화 세션 생성"""
+    from apps.data.models import PromptOptimizationSession, ProcedureInfo, PromptTemplate
+    from apps.ml.services.llm_service import AVAILABLE_MODELS
+
+    if request.method == 'POST':
+        data = request.POST
+        session = PromptOptimizationSession.objects.create(
+            name=data.get('name', '새 세션'),
+            description=data.get('description', ''),
+            base_prompt_template_id=data.get('template_id') or None,
+            procedure_id=data.get('procedure_id') or None,
+            user_input=data.get('user_input', ''),
+            samples_per_round=int(data.get('samples_per_round', 50)),
+            target_rounds=int(data.get('target_rounds', 5)),
+            mode=data.get('mode', 'semi_auto'),
+            auto_approve_threshold=float(data.get('auto_approve_threshold', 8.0)),
+            model_used=data.get('model_used', 'claude-sonnet-4-5-20250929'),
+            analysis_model=data.get('analysis_model', 'claude-sonnet-4-5-20250929'),
+            # 상세 생성 설정
+            temperature_min=float(data.get('temperature_min', 0.7)),
+            temperature_max=float(data.get('temperature_max', 0.95)),
+            max_tokens_generation=int(data.get('max_tokens_generation', 4000)),
+            max_tokens_analysis=int(data.get('max_tokens_analysis', 8000)),
+            analysis_depth=data.get('analysis_depth', 'detailed'),
+            # 분석 옵션
+            analyze_ai_detection=data.get('analyze_ai_detection') == 'on',
+            analyze_naturalness=data.get('analyze_naturalness') == 'on',
+            analyze_diversity=data.get('analyze_diversity') == 'on',
+            analyze_accuracy=data.get('analyze_accuracy') == 'on',
+        )
+        from django.shortcuts import redirect
+        return redirect('dashboard:optimization_session', pk=session.pk)
+
+    # GET: 폼 표시
+    templates = PromptTemplate.objects.filter(is_active=True)
+    procedures = ProcedureInfo.objects.filter(is_active=True)
+    models_list = []
+    for provider, models in AVAILABLE_MODELS.items():
+        for model_id, info in models.items():
+            models_list.append({
+                "id": model_id,
+                "provider": provider,
+                "name": info["name"],
+                "desc": info["desc"],
+            })
+
+    return render(request, "dashboard/optimization_new.html", {
+        "templates": templates,
+        "procedures": procedures,
+        "models": models_list,
+    })
+
+
+def optimization_session(request, pk):
+    """최적화 세션 상세 (메인 워크플로우)"""
+    from apps.data.models import PromptOptimizationSession, OptimizationRound
+    from apps.ml.services.llm_service import AVAILABLE_MODELS
+
+    session = get_object_or_404(PromptOptimizationSession, pk=pk)
+    rounds = session.rounds.all().order_by('round_number')
+    current_round = rounds.last() if rounds.exists() else None
+
+    # 가장 최근 승인된 라운드 찾기
+    latest_approved_round = rounds.filter(status='approved').order_by('-round_number').first()
+
+    models_list = []
+    for provider, models in AVAILABLE_MODELS.items():
+        for model_id, info in models.items():
+            models_list.append({
+                "id": model_id,
+                "provider": provider,
+                "name": info["name"],
+                "desc": info["desc"],
+            })
+
+    return render(request, "dashboard/optimization_session.html", {
+        "session": session,
+        "rounds": rounds,
+        "current_round": current_round,
+        "latest_approved_round": latest_approved_round,
+        "models": models_list,
+    })
+
+
+def optimization_session_auto(request, pk):
+    """자동 최적화 세션 (완전 자동화)"""
+    from apps.data.models import PromptOptimizationSession, OptimizationRound
+    from apps.ml.services.llm_service import AVAILABLE_MODELS
+
+    session = get_object_or_404(PromptOptimizationSession, pk=pk)
+    rounds = session.rounds.all().order_by('round_number')
+    current_round = rounds.last() if rounds.exists() else None
+
+    models_list = []
+    for provider, models in AVAILABLE_MODELS.items():
+        for model_id, info in models.items():
+            models_list.append({
+                "id": model_id,
+                "provider": provider,
+                "name": info["name"],
+                "desc": info["desc"],
+            })
+
+    return render(request, "dashboard/optimization_session_auto.html", {
+        "session": session,
+        "rounds": rounds,
+        "current_round": current_round,
+        "models": models_list,
+    })
+
+
+@require_http_methods(["POST"])
+def optimization_delete(request, pk):
+    """세션 삭제"""
+    from apps.data.models import PromptOptimizationSession
+    session = get_object_or_404(PromptOptimizationSession, pk=pk)
+    session.delete()
+    return JsonResponse({"success": True})
+
+
+# =====================================================
+# 최적화 API - 세션 관리
+# =====================================================
+
+def api_optimization_sessions(request):
+    """세션 목록/생성 API"""
+    from apps.data.models import PromptOptimizationSession
+
+    if request.method == 'GET':
+        sessions = PromptOptimizationSession.objects.all()
+        data = [{
+            "id": s.id,
+            "name": s.name,
+            "status": s.status,
+            "current_round": s.current_round,
+            "target_rounds": s.target_rounds,
+            "total_cost_usd": s.total_cost_usd,
+            "created_at": s.created_at.strftime('%Y-%m-%d %H:%M'),
+        } for s in sessions]
+        return JsonResponse({"sessions": data})
+
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+        session = PromptOptimizationSession.objects.create(
+            name=data.get('name', '새 세션'),
+            description=data.get('description', ''),
+            base_prompt_template_id=data.get('template_id'),
+            procedure_id=data.get('procedure_id'),
+            user_input=data.get('user_input', ''),
+            samples_per_round=data.get('samples_per_round', 50),
+            target_rounds=data.get('target_rounds', 5),
+            mode=data.get('mode', 'semi_auto'),
+        )
+        return JsonResponse({"success": True, "id": session.id})
+
+
+def api_optimization_session_detail(request, pk):
+    """세션 상세/삭제 API"""
+    from apps.data.models import PromptOptimizationSession
+
+    session = get_object_or_404(PromptOptimizationSession, pk=pk)
+
+    if request.method == 'GET':
+        rounds_data = [{
+            "id": r.id,
+            "round_number": r.round_number,
+            "status": r.status,
+            "score_overall": r.score_overall,
+            "generated_count": r.generated_count,
+        } for r in session.rounds.all().order_by('round_number')]
+
+        return JsonResponse({
+            "id": session.id,
+            "name": session.name,
+            "description": session.description,
+            "status": session.status,
+            "current_round": session.current_round,
+            "target_rounds": session.target_rounds,
+            "samples_per_round": session.samples_per_round,
+            "mode": session.mode,
+            "analyze_ai_detection": session.analyze_ai_detection,
+            "analyze_naturalness": session.analyze_naturalness,
+            "analyze_diversity": session.analyze_diversity,
+            "analyze_accuracy": session.analyze_accuracy,
+            "total_cost_usd": session.total_cost_usd,
+            "rounds": rounds_data,
+        })
+
+    elif request.method == 'DELETE':
+        session.delete()
+        return JsonResponse({"success": True})
+
+
+# =====================================================
+# 최적화 API - 라운드 실행
+# =====================================================
+
+@require_http_methods(["POST"])
+def api_optimization_start_round(request, pk):
+    """새 라운드 시작"""
+    from apps.data.models import PromptOptimizationSession, OptimizationRound, OptimizationLog
+
+    session = get_object_or_404(PromptOptimizationSession, pk=pk)
+
+    # 아직 완료되지 않은 라운드가 있는지 확인 (승인/거부되지 않은 모든 라운드)
+    incomplete_round = session.rounds.exclude(status__in=['approved', 'rejected']).first()
+    if incomplete_round:
+        status_msg = {
+            'pending': '대기 중 (생성 시작 필요)',
+            'generating': '생성 중',
+            'generated': '생성 완료 (분석 필요)',
+            'analyzing': '분석 중',
+            'analyzed': '분석 완료 (승인 필요)',
+        }.get(incomplete_round.status, incomplete_round.status)
+        return JsonResponse({
+            "error": f"라운드 {incomplete_round.round_number}이(가) 아직 완료되지 않았습니다. (상태: {status_msg})"
+        }, status=400)
+
+    # 새 라운드 번호 결정 - 단순히 전체 라운드 수 + 1
+    existing_count = session.rounds.count()
+    new_round_number = existing_count + 1
+
+    # 마지막 승인된 라운드 찾기
+    last_approved = session.rounds.filter(status='approved').order_by('-round_number').first()
+
+    # 프롬프트 결정: 마지막 승인된 프롬프트 또는 기본 템플릿
+    if last_approved and last_approved.approved_prompt:
+        prompt_content = last_approved.approved_prompt
+        prompt_changes = f"라운드 {last_approved.round_number}에서 승인된 프롬프트 사용"
+    elif session.base_prompt_template:
+        prompt_content = session.base_prompt_template.content
+        prompt_changes = "기본 템플릿 사용"
+    else:
+        # 기본 프롬프트
+        prompt_content = """당신은 실제로 시술을 받은 환자로서 자연스러운 후기를 작성합니다.
+
+## 작성 원칙
+1. 실제 환자가 쓴 것처럼 자연스러운 말투 사용
+2. 구체적인 경험과 감정 묘사
+3. 과장 없이 솔직하게 작성
+4. 광고성 문구 사용 금지
+
+{user_input}
+
+자연스러운 후기를 작성해주세요:"""
+        prompt_changes = "기본 프롬프트로 시작"
+
+    # 라운드 생성
+    new_round = OptimizationRound.objects.create(
+        session=session,
+        round_number=new_round_number,
+        prompt_content=prompt_content,
+        prompt_changes=prompt_changes,
+        status='pending',
+    )
+
+    # 세션 상태 업데이트
+    session.status = 'in_progress'
+    session.current_round = new_round_number
+    session.save()
+
+    # 로그
+    OptimizationLog.objects.create(
+        session=session,
+        round=new_round,
+        log_type='info',
+        message=f"라운드 {new_round_number} 시작",
+    )
+
+    return JsonResponse({
+        "success": True,
+        "round_id": new_round.id,
+        "round_number": new_round_number,
+        "prompt_content": prompt_content,
+    })
+
+
+@require_http_methods(["POST"])
+def api_optimization_generate_next(request, pk):
+    """다음 샘플 생성"""
+    from apps.data.models import PromptOptimizationSession, OptimizationRound, OptimizationSample, OptimizationLog
+    from apps.ml.services.llm_service import generate_review_with_prompt
+    import random
+
+    session = get_object_or_404(PromptOptimizationSession, pk=pk)
+
+    # 현재 진행중인 라운드 찾기
+    current_round = session.rounds.filter(
+        status__in=['pending', 'generating']
+    ).order_by('-round_number').first()
+
+    if not current_round:
+        return JsonResponse({"error": "진행중인 라운드가 없습니다."}, status=400)
+
+    # 이미 목표 수만큼 생성했는지 확인
+    generated_count = current_round.samples.count()
+    if generated_count >= session.samples_per_round:
+        current_round.status = 'generated'
+        current_round.save()
+        return JsonResponse({
+            "success": True,
+            "completed": True,
+            "generated_count": generated_count,
+            "message": "모든 샘플 생성 완료"
+        })
+
+    # 상태 업데이트
+    if current_round.status == 'pending':
+        current_round.status = 'generating'
+        current_round.save()
+
+    # 랜덤 페르소나 생성 (세션 옵션 반영)
+    persona = _generate_random_persona(session)
+
+    # 온도 범위 내에서 랜덤
+    temp_min = getattr(session, 'temperature_min', 0.7) or 0.7
+    temp_max = getattr(session, 'temperature_max', 0.95) or 0.95
+    temperature = round(random.uniform(temp_min, temp_max), 2)
+
+    # 최대 토큰
+    max_tokens = getattr(session, 'max_tokens_generation', 4000) or 4000
+
+    # 프롬프트 구성
+    prompt = current_round.prompt_content
+
+    # 변수 치환
+    replacements = {
+        "{user_input}": session.user_input or "",
+        "{procedure_name}": session.procedure.name if session.procedure else "시술",
+        "{age_group}": persona.get('age_group', '30대'),
+        "{gender}": persona.get('gender', '여성'),
+        "{job}": persona.get('job', '직장인'),
+        "{tone}": persona.get('tone', '친근'),
+        "{emoji}": persona.get('emoji', '적당히'),
+        "{experience}": persona.get('experience', '첫시술'),
+        "{writing_style}": persona.get('writing_style', '중간 길이'),
+        "{motivation}": persona.get('motivation', '고민 해결'),
+        "{satisfaction}": persona.get('satisfaction', '만족'),
+        "{pain_level}": persona.get('pain_level', '견딜만함'),
+        "{sentence_ending}": persona.get('sentence_ending', '~요'),
+        "{paragraph_style}": persona.get('paragraph_style', '적당히'),
+        "{detail_level}": persona.get('detail_level', '적당히'),
+    }
+    for key, val in replacements.items():
+        prompt = prompt.replace(key, str(val))
+
+    # 페르소나 상세 추가 (프롬프트에 명시적 지시 추가)
+    persona_text = f"""
+
+## 이번 리뷰의 작성자 설정
+- **기본 정보**: {persona.get('age_group', '30대')} {persona.get('gender', '여성')}, {persona.get('job', '직장인')}
+- **시술 경험**: {persona.get('experience', '첫시술')} / 시술 계기: {persona.get('motivation', '고민 해결')}
+- **만족도**: {persona.get('satisfaction', '만족')} / 통증: {persona.get('pain_level', '견딜만함')}
+- **글 스타일**: {persona.get('writing_style', '중간 길이')}, {persona.get('tone', '친근')}한 말투
+- **문장 끝**: {persona.get('sentence_ending', '~요')} 스타일
+- **이모지 사용**: {persona.get('emoji', '적당히')}
+- **문단 스타일**: {persona.get('paragraph_style', '적당히')}
+- **상세도**: {persona.get('detail_level', '적당히')}
+
+위 설정에 맞는 자연스러운 후기를 작성해주세요. AI가 쓴 티가 나지 않도록 주의하세요.
+"""
+    full_prompt = prompt + persona_text
+
+    try:
+        # LLM 호출
+        result = generate_review_with_prompt(
+            prompt=full_prompt,
+            model=session.model_used,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            return_usage=True,
+        )
+
+        # 샘플 저장
+        sample = OptimizationSample.objects.create(
+            round=current_round,
+            sample_index=generated_count + 1,
+            persona_settings=persona,
+            generated_content=result.get('text', ''),
+            input_tokens=result.get('input_tokens', 0),
+            output_tokens=result.get('output_tokens', 0),
+        )
+
+        # 라운드 통계 업데이트
+        current_round.generated_count = generated_count + 1
+        current_round.input_tokens += result.get('input_tokens', 0)
+        current_round.output_tokens += result.get('output_tokens', 0)
+        current_round.cost_usd += result.get('cost_usd', 0.0)
+        current_round.save()
+
+        # 세션 통계 업데이트
+        session.total_input_tokens += result.get('input_tokens', 0)
+        session.total_output_tokens += result.get('output_tokens', 0)
+        session.total_cost_usd += result.get('cost_usd', 0.0)
+        session.save()
+
+        # 완료 여부 확인
+        is_completed = (generated_count + 1) >= session.samples_per_round
+        if is_completed:
+            current_round.status = 'generated'
+            current_round.save()
+
+        return JsonResponse({
+            "success": True,
+            "sample_id": sample.id,
+            "sample_index": sample.sample_index,
+            "content_preview": sample.generated_content[:200] + "..." if len(sample.generated_content) > 200 else sample.generated_content,
+            "generated_count": generated_count + 1,
+            "target_count": session.samples_per_round,
+            "completed": is_completed,
+        })
+
+    except Exception as e:
+        OptimizationLog.objects.create(
+            session=session,
+            round=current_round,
+            log_type='error',
+            message=f"샘플 생성 실패: {str(e)}",
+        )
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+def _generate_random_persona(session=None):
+    """랜덤 페르소나 생성 (세션 옵션 반영)"""
+    import random
+
+    # 기본 옵션
+    default_options = {
+        "age_groups": ['20대 초반', '20대 중반', '20대 후반', '30대 초반', '30대 중반', '30대 후반', '40대', '40대 후반', '50대'],
+        "genders": ['여성', '남성'],
+        "gender_weights": [85, 15],
+        "tones": ['친근', '정중', '털털', '조심스러운', '활발한', '차분한', '솔직한', '신중한'],
+        "emoji_levels": ['많음', '적당히', '거의없음', '전혀없음'],
+        "experiences": ['첫시술', '2~3회차', '5회 이상', '단골', '오랜만에 다시'],
+        "jobs": ['직장인', '대학생', '주부', '자영업', '프리랜서', '전문직'],
+        "writing_styles": ['짧고 간결', '중간 길이', '상세하게', '두서없이'],
+        "motivations": ['고민 해결', '자기관리', '특별한 날', '친구 추천', '이벤트/할인'],
+    }
+
+    # 세션에서 커스텀 옵션 가져오기
+    opts = default_options.copy()
+    if session and session.persona_options:
+        for key, val in session.persona_options.items():
+            if val:
+                opts[key] = val
+
+    # 스타일 옵션
+    style_opts = {
+        "sentence_endings": ['~요', '~음', '~다', '혼용'],
+        "paragraph_style": ['줄바꿈 많음', '붙여쓰기', '적당히'],
+        "detail_level": ['핵심만', '적당히', '자세하게'],
+    }
+    if session and session.style_options:
+        for key, val in session.style_options.items():
+            if val:
+                style_opts[key] = val
+
+    return {
+        "age_group": random.choice(opts["age_groups"]),
+        "gender": random.choices(opts["genders"], weights=opts.get("gender_weights", [85, 15]))[0],
+        "job": random.choice(opts.get("jobs", ['직장인'])),
+        "tone": random.choice(opts["tones"]),
+        "emoji": random.choice(opts["emoji_levels"]),
+        "experience": random.choice(opts["experiences"]),
+        "writing_style": random.choice(opts.get("writing_styles", ['중간 길이'])),
+        "motivation": random.choice(opts.get("motivations", ['고민 해결'])),
+        "sentence_ending": random.choice(style_opts["sentence_endings"]),
+        "paragraph_style": random.choice(style_opts["paragraph_style"]),
+        "detail_level": random.choice(style_opts["detail_level"]),
+        # 추가 변수
+        "satisfaction": random.choice(['매우 만족', '만족', '대체로 만족', '보통', '약간 아쉬움']),
+        "pain_level": random.choice(['거의 없음', '약간 따끔', '견딜만함', '좀 아팠음']),
+        "would_recommend": random.choice(['강추', '추천', '상황에 따라', '글쎄']),
+    }
+
+
+@require_http_methods(["POST"])
+def api_optimization_analyze(request, pk):
+    """라운드 분석 실행"""
+    from apps.data.models import OptimizationRound, OptimizationLog
+    from apps.ml.services.llm_service import generate_review_with_prompt
+
+    round_obj = get_object_or_404(OptimizationRound, pk=pk)
+    session = round_obj.session
+
+    if round_obj.status not in ['generated', 'analyzed']:
+        return JsonResponse({"error": "생성이 완료된 라운드만 분석 가능합니다."}, status=400)
+
+    round_obj.status = 'analyzing'
+    round_obj.save()
+
+    # 샘플들 가져오기
+    samples = list(round_obj.samples.all().order_by('sample_index'))
+    if not samples:
+        return JsonResponse({"error": "분석할 샘플이 없습니다."}, status=400)
+
+    # 분석 깊이에 따른 샘플 수 결정
+    analysis_depth = getattr(session, 'analysis_depth', 'detailed') or 'detailed'
+    max_samples_map = {'basic': 20, 'detailed': 40, 'exhaustive': 50}
+    max_samples = max_samples_map.get(analysis_depth, 40)
+
+    # 샘플 텍스트 모음
+    sample_texts = "\n\n---\n\n".join([
+        f"[샘플 {s.sample_index}]\n{s.generated_content}"
+        for s in samples[:max_samples]
+    ])
+
+    # 분석 최대 토큰
+    max_tokens_analysis = getattr(session, 'max_tokens_analysis', 8000) or 8000
+
+    # 분석 프롬프트 구성 (대폭 강화)
+    analysis_prompt = f"""당신은 AI 생성 텍스트 탐지 전문가이자 콘텐츠 품질 분석가입니다.
+다음 {len(samples)}개의 시술 후기 샘플을 **매우 엄격하고 정밀하게** 분석해주세요.
+
+## 분석 맥락
+- 이 텍스트들은 AI가 생성한 시술 후기입니다
+- 목표: AI 탐지 도구(GPTZero, Originality.ai 등)를 통과하면서 실제 사람이 쓴 것처럼 보이는 것
+- 실제 네이버 카페, 블로그, 커뮤니티에 게시될 예정
+
+## 평가 기준 (각 10점 만점, 0.5점 단위)
+
+### 1. AI 탐지 회피 (ai_detection_score)
+**엄격하게 평가하세요. 대부분의 AI 텍스트는 6점 이하입니다.**
+
+체크리스트:
+- [ ] 문장 구조가 너무 균일하거나 정형화되어 있지 않은가?
+- [ ] 접속사 사용이 자연스러운가? (그래서, 그런데, 근데 등)
+- [ ] 문장 길이 변화가 자연스러운가? (짧은 문장과 긴 문장 혼용)
+- [ ] AI 특유의 나열식 구조가 보이지 않는가?
+- [ ] "~입니다", "~습니다" 같은 딱딱한 어미가 과도하지 않은가?
+- [ ] 불필요하게 논리적이거나 체계적이지 않은가?
+- [ ] 인간적인 비논리성, 두서없음이 적절히 있는가?
+- [ ] Perplexity(예측 불가능성)가 충분히 높은가?
+- [ ] Burstiness(문장 길이 변화)가 자연스러운가?
+
+감점 요소:
+- 모든 문장이 비슷한 길이 → -2점
+- "첫째, 둘째" 또는 번호 나열 → -1점
+- 과도한 접속사 패턴 → -1점
+- 균일한 문단 구조 → -1점
+
+### 2. 자연스러움 (naturalness_score)
+**실제 카페 글과 비교해서 평가하세요.**
+
+체크리스트:
+- [ ] 실제 사람이 카페에 올릴 법한 글인가?
+- [ ] 감정 표현이 과장되지 않고 진정성 있는가?
+- [ ] 구어체와 문어체가 자연스럽게 섞여 있는가?
+- [ ] 적절한 축약어, 신조어 사용이 있는가?
+- [ ] 불필요한 부연설명이 없는가?
+- [ ] 문맥에 맞는 감탄사 사용인가?
+- [ ] "정말", "진짜", "너무" 등의 강조 표현이 과도하지 않은가?
+- [ ] 글의 흐름이 자연스러운가?
+
+감점 요소:
+- 모든 문장에 "정말", "너무" 반복 → -2점
+- 과도한 이모지 또는 전혀 없는 이모지 → -1점
+- 광고성 표현 ("강력 추천", "꼭 가세요") → -2점
+- 비현실적으로 긍정적인 톤 → -1점
+
+### 3. 다양성 (diversity_score)
+**샘플 간 차이를 엄격하게 분석하세요.**
+
+체크리스트:
+- [ ] 시작 문장이 얼마나 다양한가?
+- [ ] 끝맺음 패턴이 다양한가?
+- [ ] 문단 구조가 다양한가?
+- [ ] 표현 방식이 다양한가?
+- [ ] 감정 표현의 스펙트럼이 넓은가?
+- [ ] 각 샘플이 독립적인 개성을 가지는가?
+
+감점 요소:
+- 50% 이상 비슷한 시작 문장 → -3점
+- 반복되는 핵심 문구 → -2점
+- 유사한 문단 구조 → -1점
+- 동일한 감정 표현 패턴 → -1점
+
+### 4. 정보 정확도 (accuracy_score)
+체크리스트:
+- [ ] 시술 관련 정보가 정확한가?
+- [ ] 회복 기간, 통증 묘사가 현실적인가?
+- [ ] 비용 관련 언급이 있다면 적절한가?
+- [ ] 부작용/주의사항 언급이 균형 잡혀 있는가?
+- [ ] 전문 용어 사용이 적절한가?
+
+## 분석 대상 샘플 ({len(samples[:max_samples])}개)
+
+{sample_texts}
+
+## 응답 형식 (반드시 JSON)
+
+{{
+  "ai_detection_score": 6.5,
+  "ai_detection_analysis": {{
+    "sentence_uniformity": "높음/중간/낮음 + 구체적 예시",
+    "perplexity_level": "높음/중간/낮음",
+    "burstiness_level": "높음/중간/낮음",
+    "problematic_patterns": ["패턴1", "패턴2"],
+    "detection_risk": "높음/중간/낮음"
+  }},
+  "ai_detection_feedback": "상세한 피드백",
+
+  "naturalness_score": 7.0,
+  "naturalness_analysis": {{
+    "tone_authenticity": "높음/중간/낮음",
+    "emotional_range": "넓음/중간/좁음",
+    "overused_expressions": ["표현1", "표현2"],
+    "missing_elements": ["요소1", "요소2"]
+  }},
+  "naturalness_feedback": "상세한 피드백",
+
+  "diversity_score": 5.5,
+  "diversity_analysis": {{
+    "opening_variety": "높음/중간/낮음 + 반복 패턴",
+    "closing_variety": "높음/중간/낮음",
+    "structure_variety": "높음/중간/낮음",
+    "repeated_phrases": ["문구1", "문구2"]
+  }},
+  "diversity_feedback": "상세한 피드백",
+
+  "accuracy_score": 8.5,
+  "accuracy_feedback": "상세한 피드백",
+
+  "overall_score": 6.9,
+  "overall_feedback": "종합 평가 (강점과 약점 모두)",
+
+  "critical_issues": [
+    "가장 시급히 해결해야 할 문제 1",
+    "가장 시급히 해결해야 할 문제 2"
+  ],
+
+  "improvement_suggestions": [
+    {{
+      "category": "ai_detection",
+      "priority": "높음",
+      "suggestion": "구체적 개선 방안",
+      "example_before": "개선 전 예시",
+      "example_after": "개선 후 예시"
+    }}
+  ],
+
+  "best_samples": [1, 5, 12],
+  "best_sample_reasons": ["좋은 이유1", "좋은 이유2"],
+  "worst_samples": [3, 8],
+  "worst_sample_reasons": ["나쁜 이유1", "나쁜 이유2"],
+
+  "patterns_to_avoid": ["피해야 할 패턴1", "피해야 할 패턴2"],
+  "patterns_to_encourage": ["권장 패턴1", "권장 패턴2"],
+
+  "prompt_improvement_direction": "프롬프트 개선 방향 상세 설명"
+}}
+
+**중요**: 점수를 관대하게 주지 마세요. 실제 AI 탐지 도구 기준으로 엄격하게 평가해주세요.
+대부분의 AI 생성 텍스트는 ai_detection_score가 5~7점 사이입니다.
+
+JSON 형식으로만 응답해주세요:"""
+
+    try:
+        result = generate_review_with_prompt(
+            prompt=analysis_prompt,
+            model=session.analysis_model,
+            temperature=0.2,  # 분석은 더 일관성 있게
+            max_tokens=max_tokens_analysis,
+            return_usage=True,
+        )
+
+        # JSON 파싱
+        response_text = result.get('text', '{}')
+        original_response = response_text
+
+        # JSON 블록 추출
+        if '```json' in response_text:
+            response_text = response_text.split('```json')[1].split('```')[0]
+        elif '```' in response_text:
+            parts = response_text.split('```')
+            if len(parts) >= 2:
+                response_text = parts[1]
+
+        try:
+            analysis = json.loads(response_text.strip())
+        except json.JSONDecodeError:
+            # JSON 파싱 실패 시 기본 점수 설정
+            analysis = {
+                "ai_detection_score": 5.0,
+                "naturalness_score": 5.0,
+                "diversity_score": 5.0,
+                "accuracy_score": 5.0,
+                "overall_score": 5.0,
+                "overall_feedback": "JSON 파싱 실패 - 원본 응답: " + original_response[:500],
+                "parse_error": True,
+            }
+
+        # 라운드 업데이트
+        round_obj.analysis_result = analysis
+        round_obj.score_ai_detection = analysis.get('ai_detection_score') or 5.0
+        round_obj.score_naturalness = analysis.get('naturalness_score') or 5.0
+        round_obj.score_diversity = analysis.get('diversity_score') or 5.0
+        round_obj.score_accuracy = analysis.get('accuracy_score') or 5.0
+        round_obj.score_overall = analysis.get('overall_score') or 5.0
+        round_obj.analysis_feedback = analysis.get('overall_feedback', '')
+        round_obj.status = 'analyzed'
+        round_obj.input_tokens += result.get('input_tokens', 0)
+        round_obj.output_tokens += result.get('output_tokens', 0)
+        round_obj.cost_usd += result.get('cost_usd', 0.0)
+        round_obj.save()
+
+        # 세션 통계 업데이트
+        session.total_input_tokens += result.get('input_tokens', 0)
+        session.total_output_tokens += result.get('output_tokens', 0)
+        session.total_cost_usd += result.get('cost_usd', 0.0)
+        session.save()
+
+        # 로그
+        OptimizationLog.objects.create(
+            session=session,
+            round=round_obj,
+            log_type='analysis',
+            message=f"분석 완료 - 종합점수: {analysis.get('overall_score', 'N/A')}",
+            details=analysis,
+        )
+
+        return JsonResponse({
+            "success": True,
+            "analysis": analysis,
+            "scores": {
+                "ai_detection": round_obj.score_ai_detection,
+                "naturalness": round_obj.score_naturalness,
+                "diversity": round_obj.score_diversity,
+                "accuracy": round_obj.score_accuracy,
+                "overall": round_obj.score_overall,
+            }
+        })
+
+    except Exception as e:
+        OptimizationLog.objects.create(
+            session=session,
+            round=round_obj,
+            log_type='error',
+            message=f"분석 실패: {str(e)}",
+        )
+        round_obj.status = 'generated'
+        round_obj.save()
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+# =====================================================
+# 최적화 API - 프롬프트 개선
+# =====================================================
+
+def api_optimization_suggestions(request, pk):
+    """개선 제안 조회/생성"""
+    from apps.data.models import OptimizationRound, OptimizationLog
+    from apps.ml.services.llm_service import generate_review_with_prompt
+
+    round_obj = get_object_or_404(OptimizationRound, pk=pk)
+    session = round_obj.session
+
+    if request.method == 'GET':
+        return JsonResponse({
+            "round_number": round_obj.round_number,
+            "current_prompt": round_obj.prompt_content,
+            "suggested_prompt": round_obj.suggested_prompt,
+            "suggested_changes": round_obj.suggested_changes,
+            "analysis_result": round_obj.analysis_result,
+        })
+
+    elif request.method == 'POST':
+        # 새로운 제안 생성
+        if round_obj.status != 'analyzed':
+            return JsonResponse({"error": "분석이 완료된 라운드만 제안 생성 가능합니다."}, status=400)
+
+        analysis = round_obj.analysis_result
+        max_tokens_analysis = getattr(session, 'max_tokens_analysis', 8000) or 8000
+
+        # 분석 세부 정보 추출
+        ai_analysis = analysis.get('ai_detection_analysis', {})
+        naturalness_analysis = analysis.get('naturalness_analysis', {})
+        diversity_analysis = analysis.get('diversity_analysis', {})
+        critical_issues = analysis.get('critical_issues', [])
+        improvement_suggestions = analysis.get('improvement_suggestions', [])
+
+        suggestion_prompt = f"""당신은 AI 탐지를 회피하면서 자연스러운 텍스트를 생성하는 프롬프트 엔지니어링 전문가입니다.
+현재 프롬프트의 분석 결과를 바탕으로, **실질적으로 점수를 향상시킬 수 있는** 개선된 프롬프트를 작성해주세요.
+
+## 현재 프롬프트
+```
+{round_obj.prompt_content}
+```
+
+## 상세 분석 결과
+
+### AI 탐지 회피: {analysis.get('ai_detection_score', 'N/A')}/10
+- 피드백: {analysis.get('ai_detection_feedback', '')}
+- 문장 균일성: {ai_analysis.get('sentence_uniformity', 'N/A')}
+- Perplexity: {ai_analysis.get('perplexity_level', 'N/A')}
+- Burstiness: {ai_analysis.get('burstiness_level', 'N/A')}
+- 문제 패턴: {json.dumps(ai_analysis.get('problematic_patterns', []), ensure_ascii=False)}
+
+### 자연스러움: {analysis.get('naturalness_score', 'N/A')}/10
+- 피드백: {analysis.get('naturalness_feedback', '')}
+- 톤 진정성: {naturalness_analysis.get('tone_authenticity', 'N/A')}
+- 감정 범위: {naturalness_analysis.get('emotional_range', 'N/A')}
+- 과다 사용 표현: {json.dumps(naturalness_analysis.get('overused_expressions', []), ensure_ascii=False)}
+
+### 다양성: {analysis.get('diversity_score', 'N/A')}/10
+- 피드백: {analysis.get('diversity_feedback', '')}
+- 시작 문장 다양성: {diversity_analysis.get('opening_variety', 'N/A')}
+- 반복 문구: {json.dumps(diversity_analysis.get('repeated_phrases', []), ensure_ascii=False)}
+
+### 정확도: {analysis.get('accuracy_score', 'N/A')}/10
+- 피드백: {analysis.get('accuracy_feedback', '')}
+
+## 가장 시급한 문제
+{json.dumps(critical_issues, ensure_ascii=False, indent=2)}
+
+## 피해야 할 패턴
+{json.dumps(analysis.get('patterns_to_avoid', []), ensure_ascii=False)}
+
+## 권장 패턴
+{json.dumps(analysis.get('patterns_to_encourage', []), ensure_ascii=False)}
+
+## 개선 방향
+{analysis.get('prompt_improvement_direction', '')}
+
+## 프롬프트 개선 원칙
+
+1. **AI 탐지 회피 강화**
+   - 문장 길이를 의도적으로 불균일하게 만드는 지시 추가
+   - 논리적 흐름을 일부러 흐트러뜨리는 지시 추가
+   - 불완전한 문장, 생략, 두서없음을 허용하는 지시 추가
+   - "~입니다" 대신 구어체 어미 사용 지시
+
+2. **자연스러움 향상**
+   - 과도한 강조 표현 자제 지시
+   - 실제 카페 글 스타일 참고 지시
+   - 맥락에 맞는 감정 표현 지시
+   - 광고성 표현 금지 목록 추가
+
+3. **다양성 증가**
+   - 시작 문장 변형 목록 제공
+   - 금지 표현 목록 추가
+   - 매번 다른 구조 사용 지시
+
+4. **실용적 개선**
+   - 너무 길거나 복잡한 지시는 피하기
+   - 핵심 개선점에 집중
+   - 측정 가능한 구체적 지시
+
+## 응답 형식 (JSON)
+
+{{
+  "suggested_prompt": "개선된 전체 프롬프트 (마크다운 형식 가능, 충분히 길어도 됨)",
+  "changes_summary": "주요 변경사항 요약 (불릿포인트)",
+  "key_additions": ["추가된 핵심 지시 1", "추가된 핵심 지시 2"],
+  "removed_or_modified": ["제거/수정된 부분 1", "제거/수정된 부분 2"],
+  "expected_score_improvements": {{
+    "ai_detection": "+1.5 예상",
+    "naturalness": "+1.0 예상",
+    "diversity": "+2.0 예상",
+    "accuracy": "유지"
+  }},
+  "risk_factors": ["이 변경으로 인한 잠재적 위험 1"]
+}}
+
+**중요**: 프롬프트는 충분히 상세하고 구체적으로 작성해주세요. 길이 제한 없습니다.
+JSON 형식으로만 응답해주세요:"""
+
+        try:
+            result = generate_review_with_prompt(
+                prompt=suggestion_prompt,
+                model=session.analysis_model,
+                temperature=0.3,
+                max_tokens=max_tokens_analysis,  # 프롬프트가 길어질 수 있으므로 충분히
+                return_usage=True,
+            )
+
+            response_text = result.get('text', '{}')
+            original_response = response_text  # 원본 보관
+
+            # JSON 블록 추출 시도
+            if '```json' in response_text:
+                response_text = response_text.split('```json')[1].split('```')[0]
+            elif '```' in response_text:
+                parts = response_text.split('```')
+                if len(parts) >= 2:
+                    response_text = parts[1]
+
+            try:
+                suggestion = json.loads(response_text.strip())
+            except json.JSONDecodeError as e:
+                # JSON 파싱 실패 시 - 전체 텍스트를 프롬프트로 사용
+                suggestion = {
+                    "suggested_prompt": original_response,  # 원본 텍스트를 프롬프트로
+                    "changes_summary": "JSON 파싱 실패로 원본 응답 사용",
+                    "parse_error": str(e),
+                }
+
+            # 라운드 업데이트
+            round_obj.suggested_prompt = suggestion.get('suggested_prompt', '') or original_response
+            round_obj.suggested_changes = suggestion.get('changes_summary', '')
+            round_obj.input_tokens += result.get('input_tokens', 0)
+            round_obj.output_tokens += result.get('output_tokens', 0)
+            round_obj.cost_usd += result.get('cost_usd', 0.0)
+            round_obj.save()
+
+            # 세션 통계 업데이트
+            session.total_input_tokens += result.get('input_tokens', 0)
+            session.total_output_tokens += result.get('output_tokens', 0)
+            session.total_cost_usd += result.get('cost_usd', 0.0)
+            session.save()
+
+            return JsonResponse({
+                "success": True,
+                "suggestion": suggestion,
+            })
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+
+@require_http_methods(["POST"])
+def api_optimization_approve(request, pk):
+    """제안 승인"""
+    from apps.data.models import OptimizationRound, OptimizationLog
+
+    round_obj = get_object_or_404(OptimizationRound, pk=pk)
+    session = round_obj.session
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        data = {}
+
+    # 승인할 프롬프트 결정
+    if data.get('use_suggested', True):
+        approved = round_obj.suggested_prompt or round_obj.prompt_content
+    else:
+        approved = round_obj.prompt_content
+
+    round_obj.approved_prompt = approved
+    round_obj.status = 'approved'
+    round_obj.save()
+
+    # 로그
+    OptimizationLog.objects.create(
+        session=session,
+        round=round_obj,
+        log_type='approval',
+        message=f"라운드 {round_obj.round_number} 승인 완료",
+    )
+
+    # 자동 모드면 다음 라운드 체크
+    auto_continue = False
+    if session.mode == 'auto' and session.current_round < session.target_rounds:
+        auto_continue = True
+
+    return JsonResponse({
+        "success": True,
+        "approved_prompt": approved,
+        "auto_continue": auto_continue,
+    })
+
+
+@require_http_methods(["POST"])
+def api_optimization_modify(request, pk):
+    """수정 후 승인"""
+    from apps.data.models import OptimizationRound, OptimizationLog
+
+    round_obj = get_object_or_404(OptimizationRound, pk=pk)
+    session = round_obj.session
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "잘못된 요청"}, status=400)
+
+    modified_prompt = data.get('prompt', '').strip()
+    if not modified_prompt:
+        return JsonResponse({"error": "수정된 프롬프트를 입력해주세요."}, status=400)
+
+    round_obj.approved_prompt = modified_prompt
+    round_obj.status = 'approved'
+    round_obj.save()
+
+    # 로그
+    OptimizationLog.objects.create(
+        session=session,
+        round=round_obj,
+        log_type='approval',
+        message=f"라운드 {round_obj.round_number} 수정 후 승인",
+        details={"modified": True},
+    )
+
+    return JsonResponse({
+        "success": True,
+        "approved_prompt": modified_prompt,
+    })
+
+
+# =====================================================
+# 최적화 API - 비교 & 내보내기
+# =====================================================
+
+def api_optimization_compare(request, pk):
+    """라운드 비교"""
+    from apps.data.models import PromptOptimizationSession
+
+    session = get_object_or_404(PromptOptimizationSession, pk=pk)
+    rounds = session.rounds.filter(status__in=['analyzed', 'approved']).order_by('round_number')
+
+    comparison_data = []
+    for r in rounds:
+        comparison_data.append({
+            "round_number": r.round_number,
+            "status": r.status,
+            "scores": {
+                "ai_detection": r.score_ai_detection,
+                "naturalness": r.score_naturalness,
+                "diversity": r.score_diversity,
+                "accuracy": r.score_accuracy,
+                "overall": r.score_overall,
+            },
+            "generated_count": r.generated_count,
+            "cost_usd": r.cost_usd,
+            "prompt_changes": r.prompt_changes,
+        })
+
+    # 점수 추이 계산
+    if len(comparison_data) >= 2:
+        first = comparison_data[0]['scores']
+        last = comparison_data[-1]['scores']
+        improvement = {
+            k: (last.get(k, 0) or 0) - (first.get(k, 0) or 0)
+            for k in ['ai_detection', 'naturalness', 'diversity', 'accuracy', 'overall']
+        }
+    else:
+        improvement = None
+
+    return JsonResponse({
+        "session_name": session.name,
+        "total_rounds": session.current_round,
+        "comparison": comparison_data,
+        "improvement": improvement,
+        "total_cost_usd": session.total_cost_usd,
+    })
+
+
+def api_optimization_export(request, pk):
+    """세션 내보내기"""
+    from apps.data.models import PromptOptimizationSession
+    from django.http import HttpResponse
+    import csv
+    from io import StringIO
+
+    session = get_object_or_404(PromptOptimizationSession, pk=pk)
+    export_format = request.GET.get('format', 'json')
+
+    if export_format == 'json':
+        # JSON 내보내기
+        rounds_data = []
+        for r in session.rounds.all().order_by('round_number'):
+            samples_data = [{
+                "index": s.sample_index,
+                "content": s.generated_content,
+                "persona": s.persona_settings,
+            } for s in r.samples.all().order_by('sample_index')]
+
+            rounds_data.append({
+                "round_number": r.round_number,
+                "prompt": r.prompt_content,
+                "approved_prompt": r.approved_prompt,
+                "scores": {
+                    "ai_detection": r.score_ai_detection,
+                    "naturalness": r.score_naturalness,
+                    "diversity": r.score_diversity,
+                    "accuracy": r.score_accuracy,
+                    "overall": r.score_overall,
+                },
+                "analysis": r.analysis_result,
+                "samples": samples_data,
+            })
+
+        export_data = {
+            "session": {
+                "id": session.id,
+                "name": session.name,
+                "created_at": session.created_at.isoformat(),
+                "total_cost_usd": session.total_cost_usd,
+            },
+            "rounds": rounds_data,
+        }
+
+        response = JsonResponse(export_data, json_dumps_params={'ensure_ascii': False, 'indent': 2})
+        response['Content-Disposition'] = f'attachment; filename="optimization_{session.id}.json"'
+        return response
+
+    elif export_format == 'csv':
+        # CSV 내보내기 (샘플 중심)
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Round', 'Sample', 'Content', 'Persona', 'Overall Score'])
+
+        for r in session.rounds.all().order_by('round_number'):
+            for s in r.samples.all().order_by('sample_index'):
+                writer.writerow([
+                    r.round_number,
+                    s.sample_index,
+                    s.generated_content,
+                    json.dumps(s.persona_settings, ensure_ascii=False),
+                    r.score_overall,
+                ])
+
+        response = HttpResponse(output.getvalue(), content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="optimization_{session.id}.csv"'
+        return response
+
+
+def api_optimization_logs(request, pk):
+    """세션 로그 조회"""
+    from apps.data.models import PromptOptimizationSession
+
+    session = get_object_or_404(PromptOptimizationSession, pk=pk)
+
+    logs = session.logs.all().order_by('-created_at')[:100]
+    logs_data = [{
+        "id": log.id,
+        "type": log.log_type,
+        "message": log.message,
+        "round_number": log.round.round_number if log.round else None,
+        "created_at": log.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+    } for log in logs]
+
+    return JsonResponse({"logs": logs_data})
+
+
+def api_optimization_round_samples(request, pk):
+    """라운드의 샘플 조회"""
+    from apps.data.models import OptimizationRound
+
+    round_obj = get_object_or_404(OptimizationRound, pk=pk)
+
+    samples = round_obj.samples.all().order_by('sample_index')
+    samples_data = [{
+        "id": sample.id,
+        "index": sample.sample_index,
+        "content": sample.generated_content,
+        "persona": sample.persona_settings,
+        "scores": sample.individual_scores,
+    } for sample in samples]
+
+    return JsonResponse({
+        "success": True,
+        "round_id": round_obj.id,
+        "round_number": round_obj.round_number,
+        "prompt": round_obj.approved_prompt or round_obj.prompt_content,
+        "samples": samples_data,
+        "count": len(samples_data),
+    })
