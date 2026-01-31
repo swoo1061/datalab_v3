@@ -182,9 +182,50 @@
     vertical-align: middle; margin-right: 6px;
   }
 
+  /* Result mode buttons */
+  .result-mode-btn { background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
+  .result-mode-btn:hover { border-color: var(--brand); color: var(--brand); }
+  .result-mode-btn.active { background: var(--brand); color: white; border-color: var(--brand); }
+  .result-view { display: none; }
+  .result-view.active { display: block; }
+
+  /* Stat cards */
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .stat-card {
+    background: var(--bg); border-radius: 10px; padding: 16px; text-align: center;
+    border: 1px solid var(--border);
+  }
+  .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--brand); }
+  .stat-label { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
+  /* Batch item in list */
+  .batch-item {
+    padding: 12px 16px; background: var(--bg); border-radius: 10px;
+    margin-bottom: 8px; border: 1px solid var(--border); cursor: pointer;
+    transition: all 0.2s;
+  }
+  .batch-item:hover { border-color: var(--brand); background: var(--brand-bg); }
+  .batch-item.selected { border-color: var(--brand); background: var(--brand-bg); }
+  .batch-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .batch-item-title { font-weight: 600; font-size: 0.9rem; }
+  .batch-item-meta { font-size: 0.75rem; color: var(--muted); }
+  .batch-item-preview { font-size: 0.8rem; color: var(--text-secondary); max-height: 40px; overflow: hidden; }
+
+  /* Saved JSON list */
+  .saved-json-item {
+    padding: 10px 14px; background: var(--surface); border-radius: 8px;
+    margin-bottom: 6px; border: 1px solid var(--border); cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .saved-json-item:hover { background: var(--brand-bg); border-color: var(--brand); }
+  .saved-json-item .json-name { font-weight: 500; font-size: 0.85rem; }
+  .saved-json-item .json-meta { font-size: 0.75rem; color: var(--muted); }
+  .saved-json-item .json-actions { display: flex; gap: 6px; }
+
   @media (max-width: 1024px) {
     .two-col, .two-col-wide { grid-template-columns: 1fr; }
     .setting-grid { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
   }
 </style>
 {% endblock %}
@@ -199,7 +240,7 @@
 
 <div class="tabs">
   <button class="tab-btn active" data-tab="tab1">시리즈 생성</button>
-  <button class="tab-btn" data-tab="tab2">배치 생성</button>
+  <button class="tab-btn" data-tab="tab2">JSON 분석</button>
   <button class="tab-btn" data-tab="tab3">비교 & 점수</button>
   <button class="tab-btn" data-tab="tab4">편집 & 스케줄</button>
   <button class="tab-btn" data-tab="tab5">내보내기 & 로그</button>
@@ -363,24 +404,86 @@
         </div>
       </div>
 
-      <button id="generateBtn" class="btn btn-primary btn-lg" style="width:100%" onclick="generateSeries()">
-        시리즈 생성
-      </button>
+      <div style="display:flex;gap:12px">
+        <button id="generateBtn" class="btn btn-primary btn-lg" style="flex:1" onclick="generateSeries()">
+          시리즈 생성
+        </button>
+      </div>
+
+      <!-- 배치 생성 섹션 -->
+      <div class="card" style="margin-top:20px">
+        <div class="card-header">
+          <h3 class="card-title">📦 배치 생성</h3>
+          <span class="text-sm text-muted">위 설정을 공유하여 여러 시리즈를 한번에 생성</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">목표 생성 수</label>
+          <div class="slider-container">
+            <input type="range" id="batchCount" min="2" max="50" step="1" value="10">
+            <span id="batchCountValue">10</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="batchBtn" class="btn btn-secondary btn-lg" style="flex:1" onclick="startBatch()">
+            배치 생성 시작
+          </button>
+          <button id="batchStopBtn" class="btn btn-ghost btn-lg" onclick="stopBatch()" style="display:none">
+            중지
+          </button>
+        </div>
+        <div id="batchProgress" style="display:none;margin-top:16px">
+          <div class="progress-bar-wrap">
+            <div id="batchProgressBar" class="progress-bar-fill" style="width:0%">0%</div>
+          </div>
+          <div id="batchInfo" class="text-sm text-muted" style="margin-top:8px"></div>
+        </div>
+      </div>
     </div>
 
     <!-- 우측: 결과 -->
     <div>
+      <!-- 결과 모드 선택 -->
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn btn-sm result-mode-btn active" data-mode="preview" onclick="setResultMode('preview')">미리보기</button>
+        <button class="btn btn-sm result-mode-btn" data-mode="json" onclick="setResultMode('json')">JSON</button>
+        <button class="btn btn-sm result-mode-btn" data-mode="batch" onclick="setResultMode('batch')">배치 목록</button>
+      </div>
+
       <div class="card" style="margin-bottom:20px">
         <div class="card-header">
           <h3 class="card-title">생성 결과</h3>
-          <button class="btn btn-ghost btn-sm" onclick="togglePrompt()">프롬프트 보기</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="togglePrompt()">프롬프트</button>
+            <button class="btn btn-ghost btn-sm" onclick="saveJsonToStorage()">💾 JSON 저장</button>
+          </div>
         </div>
         <div id="promptPreview" class="prompt-preview" style="display:none">
           <pre id="promptText"></pre>
         </div>
-        <div id="seriesResult">
-          <div class="text-center text-muted" style="padding:60px">시리즈를 생성해주세요</div>
+
+        <!-- 미리보기 모드 -->
+        <div id="resultPreview" class="result-view active">
+          <div id="seriesResult">
+            <div class="text-center text-muted" style="padding:60px">시리즈를 생성해주세요</div>
+          </div>
         </div>
+
+        <!-- JSON 모드 -->
+        <div id="resultJson" class="result-view" style="display:none">
+          <textarea id="jsonOutput" class="form-textarea" rows="20" style="font-family:monospace;font-size:0.8rem" readonly></textarea>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-sm btn-secondary" onclick="copyJson()">📋 복사</button>
+            <button class="btn btn-sm btn-secondary" onclick="downloadJson()">⬇️ 다운로드</button>
+          </div>
+        </div>
+
+        <!-- 배치 목록 모드 -->
+        <div id="resultBatch" class="result-view" style="display:none">
+          <div id="batchItemsList" style="max-height:500px;overflow-y:auto">
+            <div class="text-center text-muted" style="padding:40px">배치 생성을 시작하세요</div>
+          </div>
+        </div>
+
         <div id="usageInfo" class="usage-info" style="display:none"></div>
       </div>
 
@@ -392,47 +495,65 @@
   </div>
 </div>
 
-<!-- ========== TAB 2: 배치 생성 ========== -->
+<!-- ========== TAB 2: JSON 분석 ========== -->
 <div id="tab2" class="tab-content">
   <div class="two-col">
-    <!-- 좌측: 설정 -->
+    <!-- 좌측: JSON 입력 -->
     <div>
       <div class="card" style="margin-bottom:20px">
-        <div class="card-header"><h3 class="card-title">배치 생성 설정</h3></div>
-        <p class="text-sm text-muted" style="margin-bottom:16px">Tab 1의 설정을 공유합니다. 목표 생성 수만 추가로 설정하세요.</p>
-
+        <div class="card-header">
+          <h3 class="card-title">JSON 불러오기</h3>
+          <button class="btn btn-ghost btn-sm" onclick="loadFromStorage()">💾 저장된 JSON</button>
+        </div>
         <div class="form-group">
-          <label class="form-label">목표 생성 수</label>
-          <div class="slider-container">
-            <input type="range" id="batchCount" min="5" max="50" step="1" value="30">
-            <span id="batchCountValue">30</span>
-          </div>
-          <div class="form-hint">5~50개 시리즈를 순차 생성합니다.</div>
+          <label class="form-label">JSON 데이터 붙여넣기</label>
+          <textarea id="analyzeJsonInput" class="form-textarea" rows="12" style="font-family:monospace;font-size:0.8rem" placeholder='{"batches": [...], "settings": {...}}'></textarea>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="parseAndAnalyze()">분석 시작</button>
+          <label class="btn btn-secondary" style="cursor:pointer">
+            📂 파일 열기
+            <input type="file" accept=".json" onchange="loadJsonFile(event)" style="display:none">
+          </label>
         </div>
       </div>
 
-      <button id="batchBtn" class="btn btn-primary btn-lg" style="width:100%" onclick="startBatch()">
-        배치 생성 시작
-      </button>
-
-      <div id="batchStatus" style="margin-top:20px;display:none">
-        <div class="card">
-          <h4 style="margin-bottom:12px">진행 상태</h4>
-          <div class="progress-bar-wrap">
-            <div id="batchProgress" class="progress-bar-fill" style="width:0%">0%</div>
-          </div>
-          <div id="batchInfo" class="text-sm text-muted"></div>
-          <button id="batchStopBtn" class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="stopBatch()">중지</button>
-        </div>
+      <!-- 저장된 JSON 목록 -->
+      <div class="card" id="savedJsonListCard" style="display:none">
+        <div class="card-header"><h3 class="card-title">저장된 JSON 목록</h3></div>
+        <div id="savedJsonList" style="max-height:300px;overflow-y:auto"></div>
       </div>
     </div>
 
-    <!-- 우측: 완료된 시리즈 -->
+    <!-- 우측: 분석 결과 -->
     <div>
       <div class="card">
-        <div class="card-header"><h3 class="card-title">완료된 시리즈</h3></div>
-        <div id="batchItemsList" style="max-height:600px;overflow-y:auto">
-          <div class="text-center text-muted" style="padding:40px">배치 생성을 시작하세요</div>
+        <div class="card-header">
+          <h3 class="card-title">분석 결과</h3>
+          <span id="analyzeStats" class="text-sm text-muted"></span>
+        </div>
+
+        <!-- 요약 통계 -->
+        <div id="analyzeSummary" style="display:none;margin-bottom:20px">
+          <div class="grid-3" style="gap:12px">
+            <div class="stat-card">
+              <div class="stat-value" id="statBatchCount">0</div>
+              <div class="stat-label">총 배치</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statTotalChars">0</div>
+              <div class="stat-label">총 글자수</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statAvgChars">0</div>
+              <div class="stat-label">평균 글자수</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 배치별 상세 -->
+        <div id="analyzeDetails" style="max-height:500px;overflow-y:auto">
+          <div class="text-center text-muted" style="padding:40px">JSON을 붙여넣고 분석을 시작하세요</div>
         </div>
       </div>
     </div>
@@ -580,12 +701,14 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // ==================== Globals ====================
-let currentSeries = [];       // Tab 1 result
+let currentSeries = [];       // Tab 1 single result
 let currentPrompt = '';
 let batchId = null;
-let batchItems = [];          // batch results
+let batchItems = [];          // batch results (array of series)
 let batchRunning = false;
 let currentEditItemId = null;
+let currentResultMode = 'preview';
+let allBatchData = null;      // Full JSON data for export
 
 const TYPE_NAMES = {
   'title': '📝 제목',
@@ -654,6 +777,85 @@ document.getElementById('batchCount').addEventListener('input', (e) => {
   document.getElementById('batchCountValue').textContent = e.target.value;
 });
 
+// ==================== Result Mode ====================
+function setResultMode(mode) {
+  currentResultMode = mode;
+  document.querySelectorAll('.result-mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+  document.querySelectorAll('.result-view').forEach(view => {
+    view.classList.remove('active');
+    view.style.display = 'none';
+  });
+  const viewEl = document.getElementById('result' + mode.charAt(0).toUpperCase() + mode.slice(1));
+  if (viewEl) {
+    viewEl.classList.add('active');
+    viewEl.style.display = 'block';
+  }
+  // Update JSON output when switching to json mode
+  if (mode === 'json') updateJsonOutput();
+}
+
+function updateJsonOutput() {
+  const output = buildExportJson();
+  document.getElementById('jsonOutput').value = JSON.stringify(output, null, 2);
+}
+
+function buildExportJson() {
+  const settings = getSettings();
+  return {
+    generated_at: new Date().toISOString(),
+    settings: {
+      procedure_name: settings.procedure_name,
+      model: settings.model,
+      temperature: settings.temperature,
+      content_types: settings.types,
+      content_lengths: settings.lengths,
+      persona: settings.persona,
+      situation: settings.situation,
+      user_input: settings.user_input
+    },
+    batches: batchItems.length > 0 ? batchItems : (currentSeries.length > 0 ? [{ index: 1, series: currentSeries }] : []),
+    total_batches: batchItems.length > 0 ? batchItems.length : (currentSeries.length > 0 ? 1 : 0)
+  };
+}
+
+function copyJson() {
+  const textarea = document.getElementById('jsonOutput');
+  textarea.select();
+  document.execCommand('copy');
+  alert('JSON이 클립보드에 복사되었습니다.');
+}
+
+function downloadJson() {
+  const content = document.getElementById('jsonOutput').value;
+  const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const timestamp = new Date().toISOString().slice(0, 10);
+  a.download = `multi_series_${timestamp}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function saveJsonToStorage() {
+  const data = buildExportJson();
+  if (data.total_batches === 0) {
+    alert('저장할 데이터가 없습니다.');
+    return;
+  }
+  const key = 'multiJson_' + Date.now();
+  const savedList = JSON.parse(localStorage.getItem('multiJsonList') || '[]');
+  const name = prompt('저장할 이름을 입력하세요:', `${data.settings.procedure_name || '시리즈'}_${new Date().toLocaleDateString()}`);
+  if (!name) return;
+
+  savedList.push({ key, name, batches: data.total_batches, created: new Date().toISOString() });
+  localStorage.setItem('multiJsonList', JSON.stringify(savedList));
+  localStorage.setItem(key, JSON.stringify(data));
+  alert(`"${name}" 저장 완료!`);
+}
+
 function randomizePersona() {
   const selects = ['pAge', 'pGender', 'pJob', 'pPersonality', 'pTone', 'pExperience'];
   selects.forEach(id => {
@@ -667,13 +869,29 @@ function randomizePersona() {
 function getContentTypes() {
   const types = [];
   const lengths = {};
-  ['question', 'research', 'consultation', 'day0', 'month1', 'month2', 'month3'].forEach(t => {
-    if (document.getElementById('ct_' + t).checked) {
+  const allTypes = ['title', 'question', 'research', 'consultation', 'day0', 'week1', 'week2', 'week3', 'month1', 'month2', 'month3'];
+  allTypes.forEach(t => {
+    const cb = document.getElementById('ct_' + t);
+    if (cb && cb.checked) {
       types.push(t);
       lengths[t] = parseInt(document.getElementById('len_' + t).value) || 500;
     }
   });
   return { types, lengths };
+}
+
+function getSettings() {
+  return {
+    user_input: document.getElementById('userInput').value.trim(),
+    procedure_id: document.getElementById('procedureId').value || null,
+    procedure_name: document.getElementById('procName')?.textContent || '',
+    model: document.getElementById('modelSelect').value,
+    template_id: document.getElementById('templateSelect').value || null,
+    temperature: parseFloat(document.getElementById('temperature').value),
+    persona: getPersona(),
+    situation: getSituation(),
+    ...getContentTypes()
+  };
 }
 
 function getPersona() {
@@ -747,8 +965,12 @@ async function generateSeries() {
       `;
     }
 
-    // Update edit dropdown
+    // Reset batch items when doing single generation
+    batchItems = [];
+
+    // Update edit dropdown and JSON
     updateEditDropdown();
+    updateJsonOutput();
   } catch (e) {
     document.getElementById('seriesResult').innerHTML = `<div style="color:var(--danger);padding:20px">오류: ${e.message}</div>`;
   } finally {
@@ -812,38 +1034,42 @@ function escapeAttr(text) {
   return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// ==================== TAB 2: Batch ====================
+// ==================== Batch Generation ====================
 async function startBatch() {
-  const userInput = document.getElementById('userInput').value.trim();
-  if (!userInput) return alert('Tab 1에서 기본 정보를 입력해주세요.');
-
-  const { types, lengths } = getContentTypes();
-  if (types.length === 0) return alert('Tab 1에서 컨텐츠 타입을 선택해주세요.');
+  const settings = getSettings();
+  if (!settings.user_input) return alert('기본 정보를 입력해주세요.');
+  if (settings.types.length === 0) return alert('최소 하나의 컨텐츠를 선택해주세요.');
 
   const targetCount = parseInt(document.getElementById('batchCount').value);
 
   batchRunning = true;
   batchItems = [];
-  document.getElementById('batchStatus').style.display = 'block';
+  let totalCost = 0;
+
+  // Show progress UI
+  document.getElementById('batchProgress').style.display = 'block';
   document.getElementById('batchBtn').disabled = true;
+  document.getElementById('batchStopBtn').style.display = 'inline-block';
   document.getElementById('batchItemsList').innerHTML = '';
-  updateProgress(0, targetCount);
+  updateBatchProgress(0, targetCount);
+
+  // Switch to batch view
+  setResultMode('batch');
 
   try {
-    // 1. Create batch
+    // 1. Create batch record (optional - for DB tracking)
     const batchData = await apiPost('/dashboard/api/generate-multi-batch/', {
-      user_input: userInput,
-      procedure_id: document.getElementById('procedureId').value || null,
-      content_types: types,
-      content_lengths: lengths,
-      model: document.getElementById('modelSelect').value,
+      user_input: settings.user_input,
+      procedure_id: settings.procedure_id,
+      content_types: settings.types,
+      content_lengths: settings.lengths,
+      model: settings.model,
       target_count: targetCount,
     });
 
     if (batchData.error) {
       alert(batchData.error);
-      batchRunning = false;
-      document.getElementById('batchBtn').disabled = false;
+      resetBatchUI();
       return;
     }
 
@@ -854,70 +1080,109 @@ async function startBatch() {
       try {
         const nextData = await apiPost('/dashboard/api/generate-multi-batch-next/', {
           batch_id: batchId,
-          content_lengths: lengths,
+          content_lengths: settings.lengths,
         });
 
         if (nextData.error) {
-          addBatchMiniCard(i + 1, null, nextData.error);
+          addBatchItem(i + 1, null, nextData.error);
           continue;
         }
 
-        batchItems.push(nextData);
-        addBatchMiniCard(i + 1, nextData);
-        updateProgress(i + 1, targetCount);
-        document.getElementById('batchInfo').textContent =
-          `${i + 1}/${targetCount} 완료 · $${(nextData.usage?.cost_usd || 0).toFixed(4)}`;
+        // Store batch result
+        const batchItem = {
+          index: i + 1,
+          series: nextData.series,
+          persona: nextData.persona,
+          usage: nextData.usage,
+          item_id: nextData.item_id
+        };
+        batchItems.push(batchItem);
+        totalCost += nextData.usage?.cost_usd || 0;
+
+        addBatchItem(i + 1, batchItem);
+        updateBatchProgress(i + 1, targetCount);
+        document.getElementById('batchInfo').innerHTML =
+          `<span>${i + 1}/${targetCount} 완료</span> · <span>$${totalCost.toFixed(4)}</span>`;
 
         if (nextData.completed) break;
       } catch (e) {
-        addBatchMiniCard(i + 1, null, e.message);
+        addBatchItem(i + 1, null, e.message);
       }
     }
 
-    batchRunning = false;
-    document.getElementById('batchBtn').disabled = false;
-    document.getElementById('batchInfo').textContent += ' (완료)';
+    // Done
+    document.getElementById('batchInfo').innerHTML += ' <strong style="color:var(--success)">(완료)</strong>';
     updateEditDropdown();
+    updateJsonOutput();
   } catch (e) {
     alert('배치 생성 실패: ' + e.message);
-    batchRunning = false;
-    document.getElementById('batchBtn').disabled = false;
+  } finally {
+    resetBatchUI();
   }
 }
 
 function stopBatch() {
   batchRunning = false;
-  document.getElementById('batchBtn').disabled = false;
-  document.getElementById('batchInfo').textContent += ' (중지됨)';
+  document.getElementById('batchInfo').innerHTML += ' <strong style="color:var(--warning)">(중지됨)</strong>';
+  resetBatchUI();
 }
 
-function updateProgress(current, total) {
+function resetBatchUI() {
+  batchRunning = false;
+  document.getElementById('batchBtn').disabled = false;
+  document.getElementById('batchStopBtn').style.display = 'none';
+}
+
+function updateBatchProgress(current, total) {
   const pct = Math.round((current / total) * 100);
-  const bar = document.getElementById('batchProgress');
+  const bar = document.getElementById('batchProgressBar');
   bar.style.width = pct + '%';
   bar.textContent = pct + '%';
 }
 
-function addBatchMiniCard(idx, data, error) {
+function addBatchItem(idx, data, error) {
   const list = document.getElementById('batchItemsList');
   if (idx === 1) list.innerHTML = '';
 
   if (error) {
-    list.innerHTML += `<div class="mini-card" style="border-color:var(--danger)">
-      <span>#${idx} 실패: ${error}</span>
+    list.innerHTML += `<div class="batch-item" style="border-color:var(--danger)">
+      <div class="batch-item-header">
+        <span class="batch-item-title">#${idx} 실패</span>
+      </div>
+      <div class="batch-item-meta" style="color:var(--danger)">${error}</div>
     </div>`;
     return;
   }
 
   const persona = data.persona || {};
-  const personaStr = [persona.age, persona.gender, persona.job].filter(Boolean).join(' · ');
-  const piecesCount = data.series ? data.series.length : 0;
+  const personaStr = [persona.age, persona.gender, persona.job].filter(x => x && x !== '미지정').join(' · ') || '랜덤';
+  const totalChars = data.series.reduce((sum, s) => sum + (s.char_count || s.content.length), 0);
+  const preview = data.series[0]?.content?.slice(0, 60) || '';
 
-  list.innerHTML += `<div class="mini-card">
-    <span>#${idx} · ${piecesCount}피스</span>
-    <span class="persona-tag">${personaStr}</span>
+  list.innerHTML += `<div class="batch-item" onclick="viewBatchItem(${idx - 1})">
+    <div class="batch-item-header">
+      <span class="batch-item-title">#${idx} · ${data.series.length}피스 · ${totalChars}자</span>
+      <span class="persona-tag">${personaStr}</span>
+    </div>
+    <div class="batch-item-preview">${escapeHtml(preview)}...</div>
   </div>`;
   list.scrollTop = list.scrollHeight;
+}
+
+function viewBatchItem(idx) {
+  const item = batchItems[idx];
+  if (!item) return;
+
+  // Switch to preview mode and show this batch's series
+  setResultMode('preview');
+  currentSeries = item.series;
+  renderSeries(item.series);
+  renderTitles(item.series);
+
+  // Highlight selected
+  document.querySelectorAll('.batch-item').forEach((el, i) => {
+    el.classList.toggle('selected', i === idx);
+  });
 }
 
 // ==================== TAB 3: Score ====================
@@ -1129,52 +1394,62 @@ async function saveSchedule() {
 // ==================== TAB 5: Export ====================
 async function exportData(format) {
   const source = document.getElementById('exportSource').value;
-  let payload = { format };
 
-  if (source === 'batch' && batchId) {
-    payload.batch_id = batchId;
+  // Get data based on source
+  let exportBatches = [];
+  if (source === 'batch' && batchItems.length > 0) {
+    exportBatches = batchItems;
   } else if (source === 'tab1' && currentSeries.length > 0) {
-    // For tab1, we send items directly since no DB record
-    payload.item_ids = [];
-    // Build a local export
-    localExport(format);
-    return;
-  } else {
+    exportBatches = [{ index: 1, series: currentSeries }];
+  } else if (batchId) {
+    // Try to fetch from server
+    try {
+      const data = await apiPost('/dashboard/api/export-multi/', { batch_id: batchId, format });
+      if (data.success) {
+        const content = typeof data.data === 'string' ? data.data : JSON.stringify(data.data, null, 2);
+        document.getElementById('exportContent').value = content;
+        document.getElementById('exportPreview').style.display = 'block';
+        window._exportFormat = format;
+        window._exportContent = content;
+        return;
+      }
+    } catch (e) {}
+  }
+
+  if (exportBatches.length === 0) {
     alert('내보낼 데이터가 없습니다.');
     return;
   }
 
-  try {
-    const data = await apiPost('/dashboard/api/export-multi/', payload);
-    if (data.success) {
-      const content = typeof data.data === 'string' ? data.data : JSON.stringify(data.data, null, 2);
-      document.getElementById('exportContent').value = content;
-      document.getElementById('exportPreview').style.display = 'block';
-      window._exportFormat = format;
-      window._exportContent = content;
-    } else {
-      alert('내보내기 실패: ' + (data.error || ''));
-    }
-  } catch (e) {
-    alert('오류: ' + e.message);
-  }
+  localExport(format, exportBatches);
 }
 
-function localExport(format) {
+function localExport(format, batches) {
   let content = '';
-  if (format === 'text') {
-    content = currentSeries.map((s, i) => {
-      const title = s.selected_title ? ` ${s.selected_title}` : '';
-      return `--- [${TYPE_NAMES[s.type] || s.type}]${title} ---\n${s.edited_content || s.content}`;
-    }).join('\n\n=======\n\n');
-  } else if (format === 'json') {
-    content = JSON.stringify(currentSeries, null, 2);
+
+  if (format === 'json') {
+    content = JSON.stringify(buildExportJson(), null, 2);
+  } else if (format === 'text') {
+    content = batches.map((batch, bIdx) => {
+      const header = `========== 배치 #${batch.index || bIdx + 1} ==========\n`;
+      const series = batch.series.map(s => {
+        const title = s.selected_title ? ` ${s.selected_title}` : '';
+        return `--- [${TYPE_NAMES[s.type] || s.type}]${title} ---\n${s.edited_content || s.content}`;
+      }).join('\n\n');
+      return header + series;
+    }).join('\n\n\n');
   } else {
-    content = 'type,title,content,char_count\n' + currentSeries.map(s => {
-      const c = (s.edited_content || s.content).replace(/"/g, '""');
-      return `"${s.type}","${(s.selected_title || '').replace(/"/g, '""')}","${c}",${s.char_count}`;
-    }).join('\n');
+    // CSV
+    const rows = ['batch_index,type,title,content,char_count'];
+    batches.forEach((batch, bIdx) => {
+      batch.series.forEach(s => {
+        const c = (s.edited_content || s.content).replace(/"/g, '""');
+        rows.push(`${batch.index || bIdx + 1},"${s.type}","${(s.selected_title || '').replace(/"/g, '""')}","${c}",${s.char_count || s.content.length}`);
+      });
+    });
+    content = rows.join('\n');
   }
+
   document.getElementById('exportContent').value = content;
   document.getElementById('exportPreview').style.display = 'block';
   window._exportFormat = format;
@@ -1196,6 +1471,155 @@ function downloadExport() {
   URL.revokeObjectURL(url);
 }
 
+// ==================== TAB 2: JSON Analysis ====================
+function loadFromStorage() {
+  const savedList = JSON.parse(localStorage.getItem('multiJsonList') || '[]');
+  const container = document.getElementById('savedJsonList');
+  const card = document.getElementById('savedJsonListCard');
+
+  if (savedList.length === 0) {
+    card.style.display = 'none';
+    alert('저장된 JSON이 없습니다.');
+    return;
+  }
+
+  card.style.display = 'block';
+  container.innerHTML = savedList.map((item, idx) => `
+    <div class="saved-json-item">
+      <div>
+        <div class="json-name">${item.name}</div>
+        <div class="json-meta">${item.batches}개 배치 · ${new Date(item.created).toLocaleDateString()}</div>
+      </div>
+      <div class="json-actions">
+        <button class="btn btn-ghost btn-sm" onclick="loadSavedJson('${item.key}')">불러오기</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteSavedJson('${item.key}', ${idx})" style="color:var(--danger)">삭제</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function loadSavedJson(key) {
+  const data = localStorage.getItem(key);
+  if (data) {
+    document.getElementById('analyzeJsonInput').value = data;
+    document.getElementById('savedJsonListCard').style.display = 'none';
+    parseAndAnalyze();
+  }
+}
+
+function deleteSavedJson(key, idx) {
+  if (!confirm('정말 삭제하시겠습니까?')) return;
+  localStorage.removeItem(key);
+  const savedList = JSON.parse(localStorage.getItem('multiJsonList') || '[]');
+  savedList.splice(idx, 1);
+  localStorage.setItem('multiJsonList', JSON.stringify(savedList));
+  loadFromStorage();
+}
+
+function loadJsonFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('analyzeJsonInput').value = e.target.result;
+    parseAndAnalyze();
+  };
+  reader.readAsText(file);
+}
+
+function parseAndAnalyze() {
+  const input = document.getElementById('analyzeJsonInput').value.trim();
+  if (!input) {
+    alert('JSON 데이터를 입력해주세요.');
+    return;
+  }
+
+  let data;
+  try {
+    data = JSON.parse(input);
+  } catch (e) {
+    alert('JSON 파싱 오류: ' + e.message);
+    return;
+  }
+
+  allBatchData = data;
+  renderAnalysisResults(data);
+}
+
+function renderAnalysisResults(data) {
+  const batches = data.batches || [];
+  const summary = document.getElementById('analyzeSummary');
+  const details = document.getElementById('analyzeDetails');
+  const stats = document.getElementById('analyzeStats');
+
+  if (batches.length === 0) {
+    summary.style.display = 'none';
+    details.innerHTML = '<div class="text-center text-muted" style="padding:40px">배치 데이터가 없습니다.</div>';
+    return;
+  }
+
+  // Calculate stats
+  let totalChars = 0;
+  let totalPieces = 0;
+  batches.forEach(b => {
+    const series = b.series || [];
+    series.forEach(s => {
+      totalChars += s.char_count || s.content?.length || 0;
+      totalPieces++;
+    });
+  });
+
+  // Show summary
+  summary.style.display = 'block';
+  document.getElementById('statBatchCount').textContent = batches.length;
+  document.getElementById('statTotalChars').textContent = totalChars.toLocaleString();
+  document.getElementById('statAvgChars').textContent = totalPieces > 0 ? Math.round(totalChars / totalPieces).toLocaleString() : 0;
+  stats.textContent = `설정: ${data.settings?.procedure_name || '미지정'} · ${data.settings?.model || ''}`;
+
+  // Render batch details
+  details.innerHTML = batches.map((batch, idx) => {
+    const series = batch.series || [];
+    const persona = batch.persona || {};
+    const personaStr = [persona.age, persona.gender, persona.job].filter(x => x && x !== '미지정').join(' · ') || '랜덤';
+    const batchChars = series.reduce((sum, s) => sum + (s.char_count || s.content?.length || 0), 0);
+
+    return `
+      <div class="batch-item" onclick="toggleAnalysisBatch(${idx})">
+        <div class="batch-item-header">
+          <span class="batch-item-title">배치 #${batch.index || idx + 1}</span>
+          <span class="persona-tag">${personaStr}</span>
+        </div>
+        <div class="batch-item-meta">${series.length}피스 · ${batchChars.toLocaleString()}자</div>
+      </div>
+      <div id="analysisBatch${idx}" class="analysis-batch-content" style="display:none;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:12px">
+        ${series.map(s => `
+          <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+            <div style="font-weight:600;color:var(--brand);font-size:0.85rem;margin-bottom:6px">${TYPE_NAMES[s.type] || s.type} <span style="font-weight:400;color:var(--muted)">(${s.char_count || s.content?.length}자)</span></div>
+            <div style="font-size:0.85rem;line-height:1.6;white-space:pre-wrap;max-height:150px;overflow-y:auto">${escapeHtml(s.content || '')}</div>
+          </div>
+        `).join('')}
+        <button class="btn btn-sm btn-secondary" onclick="copyBatchContent(${idx})" style="margin-top:8px">📋 이 배치 복사</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleAnalysisBatch(idx) {
+  const el = document.getElementById('analysisBatch' + idx);
+  if (el) {
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+function copyBatchContent(idx) {
+  if (!allBatchData || !allBatchData.batches[idx]) return;
+  const batch = allBatchData.batches[idx];
+  const text = batch.series.map(s => `[${TYPE_NAMES[s.type] || s.type}]\n${s.content}`).join('\n\n---\n\n');
+  navigator.clipboard.writeText(text).then(() => {
+    alert('복사되었습니다.');
+  });
+}
+
 // ==================== Load Templates ====================
 (async function loadTemplates() {
   try {
@@ -1212,5 +1636,8 @@ function downloadExport() {
     }
   } catch(e) {}
 })();
+
+// Init result mode
+setResultMode('preview');
 </script>
 {% endblock %}
