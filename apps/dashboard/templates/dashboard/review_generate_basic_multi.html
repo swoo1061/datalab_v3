@@ -1532,21 +1532,48 @@ function loadJsonFile(event) {
 
 function parseAndAnalyze() {
   const input = document.getElementById('analyzeJsonInput').value.trim();
+  const details = document.getElementById('analyzeDetails');
+
   if (!input) {
     alert('JSON 데이터를 입력해주세요.');
     return;
   }
 
+  // 로딩 표시
+  details.innerHTML = '<div class="text-center" style="padding:40px"><div class="spinner"></div><p class="text-muted" style="margin-top:12px">JSON 분석 중...</p></div>';
+
   let data;
   try {
     data = JSON.parse(input);
   } catch (e) {
-    alert('JSON 파싱 오류: ' + e.message);
+    details.innerHTML = `<div class="text-center" style="padding:40px;color:var(--danger)">
+      <p style="font-weight:600">JSON 파싱 오류</p>
+      <p style="font-size:0.85rem;margin-top:8px">${escapeHtml(e.message)}</p>
+    </div>`;
     return;
+  }
+
+  // 데이터 구조 확인
+  if (!data.batches && !Array.isArray(data)) {
+    // batches 키가 없으면 배열 자체인지 확인
+    if (Array.isArray(data)) {
+      data = { batches: data };
+    } else if (data.series) {
+      // 단일 시리즈 결과인 경우
+      data = { batches: [{ index: 1, series: data.series }] };
+    } else {
+      details.innerHTML = `<div class="text-center" style="padding:40px;color:var(--warning)">
+        <p style="font-weight:600">지원되지 않는 JSON 구조</p>
+        <p style="font-size:0.85rem;margin-top:8px">{"batches": [...]} 형식이 필요합니다.</p>
+        <pre style="text-align:left;font-size:0.75rem;margin-top:12px;padding:12px;background:var(--bg);border-radius:8px;max-height:150px;overflow:auto">${escapeHtml(JSON.stringify(data, null, 2).slice(0, 500))}...</pre>
+      </div>`;
+      return;
+    }
   }
 
   allBatchData = data;
   renderAnalysisResults(data);
+  console.log('분석 완료:', data.batches?.length || 0, '개 배치');
 }
 
 function renderAnalysisResults(data) {
@@ -1557,7 +1584,10 @@ function renderAnalysisResults(data) {
 
   if (batches.length === 0) {
     summary.style.display = 'none';
-    details.innerHTML = '<div class="text-center text-muted" style="padding:40px">배치 데이터가 없습니다.</div>';
+    details.innerHTML = `<div class="text-center" style="padding:40px">
+      <p style="color:var(--warning);font-weight:600">배치 데이터가 없습니다</p>
+      <p class="text-muted" style="font-size:0.85rem;margin-top:8px">JSON에 batches 배열이 비어있습니다.</p>
+    </div>`;
     return;
   }
 
