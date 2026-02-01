@@ -2868,6 +2868,9 @@ def api_generate_multi_batch(request):
     content_lengths = data.get("content_lengths", {})
     model = data.get("model", "claude-sonnet-4-5-20250929")
     target_count = data.get("target_count", 30)
+    persona = data.get("persona", {})
+    situation = data.get("situation", {})
+    temperature = data.get("temperature", 0.85)
 
     if not user_input:
         return JsonResponse({"error": "기본 정보를 입력해주세요."}, status=400)
@@ -2888,6 +2891,9 @@ def api_generate_multi_batch(request):
         model_used=model,
         target_count=target_count,
         status='in_progress',
+        persona_settings=persona,
+        situation_settings=situation,
+        temperature=temperature,
     )
 
     return JsonResponse({
@@ -2923,28 +2929,54 @@ def api_generate_multi_batch_next(request):
     series_index = batch.completed_count + 1
 
     import random
+
+    # 랜덤 옵션들
     ages = ['20대 초반', '20대 중반', '20대 후반', '30대 초반', '30대 중반', '30대 후반', '40대']
     genders = ['여성', '남성']
     jobs = ['직장인', '대학생', '주부', '자영업', '프리랜서']
+    personalities = ['활발함', '소심함', '꼼꼼함', '털털함']
     tones = ['존댓말 위주', '반말 위주', '혼용', '살짝 격식체']
     experiences = ['첫 시술', '2~3회차', '5회 이상', '단골']
 
+    # 저장된 페르소나 설정 가져오기 (빈값/'미지정'이면 랜덤)
+    saved_persona = batch.persona_settings or {}
+
+    def get_or_random(saved_val, options):
+        """저장된 값이 유효하면 사용, 아니면 랜덤"""
+        if saved_val and saved_val not in ('', '미지정', '랜덤'):
+            return saved_val
+        return random.choice(options)
+
     persona = {
-        "age": random.choice(ages),
-        "gender": random.choice(genders),
-        "job": random.choice(jobs),
-        "tone": random.choice(tones),
-        "experience": random.choice(experiences),
+        "age": get_or_random(saved_persona.get('age'), ages),
+        "gender": get_or_random(saved_persona.get('gender'), genders),
+        "job": get_or_random(saved_persona.get('job'), jobs),
+        "personality": get_or_random(saved_persona.get('personality'), personalities),
+        "tone": get_or_random(saved_persona.get('tone'), tones),
+        "experience": get_or_random(saved_persona.get('experience'), experiences),
     }
 
+    # 저장된 상황 설정 가져오기
+    saved_situation = batch.situation_settings or {}
     satisfaction_opts = ['매우 만족', '만족', '보통', '약간 아쉬움']
     pain_opts = ['거의 없음', '약간', '보통', '좀 아팠음']
+    consult_opts = ['매우 친절', '친절', '보통', '사무적']
+    downtime_opts = ['없음', '1~2일', '3~5일', '1주일 이상']
+    price_opts = ['매우 합리적', '적당', '좀 비쌈', '비쌈']
+    revisit_opts = ['꼭 다시 감', '아마 갈 듯', '모르겠음', '안 갈 듯']
+
     situation = {
-        "satisfaction": random.choice(satisfaction_opts),
-        "pain": random.choice(pain_opts),
+        "satisfaction": get_or_random(saved_situation.get('satisfaction'), satisfaction_opts),
+        "pain": get_or_random(saved_situation.get('pain'), pain_opts),
+        "consult": get_or_random(saved_situation.get('consult'), consult_opts),
+        "downtime": get_or_random(saved_situation.get('downtime'), downtime_opts),
+        "price": get_or_random(saved_situation.get('price'), price_opts),
+        "revisit": get_or_random(saved_situation.get('revisit'), revisit_opts),
     }
 
-    temperature = round(random.uniform(0.7, 0.95), 2)
+    # Temperature: 저장된 값 기준 ±0.05 랜덤 변동
+    base_temp = batch.temperature or 0.85
+    temperature = round(max(0.5, min(1.0, base_temp + random.uniform(-0.05, 0.05))), 2)
     content_lengths = data.get("content_lengths", {})
 
     from django.test import RequestFactory

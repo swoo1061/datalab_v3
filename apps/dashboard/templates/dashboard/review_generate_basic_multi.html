@@ -1057,7 +1057,7 @@ async function startBatch() {
   setResultMode('batch');
 
   try {
-    // 1. Create batch record (optional - for DB tracking)
+    // 1. Create batch record with persona/situation settings
     const batchData = await apiPost('/dashboard/api/generate-multi-batch/', {
       user_input: settings.user_input,
       procedure_id: settings.procedure_id,
@@ -1065,6 +1065,9 @@ async function startBatch() {
       content_lengths: settings.lengths,
       model: settings.model,
       target_count: targetCount,
+      persona: settings.persona,
+      situation: settings.situation,
+      temperature: settings.temperature,
     });
 
     if (batchData.error) {

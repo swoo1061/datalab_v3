@@ -936,6 +936,12 @@ class MultiSeriesBatch(models.Model):
     total_input_tokens = models.IntegerField(default=0, verbose_name="총 입력 토큰")
     total_output_tokens = models.IntegerField(default=0, verbose_name="총 출력 토큰")
     total_cost_usd = models.FloatField(default=0.0, verbose_name="총 비용 (USD)")
+
+    # 페르소나 & 상황 설정 (사용자 지정값, 빈값/'미지정'이면 랜덤)
+    persona_settings = JSONField(default=dict, blank=True, verbose_name="페르소나 설정")
+    situation_settings = JSONField(default=dict, blank=True, verbose_name="상황 설정")
+    temperature = models.FloatField(default=0.85, verbose_name="Temperature")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
