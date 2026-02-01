@@ -2930,6 +2930,26 @@ def api_generate_multi_batch_next(request):
 
     import random
 
+    # 저장된 페르소나 설정 가져오기
+    saved_persona = batch.persona_settings or {}
+    saved_situation = batch.situation_settings or {}
+
+    def is_valid_value(val):
+        """값이 유효한지 (빈값/'미지정'/'랜덤'이 아닌지) 확인"""
+        return val and val not in ('', '미지정')
+
+    def has_any_specified(settings):
+        """설정 중 하나라도 지정된 값이 있는지 확인"""
+        return any(is_valid_value(v) for v in settings.values())
+
+    def get_value_or_random(saved_val, options, force_random=False):
+        """저장된 값이 유효하면 사용, '랜덤'이거나 force_random이면 랜덤"""
+        if saved_val == '랜덤' or force_random:
+            return random.choice(options)
+        if is_valid_value(saved_val):
+            return saved_val
+        return None  # 미지정이면 None 반환 (프롬프트에 추가 안 함)
+
     # 랜덤 옵션들
     ages = ['20대 초반', '20대 중반', '20대 후반', '30대 초반', '30대 중반', '30대 후반', '40대']
     genders = ['여성', '남성']
@@ -2938,26 +2958,20 @@ def api_generate_multi_batch_next(request):
     tones = ['존댓말 위주', '반말 위주', '혼용', '살짝 격식체']
     experiences = ['첫 시술', '2~3회차', '5회 이상', '단골']
 
-    # 저장된 페르소나 설정 가져오기 (빈값/'미지정'이면 랜덤)
-    saved_persona = batch.persona_settings or {}
+    # 페르소나: 모든 값이 미지정이면 빈 dict (사용자 입력 텍스트만 사용)
+    # 하나라도 지정된 값이 있으면 해당 값 사용, '랜덤'이면 랜덤
+    persona = {}
+    if has_any_specified(saved_persona) or any(v == '랜덤' for v in saved_persona.values()):
+        persona_fields = {
+            'age': ages, 'gender': genders, 'job': jobs,
+            'personality': personalities, 'tone': tones, 'experience': experiences
+        }
+        for key, options in persona_fields.items():
+            val = get_value_or_random(saved_persona.get(key), options)
+            if val:
+                persona[key] = val
 
-    def get_or_random(saved_val, options):
-        """저장된 값이 유효하면 사용, 아니면 랜덤"""
-        if saved_val and saved_val not in ('', '미지정', '랜덤'):
-            return saved_val
-        return random.choice(options)
-
-    persona = {
-        "age": get_or_random(saved_persona.get('age'), ages),
-        "gender": get_or_random(saved_persona.get('gender'), genders),
-        "job": get_or_random(saved_persona.get('job'), jobs),
-        "personality": get_or_random(saved_persona.get('personality'), personalities),
-        "tone": get_or_random(saved_persona.get('tone'), tones),
-        "experience": get_or_random(saved_persona.get('experience'), experiences),
-    }
-
-    # 저장된 상황 설정 가져오기
-    saved_situation = batch.situation_settings or {}
+    # 상황 설정: 마찬가지로 지정된 값만 사용
     satisfaction_opts = ['매우 만족', '만족', '보통', '약간 아쉬움']
     pain_opts = ['거의 없음', '약간', '보통', '좀 아팠음']
     consult_opts = ['매우 친절', '친절', '보통', '사무적']
@@ -2965,14 +2979,17 @@ def api_generate_multi_batch_next(request):
     price_opts = ['매우 합리적', '적당', '좀 비쌈', '비쌈']
     revisit_opts = ['꼭 다시 감', '아마 갈 듯', '모르겠음', '안 갈 듯']
 
-    situation = {
-        "satisfaction": get_or_random(saved_situation.get('satisfaction'), satisfaction_opts),
-        "pain": get_or_random(saved_situation.get('pain'), pain_opts),
-        "consult": get_or_random(saved_situation.get('consult'), consult_opts),
-        "downtime": get_or_random(saved_situation.get('downtime'), downtime_opts),
-        "price": get_or_random(saved_situation.get('price'), price_opts),
-        "revisit": get_or_random(saved_situation.get('revisit'), revisit_opts),
-    }
+    situation = {}
+    if has_any_specified(saved_situation) or any(v == '랜덤' for v in saved_situation.values()):
+        situation_fields = {
+            'satisfaction': satisfaction_opts, 'pain': pain_opts,
+            'consult': consult_opts, 'downtime': downtime_opts,
+            'price': price_opts, 'revisit': revisit_opts
+        }
+        for key, options in situation_fields.items():
+            val = get_value_or_random(saved_situation.get(key), options)
+            if val:
+                situation[key] = val
 
     # Temperature: 저장된 값 기준 ±0.05 랜덤 변동
     base_temp = batch.temperature or 0.85
