@@ -9,8 +9,9 @@
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/header.css" />
   <link rel="stylesheet" href="css/posts_dashboard.css" />
+  <link rel="stylesheet" href="css/business_mode.css" />
 </head>
-<body class="theme-vivid">
+<body class="theme-vivid tone-sidebar">
 
 <div class="app-root">
   <div class="app-sidebar-slot" id="appSidebar"></div>
@@ -28,7 +29,10 @@
 
         <section class="post-toolbar card">
           <div class="toolbar-left">
+            <!-- <div class="filter-field"> -->
+              <!-- <label>병원</label> -->
             <select id="postClinicSelect" class="select"></select>
+            <!-- </div> -->
             <div class="month-nav" id="postMonthNav">
               <button class="month-btn" id="postMonthPrev" type="button">◀</button>
               <div class="month-label" id="postMonthLabel">-</div>
@@ -39,12 +43,12 @@
             <section class="post-filters-panel card hidden" id="postFiltersPanel">
               <div class="filter-grid">
                 <div class="filter-field">
-      
                   <div class="platform-pills" id="postPlatformPills"></div>
                 </div>
               </div>
             </section>
           </div>
+          
           <div class="toolbar-right">
             <div class="summary-chip">
               <span>총 여론</span>
@@ -73,6 +77,10 @@
                 <button class="type-pill active" data-type="opinion">여론</button>
                 <button class="type-pill" data-type="review">후기</button>
               </div>
+              <div class="sort-chip-group" id="postSortChips">
+                <button class="sort-chip active" data-sort="latest" type="button">최신순</button>
+                <button class="sort-chip" data-sort="oldest" type="button">오래된순</button>
+              </div>
               <input id="postSearch" class="input post-search" placeholder="제목 검색 (Enter)" />
             </div>
             <div class="table-actions">
@@ -92,6 +100,7 @@
               <span>플랫폼</span>
             </div>
             <div id="postList" class="table-body"></div>
+            <div id="postPager" class="table-pager"></div>
           </div>
         </section>
       </section>
@@ -104,7 +113,7 @@
 <script src="js/app.js"></script>
 <script src="js/sidebar.js"></script>
 <script src="js/header.js"></script>
-<script src="js/posts_dashboard.js"></script>
+<script src="js/posts_dashboard.js?v=20260127"></script>
 <script>
   (async () => {
     await loadLayout();

@@ -201,11 +201,11 @@ function formatMemoTime(remindAt) {
 
 function getSelectedClinicId() {
   const clinicSelect = document.getElementById("calendarClinicSelect");
-  return clinicSelect?.value || "all";
+  return clinicSelect?.value || "";
 }
 
 function filterMemosByClinic(memos, clinicId) {
-  if (clinicId === "all") return memos;
+  if (!clinicId) return memos;
   return memos.filter((memo) => memo.clinic_id === Number(clinicId) || memo.clinic_id === null);
 }
 
@@ -229,9 +229,9 @@ async function loadCalendar({ keepPanelOpen = false } = {}) {
     ? JSON.parse(clinicSelect.dataset.clinics)
     : [];
 
-  const targetClinics = clinicId === "all"
-    ? clinics
-    : clinics.filter((c) => String(c.id) === clinicId);
+  const targetClinics = clinicId
+    ? clinics.filter((c) => String(c.id) === clinicId)
+    : clinics;
 
   const items = [];
 
@@ -318,21 +318,15 @@ async function initCalendarDashboard() {
   const clinics = await fetchClinics();
   clinicSelect.dataset.clinics = JSON.stringify(clinics);
   clinicSelect.innerHTML = clinics.length
-    ? `
-      <option value="all">전체 병원</option>
-      ${clinics.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")}
-    `
+    ? clinics.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")
     : `<option value="">병원 목록 없음</option>`;
 
   const memoClinicSelect = document.getElementById("calendarMemoClinicSelect");
   if (memoClinicSelect) {
     memoClinicSelect.innerHTML = clinics.length
-      ? `
-        <option value="all">전체 병원</option>
-        ${clinics.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")}
-      `
-      : `<option value="all">전체 병원</option>`;
-    memoClinicSelect.value = clinicSelect.value || "all";
+      ? clinics.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")
+      : `<option value="">병원 없음</option>`;
+    memoClinicSelect.value = clinicSelect.value || memoClinicSelect.options?.[0]?.value || "";
   }
 
   const memoPlatform = document.getElementById("calendarMemoPlatform");
@@ -345,7 +339,7 @@ async function initCalendarDashboard() {
 
   clinicSelect.onchange = () => {
     if (memoClinicSelect) {
-      memoClinicSelect.value = clinicSelect.value || "all";
+      memoClinicSelect.value = clinicSelect.value || memoClinicSelect.options?.[0]?.value || "";
     }
     loadCalendar();
   };
@@ -648,7 +642,7 @@ async function saveCalendarMemo() {
     date,
     content,
   };
-  if (clinicId !== "all") {
+  if (clinicId) {
     payload.clinic_id = Number(clinicId);
   }
   if (platform) {

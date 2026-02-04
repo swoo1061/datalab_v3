@@ -1,0 +1,244 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}직원/병원 작업 통계{% endblock %}
+
+{% block content %}
+
+<div class="page-header flex-between">
+  <div>
+    <h1 class="page-title">직원별 작업 통계</h1>
+    <p class="page-subtitle">여론·후기 월별 건수를 직원 단위로 확인합니다</p>
+  </div>
+</div>
+
+<style>
+  body { background-image: none !important; }
+  .hidden { display: none !important; }
+  #assigneeTabs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    padding: 8px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.75);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 20px -18px rgba(15,23,42,0.35);
+  }
+  #assigneeTabs::-webkit-scrollbar { height: 6px; }
+  #assigneeTabs::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.12);
+    border-radius: 999px;
+  }
+  #assigneeTabs .type-pill {
+    flex: 0 0 auto;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    border: 1px solid rgba(15,23,42,0.08);
+    background: #ffffff;
+    color: #0f172a;
+    transition: all 0.2s ease;
+  }
+  #assigneeTabs .type-pill.active {
+    background: linear-gradient(135deg, rgba(14,165,164,0.18), rgba(56,189,248,0.18));
+    border-color: rgba(14,165,164,0.35);
+    color: #0b1220;
+    box-shadow: inset 0 0 0 1px rgba(14,165,164,0.15);
+  }
+  #assigneeTabs .type-pill:hover {
+    border-color: rgba(14,165,164,0.35);
+    transform: translateY(-1px);
+  }
+  .heatmap-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(60px, 1fr);
+    gap: 6px;
+    padding: 6px 0 2px;
+    min-width: 720px;
+  }
+  .heatmap-mini {
+    grid-auto-columns: minmax(44px, 1fr);
+    min-width: 520px;
+  }
+  .heatmap-col {
+    display: grid;
+    grid-template-rows: 18px 1fr 1fr;
+    gap: 6px;
+    align-items: start;
+  }
+  .heatmap-label {
+    font-size: 11px;
+    color: #64748b;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .heatmap-cell {
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #0f172a;
+    background: #e2e8f0;
+  }
+  .heatmap-cell.green { color: #064e3b; }
+  .heatmap-cell.blue { color: #1e3a8a; }
+</style>
+
+
+
+<div class="card mt-20">
+  <div class="card-header">
+    <h3 class="card-title">직원별 통계</h3>
+  </div>
+  <div style="padding: 16px;">
+    <div class="type-pills" id="assigneeTabs" style="flex-wrap: wrap; gap: 8px;">
+      {% for c in assignee_charts %}
+      <button class="type-pill{% if forloop.first %} active{% endif %}" data-assignee-idx="{{ forloop.counter0 }}">
+        {{ c.name }}{% if c.role %} {{ c.role }}{% endif %}
+      </button>
+      {% empty %}
+      <span class="text-muted">데이터 없음</span>
+      {% endfor %}
+    </div>
+  </div>
+  <div style="padding: 0 16px 16px;">
+    {% for c in assignee_charts %}
+    <div class="card data-panel chart-card assignee-card{% if not forloop.first %} hidden{% endif %}" data-assignee-idx="{{ forloop.counter0 }}" style="width:100%;">
+      <div class="flex-between" style="margin-bottom: 8px;">
+        <h3 class="card-title">{{ c.name }}{% if c.role %} {{ c.role }}{% endif %}</h3>
+        <!-- <span class="tag tag-muted">총 {{ c.total }}</span> -->
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-bottom: 12px;">
+        <div class="card" style="padding:10px;">
+          <div class="text-xs text-muted">총 건수</div>
+          <div class="text-lg" style="font-weight:700;">{{ c.total }}</div>
+        </div>
+        <div class="card" style="padding:10px;">
+          <div class="text-xs text-muted">여론</div>
+          <div class="text-lg" style="font-weight:700; color:#2563eb;">{{ c.opinion_total }}</div>
+        </div>
+        <div class="card" style="padding:10px;">
+          <div class="text-xs text-muted">후기</div>
+          <div class="text-lg" style="font-weight:700; color:#059669;">{{ c.review_total }}</div>
+        </div>
+      </div>
+      <div class="heatmap-wrap" style="overflow-x:auto;">
+        <div class="heatmap-grid" id="assigneeHeatmap{{ forloop.counter }}"></div>
+      </div>
+      <div style="margin-top: 16px;">
+        <div class="text-sm text-muted" style="margin-bottom: 8px;">병원별</div>
+        <div style="display:flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
+          {% for clinic in c.clinics %}
+            <span class="tag tag-muted">{{ clinic.name }} · {{ clinic.total }}</span>
+          {% empty %}
+            <span class="text-muted">병원 데이터 없음</span>
+          {% endfor %}
+        </div>
+        <div class="grid-2" style="gap: 12px;">
+          {% for clinic in c.clinics %}
+          <div class="card" style="padding: 10px;">
+            <div class="flex-between" style="margin-bottom: 6px;">
+              <div class="text-sm" style="font-weight:600;">{{ clinic.name }}</div>
+              <span class="tag tag-muted">{{ clinic.total }}</span>
+            </div>
+            <div class="text-xs text-muted" style="margin-bottom: 6px;">
+              여론 {{ clinic.opinion_total }} · 후기 {{ clinic.review_total }}
+            </div>
+            <div class="heatmap-wrap" style="overflow-x:auto;">
+              <div class="heatmap-grid heatmap-mini" id="assigneeClinicHeatmap{{ forloop.parentloop.counter }}_{{ forloop.counter }}"></div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+  window.POST_USAGE_DATA = {
+    monthLabels: {{ month_labels|safe }},
+    monthOpinion: {{ month_opinion|safe }},
+    monthReview: {{ month_review|safe }},
+    assigneeCharts: {{ assignee_charts|safe }},
+  };
+</script>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const data = window.POST_USAGE_DATA || {};
+  const monthLabels = data.monthLabels || [];
+  const charts = data.assigneeCharts || [];
+
+  const tabWrap = document.getElementById('assigneeTabs');
+  if (tabWrap) {
+    tabWrap.addEventListener('click', (e) => {
+      const btn = e.target.closest('.type-pill');
+      if (!btn) return;
+      const idx = btn.getAttribute('data-assignee-idx');
+      tabWrap.querySelectorAll('.type-pill').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.assignee-card').forEach((card) => {
+        card.classList.toggle('hidden', card.getAttribute('data-assignee-idx') !== idx);
+      });
+    });
+  }
+
+  const maxValue = (arr = []) => arr.reduce((m, v) => Math.max(m, Number(v) || 0), 0);
+  const makeColor = (value, max, base) => {
+    if (!max) return '#e2e8f0';
+    const ratio = Math.min(1, (Number(value) || 0) / max);
+    const alpha = 0.15 + ratio * 0.65;
+    return base.replace('{a}', alpha.toFixed(2));
+  };
+
+  const renderHeatmap = (rootEl, labels, opinion, review, maxVal) => {
+    if (!rootEl) return;
+    rootEl.innerHTML = '';
+    labels.forEach((label, idx) => {
+      const col = document.createElement('div');
+      col.className = 'heatmap-col';
+      const labelEl = document.createElement('div');
+      labelEl.className = 'heatmap-label';
+      labelEl.textContent = label;
+      const opinionCell = document.createElement('div');
+      opinionCell.className = 'heatmap-cell blue';
+      opinionCell.style.background = makeColor(opinion[idx], maxVal, 'rgba(59,130,246,{a})');
+      opinionCell.textContent = opinion[idx] || 0;
+      const reviewCell = document.createElement('div');
+      reviewCell.className = 'heatmap-cell green';
+      reviewCell.style.background = makeColor(review[idx], maxVal, 'rgba(16,185,129,{a})');
+      reviewCell.textContent = review[idx] || 0;
+      col.appendChild(labelEl);
+      col.appendChild(opinionCell);
+      col.appendChild(reviewCell);
+      rootEl.appendChild(col);
+    });
+  };
+
+  charts.forEach((c, idx) => {
+    const root = document.getElementById(`assigneeHeatmap${idx + 1}`);
+    const maxVal = Math.max(maxValue(c.opinion), maxValue(c.review));
+    renderHeatmap(root, monthLabels, c.opinion || [], c.review || [], maxVal);
+
+    const clinics = c.clinics || [];
+    clinics.forEach((clinic, cidx) => {
+      const croot = document.getElementById(`assigneeClinicHeatmap${idx + 1}_${cidx + 1}`);
+      const cmax = Math.max(maxValue(clinic.opinion), maxValue(clinic.review));
+      renderHeatmap(croot, monthLabels, clinic.opinion || [], clinic.review || [], cmax);
+    });
+  });
+</script>
+{% endblock %}

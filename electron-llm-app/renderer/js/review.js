@@ -5,6 +5,7 @@ let state = {
   clinicName: null,
   modelKey: null,
   modelName: null,
+  currentReviewId: null,
 
   reviewType: null,
   reviewTiming: null,
@@ -89,6 +90,7 @@ async function loadModels() {
   const models = normalizeArray(await window.api.getLLMModels());
   modelList.innerHTML = "";
 
+  const forcedModelKey = new URLSearchParams(window.location.search).get("model");
   models.forEach(m => {
     const displayName = m.label || m.name || m.key;
 
@@ -111,10 +113,26 @@ async function loadModels() {
     modelList.appendChild(card);
 
     if (!state.modelKey && m.recommended) card.click();
+    if (forcedModelKey && m.key === forcedModelKey) {
+      card.click();
+    }
   });
+
+  if (forcedModelKey) {
+    document.querySelectorAll(".model-card").forEach(c => {
+      c.style.pointerEvents = "none";
+      c.style.opacity = "0.7";
+    });
+  }
 }
 
 /* ---------- persona ---------- */
+const MBTI_RE = /\b(ISTJ|ISFJ|INFJ|INTJ|ISTP|ISFP|INFP|INTP|ESTP|ESFP|ENFP|ENTP|ESTJ|ESFJ|ENFJ|ENTJ)\b/i;
+function extractMbtiFromText(text) {
+  const m = String(text || "").match(MBTI_RE);
+  return m ? m[1].toUpperCase() : null;
+}
+
 personaInput.addEventListener("input", e => {
   state.personas = e.target.value
     .split(",")
@@ -162,6 +180,11 @@ function buildPrompt() {
   if (state.personas.length) {
     lines.push(`작성자 페르소나: ${state.personas.join(", ")}`);
   }
+  const personaText = state.personas.join(", ");
+  const mbti = extractMbtiFromText(personaText);
+  if (state.modelKey === "ft:gpt-4.1-2025-04-14:personal::D3gDuLBk" && mbti) {
+    lines.push(`MBTI: ${mbti}`);
+  }
 
   if (state.keywords.length) {
     lines.push(`강조 키워드: ${state.keywords.join(", ")}`);
@@ -198,7 +221,28 @@ async function generateReview() {
   forceInteractive();
   startInteractionWatchdog();
   modalReview.innerText = "";
+  if (titleSuggestions) {
+    titleSuggestions.classList.add("hidden");
+  }
+  if (titleSuggestionList) {
+    titleSuggestionList.innerHTML = "";
+  }
   let ok = false;
+
+  const extractLengthHint = (keywords = []) => {
+    for (const k of keywords) {
+      const m = String(k).match(/(\d+)\s*자\s*(이내|이하|내외|정도|이상|부터)?/);
+      if (m) return `${m[1]}자 ${m[2] || ""}`.trim();
+    }
+    return "";
+  };
+
+  const lengthHint = extractLengthHint(state.keywords);
+  const lengthRule = lengthHint ? `길이: ${lengthHint}` : "";
+  const minRule =
+    lengthHint && (lengthHint.includes("이상") || lengthHint.includes("부터"))
+      ? `규칙: 최소 ${lengthHint.replace(/자\s*(이상|부터).*/, "")}자 이상`
+      : "";
 
   // ✅ 서버가 요구하는 단 하나의 입력
   const prompt = `
@@ -207,41 +251,59 @@ async function generateReview() {
 후기 시점: ${state.reviewTiming || "미지정"}
 강조 포인트: ${state.keywords.join(", ") || "없음"}
 페르소나: ${state.personas.join(", ") || "없음"}
+${state.modelKey === "ft:gpt-4.1-2025-04-14:personal::D3gDuLBk" ? (() => {
+    const mbti = extractMbtiFromText(state.personas.join(", "));
+    return mbti ? `MBTI: ${mbti}` : "";
+  })() : ""}
+${lengthRule}
+${minRule}
+
+중요 규칙:
+1) 반드시 "리뷰 유형"을 최우선으로 반영해 작성할 것.
+2) 다른 유형의 글(후기/질문/고민/상담)으로 섞지 말 것.
+3) 요청된 유형과 어긋나면 전체가 실패로 간주됨.
 
 위 조건을 반영해 실제 사용자가 작성한 것처럼
-자연스럽고 솔직한 후기를 작성해주세요.
+자연스럽고 솔직한 글을 작성해주세요.
   `.trim();
 
   const payload = {
     model: state.modelKey,
     context: {
-      prompt, // 🔥 이거 하나면 끝
+      prompt,
+      clinic_id: state.clinicId,
+      personas: state.personas,
+      keywords: state.keywords,
     },
   };
 
   try {
     const res = await window.api.generateReview(payload);
     modalReview.innerText = res.review_text || "";
+    state.currentReviewId = res.review_id || null;
+    if (Array.isArray(res.title_suggestions) && res.title_suggestions.length) {
+      if (titleSuggestionList) {
+        titleSuggestionList.innerHTML = res.title_suggestions
+          .slice(0, 3)
+          .map(t => `<li>${t}</li>`)
+          .join("");
+      }
+      titleSuggestions?.classList.remove("hidden");
+    }
     openModal();
     ok = true;
-  } catch (e) {
-    console.error("❌ generateReview error:", e);
-    window.showAlert?.("리뷰 생성 실패");
-    forceCloseModal();
-    clearModalOverlays();
-  } finally {
-    reviewLoading.classList.add("hidden");
-    if (loading) loading.classList.add("hidden");
-    if (btn) {
-      btn.disabled = false;
-      btn.innerText = "리뷰 생성";
-    }
-    if (!ok) {
-      forceCloseModal();
-      clearModalOverlays();
+    } catch (e) {
+      console.error("❌ generateReview error:", e);
+      window.showAlert?.("리뷰 생성 실패");
+    } finally {
+      reviewLoading.classList.add("hidden");
+      if (loading) loading.classList.add("hidden");
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "리뷰 생성";
+      }
     }
   }
-}
 
 /* ---------- modal ---------- */
 function flashCopy(btn) {
@@ -257,6 +319,7 @@ function flashCopy(btn) {
 
 function openModal() {
   document.body.style.overflow = "hidden";
+  if (modalReview) modalReview.contentEditable = "true";
   reviewModal.classList.remove("hidden");
 }
 
@@ -319,6 +382,37 @@ window.addEventListener("DOMContentLoaded", async () => {
     const text = modalReview?.innerText || "";
     navigator.clipboard.writeText(text);
     flashCopy(document.getElementById("copyModalBtn"));
+  });
+  document.getElementById("saveModalBtn")?.addEventListener("click", async () => {
+    const editedText = (modalReview?.innerText || "").trim();
+    if (!state.currentReviewId) {
+      window.showAlert?.("먼저 리뷰를 생성하세요.");
+      return;
+    }
+    if (!editedText) {
+      window.showAlert?.("저장할 내용이 없습니다.");
+      return;
+    }
+    try {
+      const res = await window.api.saveEditedReview({
+        review_id: state.currentReviewId,
+        edited_text: editedText,
+      });
+      state.currentReviewId = res.review_id || state.currentReviewId;
+      if (Array.isArray(res.title_suggestions) && res.title_suggestions.length) {
+        if (titleSuggestionList) {
+          titleSuggestionList.innerHTML = res.title_suggestions
+            .slice(0, 3)
+            .map(t => `<li>${t}</li>`)
+            .join("");
+        }
+        titleSuggestions?.classList.remove("hidden");
+      }
+      window.showAlert?.("수정본 저장 완료");
+    } catch (e) {
+      console.error("❌ saveEditedReview error:", e);
+      window.showAlert?.("수정 저장 실패");
+    }
   });
 
   setupSingleGroup("reviewType", "reviewType");

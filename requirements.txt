@@ -10,6 +10,7 @@ anthropic>=0.75
 
 # Utilities
 python-dotenv>=1.0
+playwright>=1.41
 
 # Production (optional)
 gunicorn>=21.0

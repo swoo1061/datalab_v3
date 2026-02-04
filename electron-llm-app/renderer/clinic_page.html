@@ -10,8 +10,9 @@
   <link rel="stylesheet" href="css/header.css" />
   <link rel="stylesheet" href="css/clinic_page.css" />
   <link rel="stylesheet" href="css/schedule.css" />
+  <link rel="stylesheet" href="css/business_mode.css" />
 </head>
-<body class="theme-vivid">
+<body class="theme-vivid tone-sidebar">
 
 <div class="app-root">
   <div class="app-sidebar-slot" id="appSidebar"></div>
@@ -30,77 +31,231 @@
 
     <!-- 2. 본문 레이아웃 -->
     <div class="clinic-body">
+      <aside class="clinic-section-nav card" id="clinicSectionNav" aria-label="업무 섹션">
+        <button type="button" class="clinic-section-nav-btn active" data-section-key="daily-intake">
+          <span class="nav-step">01</span>
+          <span class="nav-label">데일리 업무</span>
+        </button>
+        <button type="button" class="clinic-section-nav-btn" data-section-key="posts">
+          <span class="nav-step">02</span>
+          <span class="nav-label">게시글 리스트</span>
+        </button>
+        <button type="button" class="clinic-section-nav-btn" data-section-key="calendar">
+          <span class="nav-step">03</span>
+          <span class="nav-label">캘린더</span>
+        </button>
+      </aside>
       <section class="result-panel">
         <div class="result-grid">
           <div class="result-left">
-            <div class="ai-intake card">
-              <div class="card-hd intake-head">
-                <div>
-                  <div class="card-title">데일리 업무 일지</div>
-                  <div class="card-sub">URL 기반 자동 분류로 빠르게 기록합니다.</div>
-                </div>
-              </div>
-              <div class="card-bd">
-                <div class="ai-intake-grid">
-                  <div class="ai-field">
-                    <label>구분</label>
-                    <div class="seg-tabs ai-type-pills" id="aiIntakeTypePills">
-                      <button class="seg-tab active" data-type="opinion">여론</button>
-                      <button class="seg-tab" data-type="review">후기</button>
+            <section class="section-block card" data-section-key="daily-intake">
+              <button type="button" class="section-toggle" data-target="clinicIntakeSection" aria-expanded="true">
+                <span class="section-title">데일리 업무 일지</span>
+                <span class="section-toggle-icon" aria-hidden="true">▾</span>
+              </button>
+              <div id="clinicIntakeSection" class="section-body open">
+                <div class="ai-intake">
+                  <!-- <div class="card-hd intake-head">
+                    <div>
+                      <div class="card-title">데일리 업무 일지</div>
+                      <div class="card-sub">URL 기반 자동 분류로 빠르게 기록합니다.</div>
                     </div>
-                  </div>
-                  <div class="ai-field span-2">
-                    <label>URL</label>
-                    <input id="aiIntakeUrl" class="input" placeholder="게시글 URL" />
-                  </div>
-                  <div class="ai-field span-2">
-                    <label>제목</label>
-                    <input id="aiIntakeTitle" class="input" />
-                  </div>
-                  <div class="ai-field">
-                    <label>플랫폼 ID</label>
-                    <input id="aiIntakeAccount" class="input" placeholder="예: naver_cafe_id" />
-                  </div>
-                  <div class="ai-field">
-                    <label>플랫폼 PW</label>
-                    <input id="aiIntakeAccountPassword" class="input" placeholder="카페 비밀번호" />
-                  </div>
-                  <div class="ai-field">
-                    <label>원장님</label>
-                    <input id="aiIntakeDoctor" class="input" placeholder="담당 원장님" />
-                  </div>
-                  <div class="ai-field">
-                    <label>플랫폼</label>
-                    <select id="aiIntakePlatform" class="select"></select>
-                    <div class="ai-field-hint" id="aiIntakePlatformHint">URL 기준 자동 선택됨 (수정 가능)</div>
-                  </div>
-                  <div class="ai-field span-2">
-                    <label>사진 첨부</label>
-                    <div class="file-input">
-                      <input id="aiIntakePhotos" class="file-native" type="file" accept="image/*" multiple />
-                      <label class="file-btn" for="aiIntakePhotos">파일 선택</label>
-                      <div class="file-name" id="aiIntakePhotoHint">선택된 파일 없음</div>
+                  </div> -->
+                  <div class="card-bd">
+                    <div class="ai-intake-top">
+                      <div class="ai-field">
+                        <!-- <label>구분</label> -->
+                        <div class="seg-tabs ai-type-pills" id="aiIntakeTypePills">
+                          <button class="seg-tab active" data-type="opinion">여론</button>
+                          <button class="seg-tab" data-type="review">후기</button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                    <div class="ai-intake-section">
+                      <div class="section-title">콘텐츠</div>
+                      <div class="ai-intake-content">
+                        <div class="content-left">
+                          <div class="ai-field">
+                            <label>제목</label>
+                            <input id="aiIntakeTitle" class="input" />
+                          </div>
+                          <div class="ai-field">
+                            <label>URL</label>
+                            <input id="aiIntakeUrl" class="input" />
+                          </div>
+                        </div>
+                        <div class="content-right">
+                          <div class="ai-field">
+                            <label>세부 유형</label>
+                            <select id="aiIntakeSubtype" class="select"></select>
+                            <div class="ai-field-hint">제목 기준 자동 선택</div>
+                          </div>
+                          <div class="ai-field">
+                            <label>플랫폼</label>
+                            <select id="aiIntakePlatform" class="select"></select>
+                            <div class="ai-field-hint" id="aiIntakePlatformHint">URL 기준 자동 선택</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="ai-intake-section">
+                      <div class="section-title">계정 · 담당</div>
+                      <div class="ai-intake-grid account-grid">
+                        <div class="ai-field">
+                          <label>플랫폼 ID</label>
+                          <input id="aiIntakeAccount" class="input" />
+                        </div>
+                        <div class="ai-field">
+                          <label>플랫폼 PW</label>
+                          <input id="aiIntakeAccountPassword" class="input"  />
+                        </div>
+                        <div class="ai-field">
+                          <label>원장님</label>
+                          <input id="aiIntakeDoctor" class="input" placeholder="담당 원장님" />
+                        </div>
+                      </div>
+                    </div>
+                    <div class="ai-intake-section">
+                      <div class="section-title">첨부</div>
+                      <div class="ai-intake-grid attach-grid">
+                        <div class="ai-field span-3">
+                          <label>사진 첨부</label>
+                          <div class="file-input">
+                            <input id="aiIntakePhotos" class="file-native" type="file" accept="image/*" multiple />
+                            <label class="file-btn" for="aiIntakePhotos">파일 선택</label>
+                            <div class="file-name" id="aiIntakePhotoHint">선택된 파일 없음</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-                <div class="ai-intake-actions">
-                  <button id="aiIntakeSubmit" class="btn primary">AI 처리 후 저장</button>
-                  <div class="ai-review-dropdown">
-                    <button id="aiIntakeReviewBtn" class="btn">리뷰 작성</button>
-                    <div class="ai-review-menu">
-                      <button class="menu-item theme-ai" data-type="ai">AI 리뷰작성</button>
-                      <button class="menu-item theme-gangnam" data-type="gangnam">강남언니</button>
-                      <button class="menu-item theme-babytok" data-type="babytok">바비톡</button>
-                      <button class="menu-item theme-todaktok" data-type="todaktok">토닥톡</button>
-                      <button class="menu-item theme-yeoshin" data-type="yeoshin">여신티켓</button>
+                    <div class="ai-intake-actions">
+                      <button id="aiIntakeSubmit" class="btn primary">저장하기</button>
+                      <div class="ai-review-dropdown">
+                        <button id="aiIntakeReviewBtn" class="btn">리뷰 작성</button>
+                        <div class="ai-review-menu">
+                          <button class="menu-item theme-ai" data-type="ai">AI 리뷰작성</button>
+                          <button class="menu-item theme-gangnam" data-type="gangnam">강남언니</button>
+                          <button class="menu-item theme-babytok" data-type="babytok">바비톡</button>
+                          <button class="menu-item theme-todaktok" data-type="todaktok">토닥톡</button>
+                          <button class="menu-item theme-yeoshin" data-type="yeoshin">여신티켓</button>
+                        </div>
+                      </div>
+                      <span id="aiIntakeStatus" class="worklog-status"></span>
+                    </div>
+                    <!-- <p class="ai-intake-hint">댓글/조회수는 크롤링 연동 시 자동 반영됩니다.</p> -->
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="section-block card" data-section-key="posts">
+              <button type="button" class="section-toggle" data-target="clinicPostsSection" aria-expanded="true">
+                <span class="section-title">게시글 리스트</span>
+                <span class="section-toggle-icon" aria-hidden="true">▾</span>
+              </button>
+              <div id="clinicPostsSection" class="section-body open">
+                <section class="post-toolbar card">
+                  <div class="toolbar-left">
+                    <div class="month-nav" id="postMonthNav">
+                      <button class="month-btn" id="postMonthPrev" type="button">◀</button>
+                      <div class="month-label" id="postMonthLabel">-</div>
+                      <button class="month-btn" id="postMonthNext" type="button">▶</button>
+                    </div>
+                    <input type="month" id="postMonth" class="month-input hidden" />
+                  </div>
+                  <div class="toolbar-right filter-summary">
+                    <div class="summary-chip">
+                      <span>총 여론</span>
+                      <strong id="opinionTotalCount">0</strong>
+                    </div>
+                    <div class="summary-chip">
+                      <span>총 후기</span>
+                      <strong id="reviewTotalCount">0</strong>
+                    </div>
+                    <div class="summary-chip">
+                      <span>월 여론</span>
+                      <strong id="opinionCount">0</strong>
+                    </div>
+                    <div class="summary-chip">
+                      <span>월 후기</span>
+                      <strong id="reviewCount">0</strong>
                     </div>
                   </div>
-                  <span id="aiIntakeStatus" class="worklog-status"></span>
-                </div>
-                <p class="ai-intake-hint">댓글/조회수는 크롤링 연동 시 자동 반영됩니다.</p>
+                  <div class="post-inline-filters">
+                    <span class="inline-filter-label">플랫폼</span>
+                    <div class="platform-pills" id="postPlatformPills"></div>
+                  </div>
+                </section>
+
+                <section class="post-table card">
+                  <div class="card-hd post-table-head">
+                    <div class="table-title">
+                      <span>게시글 리스트</span>
+                      <div class="type-pills" id="postTypePills">
+                        <button class="type-pill active" data-type="opinion">여론</button>
+                        <button class="type-pill" data-type="review">후기</button>
+                      </div>
+                      <div class="sort-chip-group" id="postSortChips">
+                        <button class="sort-chip active" data-sort="latest" type="button">최신순</button>
+                        <button class="sort-chip" data-sort="oldest" type="button">오래된순</button>
+                      </div>
+                      <input id="postSearch" class="input post-search" placeholder="제목 검색 (Enter)" />
+                    </div>
+                    <div class="table-actions">
+                      <button class="table-edit" id="clinicPostEditBtn">수정</button>
+                      <button class="table-save hidden" id="clinicPostSaveBtn">저장</button>
+                      <button class="table-delete hidden" id="postDeleteSelectedBtn" disabled>삭제</button>
+                      <button class="table-cancel hidden" id="clinicPostCancelBtn">취소</button>
+                    </div>
+                  </div>
+                  <div class="card-bd">
+                    <div class="post-row post-row-head">
+                      <div>날짜</div>
+                      <div>제목</div>
+                      <div>조회</div>
+                      <div>댓글</div>
+                      <div>쪽지</div>
+                      <div>작업자</div>
+                      <div>플랫폼</div>
+                      <div>사진</div>
+                    </div>
+                    <div id="postList"></div>
+                  </div>
+                </section>
               </div>
-            </div>
+            </section>
+
+            <section class="section-block card" data-section-key="calendar">
+              <button type="button" class="section-toggle" data-target="clinicCalendarSection" aria-expanded="true">
+                <span class="section-title">캘린더</span>
+                <span class="section-toggle-icon" aria-hidden="true">▾</span>
+              </button>
+              <div id="clinicCalendarSection" class="section-body open">
+                <div class="schedule-board compact">
+                  <div class="schedule-grid">
+                    <div class="schedule-card" style="position: relative;">
+                      <div class="card-hd calendar-card-hd">
+                        <div class="calendar-card-left">
+                          <div class="card-title" id="calendarBoardTitle">작업 캘린더</div>
+                          <button class="btn toggle active" id="clinicCalendarWorkToggle">작업 캘린더</button>
+                          <button class="btn toggle" id="clinicCalendarMemoToggle">메모 캘린더</button>
+                        </div>
+                        <div class="calendar-month-nav">
+                          <div class="month-nav" id="calendarMonthNav">
+                            <button class="month-btn" id="calendarPrevMonth" type="button">◀</button>
+                            <div class="month-label" id="calendarMonthLabel">-</div>
+                            <button class="month-btn" id="calendarNextMonth" type="button">▶</button>
+                          </div>
+                          <input type="month" id="calendarMonth" class="month-input hidden" />
+                        </div>
+                      </div>
+                      <div class="card-bd" id="clinicCalendarBoard"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </section>
@@ -109,6 +264,92 @@
 </main>
   </div>
 </div>
+
+<div id="clinicCalendarDetailPanel" class="calendar-detail-panel">
+  <div class="panel-resizer" aria-hidden="true"></div>
+  <div class="calendar-detail-header">
+    <div>
+      <strong>선택일 상세</strong>
+      <div class="detail-sub">선택한 날짜의 작업을 확인합니다.</div>
+    </div>
+    <button class="btn" id="clinicCalendarDetailClose">닫기</button>
+  </div>
+  <div class="calendar-detail-body">
+    <div class="calendar-memo-panel hidden" id="clinicCalendarMemoPanel">
+      <div class="memo-list-panel">
+        <div class="memo-list-head">
+          <div class="memo-title">
+            <span class="memo-kicker">메모 캘린더</span>
+            <strong>메모 리스트</strong>
+          </div>
+          <div class="memo-actions">
+            <span class="memo-badge" id="clinicCalendarMemoDate">-</span>
+            <span class="memo-badge outline">담당자 <strong id="clinicCalendarMemoAuthor">-</strong></span>
+            <button class="btn primary" id="clinicCalendarMemoOpen">메모 작성</button>
+          </div>
+        </div>
+        <div class="memo-list-sub">선택한 날짜 기준</div>
+        <div id="clinicCalendarMemoList" class="memo-list"></div>
+      </div>
+    </div>
+    <div id="clinicCalendarList" class="schedule-list" data-panel="clinicCalendarDetailPanel" data-variant="compact"></div>
+  </div>
+</div>
+
+<div id="clinicCalendarMemoModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">메모 작성</div>
+        <div class="modal-sub">선택한 날짜에 메모를 추가합니다.</div>
+      </div>
+      <button class="modal-close" data-close="true">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid">
+        <div class="ai-field span-2">
+          <label>내용</label>
+          <textarea id="clinicCalendarMemoContent" class="input" placeholder="메모를 입력하세요"></textarea>
+        </div>
+        <div class="ai-field">
+          <label>플랫폼</label>
+          <select id="clinicCalendarMemoPlatform" class="select"></select>
+        </div>
+        <div class="ai-field">
+          <label>알림 시간</label>
+          <input id="clinicCalendarMemoRemind" class="input" type="datetime-local" />
+        </div>
+        <div class="ai-field">
+          <label>ID</label>
+          <input id="clinicCalendarMemoAccount" class="input" />
+        </div>
+        <div class="ai-field">
+          <label>PW</label>
+          <input id="clinicCalendarMemoPassword" class="input" type="password" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-close="true">취소</button>
+      <button class="btn primary" id="clinicCalendarMemoSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<div id="postPhotoModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card photo-modal">
+    <div class="modal-head">
+      <div class="modal-title">사진 보기</div>
+      <button class="modal-close" data-close="true">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div id="postPhotoList" class="photo-list"></div>
+    </div>
+  </div>
+</div>
+
 
 <div id="aiConfirmModal" class="modal hidden">
   <div class="modal-backdrop" data-close="true"></div>
@@ -126,7 +367,7 @@
           <span class="summary-value" id="aiConfirmTypeText">-</span>
         </div>
         <div class="summary-row">
-          <span class="summary-label">후기 유형</span>
+          <span class="summary-label">세부 유형</span>
           <span class="summary-value" id="aiConfirmSubtypeText">-</span>
         </div>
         <div class="summary-row">
@@ -182,7 +423,7 @@
           </div>
         </div>
         <div class="ai-field">
-          <label>후기 유형</label>
+          <label>세부 유형</label>
           <select id="aiConfirmSubtype" class="select"></select>
         </div>
         <div class="ai-field">
@@ -247,6 +488,7 @@
 <script src="js/app.js"></script>
 <script src="js/sidebar.js"></script>
 <script src="js/header.js"></script>
+<script src="js/schedule_calendar.js"></script>
 <script src="js/clinic_page.js"></script>
 <script>
   (async () => {

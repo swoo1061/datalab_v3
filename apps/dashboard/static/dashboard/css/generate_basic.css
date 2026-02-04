@@ -133,6 +133,27 @@
   color: var(--muted);
 }
 
+.title-suggestions-box {
+  margin-top: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.title-suggestions-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+.title-suggestions-list {
+  margin: 0 0 0 14px;
+  padding: 0;
+  line-height: 1.3;
+}
+.title-suggestions-list li {
+  margin: 0;
+}
+
 .prompt-summary {
   cursor: pointer;
   font-weight: 600;

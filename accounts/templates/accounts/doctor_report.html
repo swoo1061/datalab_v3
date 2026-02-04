@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>작업 보고서</title>
+  <style>
+    body { margin: 0; font-family: "Malgun Gothic", sans-serif; background: #f3f5f9; color: #1f2937; }
+    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+    .title { font-size: 24px; font-weight: 800; margin: 0 0 8px; }
+    .sub { color: #6b7280; font-size: 14px; margin: 0; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .stat { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
+    .k { font-size: 12px; color: #6b7280; margin-bottom: 6px; }
+    .v { font-size: 21px; font-weight: 800; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border-bottom: 1px solid #eef2f7; padding: 10px 8px; text-align: left; }
+    th { color: #6b7280; font-weight: 700; font-size: 12px; }
+    .empty { color: #9ca3af; font-size: 14px; padding: 14px 0; }
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .logout { text-decoration: none; color: #334155; font-size: 13px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 10px; background: #fff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1 class="title">월간 작업 보고서</h1>
+      <a class="logout" href="{% url 'accounts:logout' %}">로그아웃</a>
+    </div>
+
+    {% if clinic %}
+      <div class="card">
+        <p class="sub">{{ clinic.name }} · {{ month_label }}</p>
+      </div>
+
+      <div class="card">
+        <div class="grid">
+          <div class="stat"><div class="k">생성 리뷰</div><div class="v">{{ generated_count }}</div></div>
+          <div class="stat"><div class="k">수정 완료</div><div class="v">{{ edited_count }}</div></div>
+          <div class="stat"><div class="k">업로드 완료</div><div class="v">{{ uploaded_count }}</div></div>
+          <div class="stat"><div class="k">게시글 작업</div><div class="v">{{ worklog_posts }}</div></div>
+          <div class="stat"><div class="k">댓글 작업</div><div class="v">{{ worklog_comments }}</div></div>
+          <div class="stat"><div class="k">리뷰 작업</div><div class="v">{{ worklog_reviews }}</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="sub" style="margin-bottom: 8px;">최근 생성 리뷰</p>
+        {% if recent_reviews %}
+          <table>
+            <thead>
+              <tr>
+                <th>생성일</th>
+                <th>시술</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in recent_reviews %}
+                <tr>
+                  <td>{{ item.created_at|date:"Y-m-d H:i" }}</td>
+                  <td>{{ item.procedure }}</td>
+                  <td>{{ item.get_status_display }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="empty">이번 달 생성된 리뷰가 없습니다.</div>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="card">
+        <p class="sub">연결된 병원이 없습니다. 관리자에게 병원 계정 연결을 요청해주세요.</p>
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>

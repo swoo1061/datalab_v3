@@ -18,8 +18,12 @@ let currentType = "opinion";
 let currentPlatform = "all";
 let currentMonth = "";
 let currentQuery = "";
+let currentSort = "latest";
 let postsCache = new Map();
 let currentPosts = [];
+let pagePosts = [];
+let currentPage = 1;
+const PAGE_SIZE = 8;
 let editingPostId = null;
 let editingAll = false;
 let selectedPostIds = new Set();
@@ -76,6 +80,17 @@ function shiftMonth(value, delta) {
   if (!y || !m) return value;
   const next = new Date(y, m - 1 + delta, 1);
   return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getPostDateValue(post) {
+  return post.published_at || post.created_at || post.updated_at || "";
+}
+
+function sortPosts(list) {
+  if (currentSort === "oldest") {
+    return list.sort((a, b) => getPostDateValue(a).localeCompare(getPostDateValue(b)));
+  }
+  return list.sort((a, b) => getPostDateValue(b).localeCompare(getPostDateValue(a)));
 }
 
 function setMonth(value) {
@@ -216,7 +231,7 @@ async function loadPosts() {
   else if (currentType === "review") posts = reviewResults;
   else posts = [...opinionResults, ...reviewResults];
 
-  posts.sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
+  sortPosts(posts);
   postsCache = new Map(posts.map((p) => [String(p.id), p]));
   currentPosts = posts;
 
@@ -225,24 +240,27 @@ async function loadPosts() {
   if (opinionTotalEl) opinionTotalEl.textContent = opinionTotalCount;
   if (reviewTotalEl) reviewTotalEl.textContent = reviewTotalCount;
   if (editingAll) toggleHeaderEditActions(true);
+  currentPage = 1;
   renderPostList();
 }
 
 function renderPostList() {
   const list = document.getElementById("postList");
+  const pager = document.getElementById("postPager");
   if (!list) return;
   if (!currentPosts.length) {
     list.innerHTML = `<div class="table-muted">표시할 게시글이 없습니다.</div>`;
+    if (pager) pager.innerHTML = "";
     return;
   }
   const table = list.closest(".post-table");
   const isEditing = editingAll || Boolean(editingPostId);
   document.body.classList.toggle("editing-posts", isEditing);
   if (table) {
-    table.classList.toggle("card-view", !isEditing);
+    table.classList.remove("card-view");
     table.classList.toggle("editing-view", isEditing);
   }
-  list.classList.toggle("card-view", !isEditing);
+  list.classList.remove("card-view");
   list.classList.toggle("editing-view", isEditing);
   list.classList.toggle("edit-only", isEditing);
   if (isEditing) {
@@ -251,12 +269,19 @@ function renderPostList() {
     document.querySelectorAll(".dragging").forEach((el) => el.classList.remove("dragging"));
   }
 
-  list.innerHTML = currentPosts.map((p) => (
+  const totalPages = Math.max(1, Math.ceil(currentPosts.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end = start + PAGE_SIZE;
+  pagePosts = currentPosts.slice(start, end);
+
+  list.innerHTML = pagePosts.map((p) => (
     editingAll || String(p.id) === String(editingPostId)
       ? renderEditRow(p)
       : renderViewRow(p)
   )).join("");
 
+  renderPager(totalPages);
   bindRowActions();
   bindPhotoButtons();
   bindSelectionActions();
@@ -266,9 +291,53 @@ function renderPostList() {
   }
 }
 
+function renderPager(totalPages) {
+  const pager = document.getElementById("postPager");
+  if (!pager) return;
+  if (totalPages <= 1) {
+    pager.innerHTML = "";
+    return;
+  }
+
+  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+  pager.innerHTML = `
+    <button class="pager-btn" data-page="${Math.max(1, currentPage - 1)}" ${currentPage === 1 ? "disabled" : ""}>이전</button>
+    ${pages.map((page) => `
+      <button class="pager-btn ${page === currentPage ? "active" : ""}" data-page="${page}">
+        ${page}
+      </button>
+    `).join("")}
+    <button class="pager-btn" data-page="${Math.min(totalPages, currentPage + 1)}" ${currentPage === totalPages ? "disabled" : ""}>다음</button>
+  `;
+
+  pager.querySelectorAll(".pager-btn[data-page]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const page = Number(btn.dataset.page || "1");
+      if (!page || page === currentPage) return;
+      currentPage = page;
+      renderPostList();
+    });
+  });
+}
+
 function renderViewRow(p) {
-  const dateLabel = (p.updated_at || "").slice(0, 10);
+  const dateLabel = (p.published_at || p.created_at || p.updated_at || "").slice(0, 10);
   const typeLabel = p.type === "review" ? "후기" : "여론";
+  const reviewSubtypeLabel = p.review_subtype_label
+    || (p.review_subtype === "photo" ? "사진"
+      : p.review_subtype === "text" ? "텍스트"
+        : p.review_subtype === "consultation" ? "상담" : "");
+  const opinionSubtypeLabel = p.opinion_subtype_label
+    || (p.opinion_subtype === "concern" ? "고민"
+      : p.opinion_subtype === "hand" ? "손품"
+        : p.opinion_subtype === "foot" ? "발품" : "고민");
+  const titleHint = String(p.title || "").toLowerCase();
+  const fallbackReviewSubtype = p.type === "review" && !p.review_subtype
+    ? (titleHint.includes("상담") ? "상담"
+      : (Array.isArray(p.photos) && p.photos.length ? "사진" : "텍스트"))
+    : "";
+  const subtypeLabel = p.type === "review" ? (reviewSubtypeLabel || fallbackReviewSubtype) : opinionSubtypeLabel;
+  const typeDisplay = subtypeLabel ? `${typeLabel}/${subtypeLabel}` : typeLabel;
   const platformLabel = p.platform_label || p.platform || "-";
   const photoUrls = Array.isArray(p.photos)
     ? p.photos.map((photo) => photo?.url || photo).filter(Boolean)
@@ -280,28 +349,23 @@ function renderViewRow(p) {
     ? `<button class="post-photo-btn" ${photoAttr}>사진</button>`
     : "";
   return `
-    <div class="table-row card-row" data-post-id="${p.id}">
-      <div class="card-top">
-        <label class="card-check edit-only"><input type="checkbox" class="row-select" data-post-id="${p.id}" /></label>
-        <div class="card-meta">
-          <span class="meta-date">${dateLabel}</span>
-          <span class="meta-type">${typeLabel}</span>
-        </div>
-        <span class="card-platform">${platformLabel}</span>
-        ${photoButton}
-      </div>
-      <div class="card-title">
+    <div class="table-row" data-post-id="${p.id}">
+      <span class="cell-check"></span>
+      <span class="cell-meta">
+        <span class="meta-date">${dateLabel}</span>
+        <span class="meta-type">${typeDisplay}</span>
+      </span>
+      <span class="cell-title">
         <a href="${p.url}" target="_blank" rel="noreferrer">${p.title}</a>
         <a class="url-link" href="${p.url}" target="_blank" rel="noreferrer">${p.url}</a>
-      </div>
-      <div class="card-metrics">
+      </span>
+      <span class="cell-metrics">
         <span class="metric-chip">조회 ${p.views ?? 0}</span>
         <span class="metric-chip">댓글 ${p.comments ?? 0}</span>
         <span class="metric-chip">쪽지 ${p.message_count ?? 0}</span>
-      </div>
-      <div class="card-foot">
-        <span class="card-assignee"> ${p.assignee_name || "-"}</span>
-      </div>
+      </span>
+      <span class="cell-assignee">${p.assignee_name || "-"}</span>
+      <span class="cell-platform">${platformLabel}${photoButton ? ` ${photoButton}` : ""}</span>
     </div>
   `;
 }
@@ -439,7 +503,9 @@ function bindSelectionActions() {
 
   const selectAll = document.getElementById("postSelectAll");
   if (selectAll) {
-    selectAll.checked = selectedPostIds.size > 0 && selectedPostIds.size === currentPosts.length;
+    const pageIds = pagePosts.map((p) => String(p.id));
+    const checkedCount = pageIds.filter((id) => selectedPostIds.has(id)).length;
+    selectAll.checked = pageIds.length > 0 && checkedCount === pageIds.length;
   }
 
   updateDeleteSelectedButton();
@@ -448,7 +514,9 @@ function bindSelectionActions() {
 function syncSelectAllState() {
   const selectAll = document.getElementById("postSelectAll");
   if (!selectAll) return;
-  selectAll.checked = selectedPostIds.size > 0 && selectedPostIds.size === currentPosts.length;
+  const pageIds = pagePosts.map((p) => String(p.id));
+  const checkedCount = pageIds.filter((id) => selectedPostIds.has(id)).length;
+  selectAll.checked = pageIds.length > 0 && checkedCount === pageIds.length;
 }
 
 function updateDeleteSelectedButton() {
@@ -494,8 +562,11 @@ function bindSelectDefaults() {
     }
   });
 }
+
 async function initPostsDashboard() {
   const clinicSelect = document.getElementById("postClinicSelect");
+  const sortSelect = document.getElementById("postSortSelect");
+  const sortChips = document.querySelectorAll("#postSortChips .sort-chip");
   const monthInput = document.getElementById("postMonth");
   const monthPrev = document.getElementById("postMonthPrev");
   const monthNext = document.getElementById("postMonthNext");
@@ -519,6 +590,24 @@ async function initPostsDashboard() {
       loadPosts();
     });
   }
+  if (sortSelect) {
+    sortSelect.value = currentSort;
+    sortSelect.addEventListener("change", () => {
+      currentSort = sortSelect.value || "latest";
+      loadPosts();
+    });
+  }
+  sortChips.forEach((chip) => {
+    chip.classList.toggle("active", (chip.dataset.sort || "latest") === currentSort);
+    chip.addEventListener("click", () => {
+      currentSort = chip.dataset.sort || "latest";
+      sortChips.forEach((item) => {
+        item.classList.toggle("active", item === chip);
+      });
+      if (sortSelect) sortSelect.value = currentSort;
+      loadPosts();
+    });
+  });
 
   if (monthInput) {
     setMonth(monthKey());
@@ -571,9 +660,9 @@ async function initPostsDashboard() {
   if (selectAll) {
     selectAll.addEventListener("change", () => {
       if (selectAll.checked) {
-        selectedPostIds = new Set(currentPosts.map((p) => String(p.id)));
+        pagePosts.forEach((p) => selectedPostIds.add(String(p.id)));
       } else {
-        selectedPostIds = new Set();
+        pagePosts.forEach((p) => selectedPostIds.delete(String(p.id)));
       }
       renderPostList();
     });

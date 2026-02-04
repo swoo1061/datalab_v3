@@ -115,6 +115,7 @@
                 />
                 <div class="hint">쉼표(,)로 구분</div>
               </div>
+
             </div>
             </div>
 
@@ -136,14 +137,15 @@
 </div>
 
 <!-- 결과 모달 -->
-<div id="reviewModal" class="modal hidden">
-  <div class="modal-backdrop" onclick="closeModal()"></div>
+<div id="reviewModal" class="modal modal-lock hidden">
+  <div class="modal-backdrop"></div>
 
   <div class="modal-panel card">
     <div class="card-hd">
       <strong>AI 리뷰 결과</strong>
       <div class="modal-actions">
         <button id="copyModalBtn" class="btn btn-secondary btn-sm">전체 복사</button>
+        <button id="saveModalBtn" class="btn btn-secondary btn-sm">수정 저장</button>
         <button class="close-btn" onclick="closeModal()">X</button>
       </div>
     </div>
@@ -172,7 +174,12 @@
         AI가 리뷰를 작성 중입니다…
       </div>
 
-      <div id="modalReview" class="review-output"></div>
+      <div id="titleSuggestions" class="title-suggestions hidden">
+        <strong>제목 추천</strong>
+        <ul id="titleSuggestionList"></ul>
+      </div>
+
+      <div id="modalReview" class="review-output" spellcheck="false"></div>
     </div>
   </div>
 </div>

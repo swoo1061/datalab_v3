@@ -24,6 +24,42 @@
   <button type="submit" class="btn btn-primary">조회</button>
 </form>
 
+<div class="kpi-grid">
+  <div class="stat-card">
+    <div class="stat-label">총 직원</div>
+    <div class="stat-value">{{ user_count|default:0 }}</div>
+    <div class="stat-sub">기간 내 사용</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">총 호출</div>
+    <div class="stat-value">{{ total_calls|default:0|floatformat:0 }}</div>
+    <div class="stat-sub">전체 합산</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">총 토큰</div>
+    <div class="stat-value">{{ total_tokens|default:0|floatformat:0 }}</div>
+    <div class="stat-sub">Input/Output 합산</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">총 비용</div>
+    <div class="stat-value">{{ total_cost|default:0|floatformat:0 }} 원</div>
+    <div class="stat-sub">기간 합계</div>
+  </div>
+</div>
+
+<div class="insight-grid">
+  <div class="insight-card">
+    <div class="insight-title">Top 사용자</div>
+    <div class="insight-value">{{ top_user.user__username|default:"-" }}</div>
+    <div class="insight-sub">{{ top_user.total_tokens|default:0|floatformat:0 }} 토큰</div>
+  </div>
+  <div class="insight-card">
+    <div class="insight-title">Top 비용</div>
+    <div class="insight-value">{{ top_user.total_cost|default:0|floatformat:0 }} 원</div>
+    <div class="insight-sub">{{ top_user.count|default:0 }} 회</div>
+  </div>
+</div>
+
 <div class="grid-2 mt-20">
   <div class="card data-panel chart-card">
     <h3 class="card-title">직원별 토큰 (상위 10)</h3>
@@ -36,29 +72,37 @@
   </div>
 </div>
 
-<h2 class="mt-20">직원별 사용량</h2>
-<table class="default-table">
-  <thead>
-    <tr>
-      <th>직원</th>
-      <th>호출 수</th>
-      <th>토큰</th>
-      <th>비용 (원)</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in by_user %}
-    <tr>
-      <td>{{ row.user__username|default:"-" }}</td>
-      <td>{{ row.count }}</td>
-      <td>{{ row.total_tokens }}</td>
-      <td>{{ row.total_cost|floatformat:0 }}</td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="4">데이터 없음</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="card mt-20">
+  <div class="card-header">
+    <h3 class="card-title">직원별 사용량</h3>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>순위</th>
+          <th>직원</th>
+          <th>호출 수</th>
+          <th>토큰</th>
+          <th>비용 (원)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in by_user %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>{{ row.user__username|default:"-" }}</td>
+          <td>{{ row.count }}</td>
+          <td>{{ row.total_tokens }}</td>
+          <td>{{ row.total_cost|floatformat:0 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5">데이터 없음</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 
 <script>
   window.LLM_USAGE_DATA = {

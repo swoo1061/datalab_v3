@@ -44,6 +44,7 @@ class FTPromptConfig:
 
     # 안전/제약(FT에 과한 규칙 넣지 말고 최소만)
     avoid: List[str] = field(default_factory=list)  # 예: ["과장 표현", "최종 결과 단정"]
+    rules: List[str] = field(default_factory=list)  # 예: ["5~7문장", "반복 표현 금지"]
 
     # 프롬프트 고정 문구
     system_prompt: str = "자연스러운 시술 후기를 작성합니다."
@@ -120,6 +121,11 @@ class FTPromptBuilder:
         if c.length_hint:
             lines.append(f"길이: {c.length_hint}")
 
+        if c.rules:
+            rules_txt = ", ".join([r.strip() for r in c.rules if r and r.strip()])[:200]
+            if rules_txt:
+                lines.append(f"규칙: {rules_txt}")
+
         if c.avoid:
             # 너무 길게 쓰지 말고 2~4개 정도로 제한 추천
             avoid_txt = ", ".join([a.strip() for a in c.avoid if a and a.strip()])[:200]
@@ -164,6 +170,7 @@ def build_ft_prompt(
     tone: Optional[str] = None,
     length_hint: Optional[str] = None,
     avoid: Optional[List[str]] = None,
+    rules: Optional[List[str]] = None,
 ) -> str:
     """
     함수형 편의 API: 입력 프롬프트만 필요할 때
@@ -179,6 +186,7 @@ def build_ft_prompt(
         tone=tone,
         length_hint=length_hint,
         avoid=avoid or [],
+        rules=rules or [],
     )
     return FTPromptBuilder(cfg).build_input_prompt()
 
@@ -204,6 +212,7 @@ def build_ft_record(
     tone: Optional[str] = None,
     length_hint: Optional[str] = None,
     avoid: Optional[List[str]] = None,
+    rules: Optional[List[str]] = None,
     system_prompt: str = "자연스러운 시술 후기를 작성합니다.",
 ) -> Dict[str, Any]:
     """
@@ -220,6 +229,7 @@ def build_ft_record(
         tone=tone,
         length_hint=length_hint,
         avoid=avoid or [],
+        rules=rules or [],
         system_prompt=system_prompt,
     )
     return FTPromptBuilder(cfg).to_jsonl_record(target_review_text)

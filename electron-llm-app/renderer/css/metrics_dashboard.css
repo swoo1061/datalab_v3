@@ -11,8 +11,8 @@
 
 .metrics-detail .page-canvas {
   background:
-    radial-gradient(circle at 10% 10%, rgba(129, 140, 248, 0.18), transparent 40%),
-    radial-gradient(circle at 90% 15%, rgba(56, 189, 248, 0.18), transparent 45%),
+    /* radial-gradient(circle at 10% 10%, rgba(129, 140, 248, 0.18), transparent 40%),
+    radial-gradient(circle at 90% 15%, rgba(56, 189, 248, 0.18), transparent 45%), */
     linear-gradient(180deg, #ffffff 0%, #f4f7fb 100%);
   border: 1px solid rgba(148, 163, 184, 0.2);
 }
@@ -85,9 +85,13 @@
 
 .detail-filter .filter-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 220px)) 1fr;
+  grid-template-columns: repeat(3, minmax(0, 200px)) 1fr;
   gap: 12px 16px;
   align-items: end;
+}
+
+.filter-field pretty-select {
+  width: 100%;
 }
 
 .detail-filter .filter-field.span-2 {
@@ -95,7 +99,7 @@
 }
 
 .detail-filter .filter-field.pretty-select {
-  position: relative;
+  margin: auto;
 }
 
 .detail-filter .select,
@@ -282,6 +286,145 @@
   letter-spacing: 0.3px;
   display: inline-flex;
   align-items: center;
+}
+
+/* =====================================================
+   Redesign: Business System Tone (Metrics)
+===================================================== */
+
+.metrics-detail {
+  --biz-bg: #f4f6f9;
+  --biz-surface: #ffffff;
+  --biz-border: #d9dee7;
+  --biz-border-strong: #c8cfdb;
+  --biz-text: #1f2937;
+  --biz-muted: #6b7280;
+  --biz-primary: #1f4fbf;
+  --biz-primary-soft: #e9efff;
+}
+
+.metrics-detail .page-canvas {
+  background: var(--biz-bg);
+  border: none;
+  padding: 14px 16px;
+}
+
+.metrics-detail .page-head.detail-head,
+.metrics-detail .detail-filter,
+.metrics-detail .summary-card,
+.metrics-detail .panel.card {
+  background: var(--biz-surface);
+  border: 1px solid var(--biz-border);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.metrics-detail .page-head.detail-head {
+  padding: 14px 16px;
+}
+
+.metrics-detail .h1 {
+  font-size: 20px;
+}
+
+.metrics-detail .sub {
+  color: var(--biz-muted);
+}
+
+.metrics-detail .pill {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #eef2f7;
+  border: 1px solid var(--biz-border);
+  color: #475569;
+  font-size: 11px;
+}
+
+.metrics-detail .pill.ghost {
+  background: #fff;
+}
+
+.detail-filter {
+  margin-top: 10px;
+  padding: 10px 12px;
+}
+
+.detail-filter .select,
+.detail-filter .month-input,
+.metrics-detail .month-nav,
+.metrics-detail .type-pill {
+  height: 32px;
+  border-radius: 7px;
+  border: 1px solid var(--biz-border);
+  background: #fff;
+  box-shadow: none;
+  font-size: 12px;
+  color: var(--biz-text);
+}
+
+.metrics-detail .month-nav {
+  padding: 3px 6px;
+}
+
+.metrics-detail .month-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--biz-border);
+  background: #fff;
+  color: #374151;
+}
+
+.metrics-detail .month-btn:hover {
+  background: #f3f4f6;
+}
+
+.metrics-detail .type-pill {
+  padding: 0 10px;
+}
+
+.metrics-detail .type-pill.active {
+  border-color: #b7c6ef;
+  background: var(--biz-primary-soft);
+  color: #1e40af;
+}
+
+.summary-grid {
+  margin-top: 10px;
+  gap: 8px;
+}
+
+.summary-card {
+  padding: 10px;
+}
+
+.summary-label {
+  font-size: 11px;
+  color: var(--biz-muted);
+}
+
+.summary-value {
+  margin-top: 4px;
+  font-size: 17px;
+}
+
+.summary-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #4b5563;
+}
+
+.detail-panels,
+.detail-deep {
+  margin-top: 10px;
+  gap: 8px;
+}
+
+.panel .card-hd {
+  border-bottom: 1px solid #e7edf5;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .chip.ghost {

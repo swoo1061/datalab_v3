@@ -3,9 +3,29 @@ Django Admin 설정 - presetss.txt 기반 144개 항목 반영
 """
 from django.contrib import admin
 from .models import (
-    Campaign, Review, ImageAsset,
-    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile
-, ClinicDoctor, ClinicPrice, ClinicPost, ClinicPostPhoto
+    AccessLog,
+    AttendanceCorrectionRequest,
+    AttendanceRecord,
+    Campaign,
+    CalendarMemo,
+    CafeProfile,
+    ClinicAssignee,
+    ClinicDoctor,
+    ClinicGuide,
+    ClinicPost,
+    ClinicPostPhoto,
+    ClinicPrice,
+    ContentTypeProfile,
+    CrawledPostContent,
+    FavoriteClinic,
+    GeneratedReview,
+    ImageAsset,
+    InternalMessage,
+    LLMUsageLog,
+    Persona,
+    PromptTemplate,
+    PromptTemplateVersion,
+    Review,
 )
 
 
@@ -146,11 +166,26 @@ class ClinicPostPhotoInline(admin.TabularInline):
 
 @admin.register(ClinicPost)
 class ClinicPostAdmin(admin.ModelAdmin):
-    list_display = ["id", "clinic", "type", "platform", "title", "views", "comments", "message_count", "updated_at"]
-    list_filter = ["type", "platform", "clinic", "status"]
+    list_display = ["id", "clinic", "type", "platform", "opinion_subtype", "review_subtype", "title", "views", "comments", "message_count", "updated_at"]
+    list_filter = ["type", "platform", "clinic", "status", "opinion_subtype", "review_subtype"]
     search_fields = ["title", "url"]
     readonly_fields = ["created_at", "updated_at"]
     inlines = [ClinicPostPhotoInline]
+
+@admin.register(ClinicPostPhoto)
+class ClinicPostPhotoAdmin(admin.ModelAdmin):
+    list_display = ["id", "post", "image", "created_at"]
+    list_filter = ["created_at"]
+    search_fields = ["post__title"]
+    readonly_fields = ["created_at"]
+
+
+@admin.register(CrawledPostContent)
+class CrawledPostContentAdmin(admin.ModelAdmin):
+    list_display = ["id", "post", "platform", "status", "views", "comments", "content_length", "fetched_at"]
+    list_filter = ["platform", "status", "fetched_at"]
+    search_fields = ["title", "content", "url", "post__title"]
+    readonly_fields = ["fetched_at", "content_length"]
 
 @admin.register(ClinicGuide)
 class ClinicGuideAdmin(admin.ModelAdmin):
@@ -214,6 +249,20 @@ class ClinicGuideAdmin(admin.ModelAdmin):
         return obj.price_objects.count()
     procedures_count.short_description = "시술"
 
+@admin.register(ClinicDoctor)
+class ClinicDoctorAdmin(admin.ModelAdmin):
+    list_display = ["id", "clinic", "name", "code", "is_active", "order"]
+    list_filter = ["clinic", "is_active"]
+    search_fields = ["name", "code", "clinic__name"]
+    ordering = ["clinic", "order", "id"]
+
+@admin.register(ClinicPrice)
+class ClinicPriceAdmin(admin.ModelAdmin):
+    list_display = ["id", "clinic", "doctor", "procedure", "price_display", "is_active", "order"]
+    list_filter = ["clinic", "is_active"]
+    search_fields = ["procedure", "clinic__name", "doctor__name"]
+    ordering = ["clinic", "order", "id"]
+
 @admin.register(ContentTypeProfile)
 class ContentTypeProfileAdmin(admin.ModelAdmin):
     list_display = ['order', 'label', 'value', 'content_purpose', 'emotion_tone', 'min_length', 'max_length', 'is_active']
@@ -256,7 +305,7 @@ class ContentTypeProfileAdmin(admin.ModelAdmin):
 
 @admin.register(GeneratedReview)
 class GeneratedReviewAdmin(admin.ModelAdmin):
-    list_display = ['id', 'clinic', 'doctor_code', 'procedure', 'status', 'char_count', 'created_at']
+    list_display = ['id', 'review_kind', 'clinic', 'doctor_code', 'procedure', 'status', 'char_count', 'created_at']
     list_filter = ['status', 'clinic', 'created_at']
     search_fields = ['procedure', 'generated_text', 'doctor_name']
     readonly_fields = ['created_at', 'updated_at']
@@ -280,6 +329,119 @@ class GeneratedReviewAdmin(admin.ModelAdmin):
     def char_count(self, obj):
         return len(obj.generated_text) if obj.generated_text else 0
     char_count.short_description = '글자수'
+
+    def review_kind(self, obj):
+        return '수정본' if obj.status == 'edited' else '생성본'
+    review_kind.short_description = '구분'
+
+@admin.register(FavoriteClinic)
+class FavoriteClinicAdmin(admin.ModelAdmin):
+    list_display = ["id", "user", "clinic", "created_at"]
+    list_filter = ["created_at"]
+    search_fields = ["user__username", "user__email", "clinic__name"]
+
+@admin.register(CalendarMemo)
+class CalendarMemoAdmin(admin.ModelAdmin):
+    list_display = ["id", "user", "clinic", "date", "platform", "is_read", "created_at"]
+    list_filter = ["platform", "is_read", "created_at"]
+    search_fields = ["content", "user__username", "clinic__name", "account"]
+    readonly_fields = ["created_at", "updated_at"]
+
+@admin.register(ClinicAssignee)
+class ClinicAssigneeAdmin(admin.ModelAdmin):
+    list_display = ["id", "clinic", "user", "is_active", "created_at"]
+    list_filter = ["is_active", "created_at"]
+    search_fields = ["clinic__name", "user__username", "user__email"]
+
+@admin.register(AccessLog)
+class AccessLogAdmin(admin.ModelAdmin):
+    list_display = ["id", "ip_address", "path", "method", "created_at"]
+    list_filter = ["method", "created_at"]
+    search_fields = ["ip_address", "path", "user_agent", "referer"]
+    readonly_fields = ["created_at"]
+
+@admin.register(LLMUsageLog)
+class LLMUsageLogAdmin(admin.ModelAdmin):
+    list_display = ["id", "user", "model", "total_tokens", "cost_usd", "cost_krw", "created_at"]
+    list_filter = ["model", "created_at"]
+    search_fields = ["user__username", "user__email", "model"]
+    readonly_fields = ["created_at"]
+
+
+@admin.register(AttendanceRecord)
+class AttendanceRecordAdmin(admin.ModelAdmin):
+    list_display = ["id", "user_name", "work_date", "status", "check_in_at", "check_out_at", "worked_minutes"]
+    list_filter = ["status", "work_date", "created_at"]
+    search_fields = ["user__username", "user__email", "user__profile__name", "note"]
+    readonly_fields = ["created_at", "updated_at", "worked_minutes"]
+
+    def user_name(self, obj):
+        profile = getattr(obj.user, "profile", None)
+        return getattr(profile, "name", None) or obj.user.username
+    user_name.short_description = "이름"
+
+
+@admin.register(AttendanceCorrectionRequest)
+class AttendanceCorrectionRequestAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "requester_name",
+        "work_date",
+        "status",
+        "requested_check_in_at",
+        "requested_check_out_at",
+        "created_at",
+    ]
+    list_filter = ["status", "work_date", "created_at"]
+    search_fields = ["user__username", "user__profile__name", "reason", "review_note"]
+    readonly_fields = [
+        "user",
+        "record",
+        "work_date",
+        "current_check_in_at",
+        "current_check_out_at",
+        "requested_check_in_at",
+        "requested_check_out_at",
+        "reason",
+        "created_at",
+        "updated_at",
+    ]
+
+    def requester_name(self, obj):
+        profile = getattr(obj.user, "profile", None)
+        return getattr(profile, "name", None) or obj.user.username
+    requester_name.short_description = "요청자"
+
+
+@admin.register(InternalMessage)
+class InternalMessageAdmin(admin.ModelAdmin):
+    list_display = ["id", "sender_name", "recipient_name", "subject", "is_read", "created_at"]
+    list_filter = ["is_read", "created_at"]
+    search_fields = ["subject", "content", "sender__username", "sender__profile__name", "recipient__username", "recipient__profile__name"]
+
+    def sender_name(self, obj):
+        p = getattr(obj.sender, "profile", None)
+        return getattr(p, "name", None) or obj.sender.username
+    sender_name.short_description = "보낸사람"
+
+    def recipient_name(self, obj):
+        p = getattr(obj.recipient, "profile", None)
+        return getattr(p, "name", None) or obj.recipient.username
+    recipient_name.short_description = "받는사람"
+
+@admin.register(PromptTemplate)
+class PromptTemplateAdmin(admin.ModelAdmin):
+    list_display = ["id", "mode", "name", "is_default", "is_active", "version", "updated_at"]
+    list_filter = ["mode", "is_default", "is_active"]
+    search_fields = ["name", "content"]
+    readonly_fields = ["created_at", "updated_at"]
+
+@admin.register(PromptTemplateVersion)
+class PromptTemplateVersionAdmin(admin.ModelAdmin):
+    list_display = ["id", "template", "version", "changed_by", "created_at"]
+    list_filter = ["template", "created_at"]
+    search_fields = ["template__name", "changed_by", "change_note"]
+    readonly_fields = ["created_at"]
 
 
 # Admin 사이트 설정

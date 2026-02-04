@@ -1,0 +1,158 @@
+.g90-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 20px;
+}
+
+.g90-card {
+  border: 1px solid #c7d2fe;
+  box-shadow: 0 14px 28px rgba(59, 130, 246, 0.12);
+}
+
+.g90-card .card-header {
+  background: linear-gradient(90deg, rgba(219, 234, 254, 0.9), rgba(224, 231, 255, 0.7));
+}
+
+.g90-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.g90-field-group {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+}
+
+.g90-span-2 {
+  grid-column: 1 / -1;
+}
+
+.g90-field-head h4 {
+  margin: 0;
+  font-size: 0.98rem;
+  color: #1e3a8a;
+}
+
+.g90-field-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.g90-row {
+  margin-top: 12px;
+}
+
+.g90-row > label {
+  display: block;
+  font-size: 0.86rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip-group button {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.chip-group button.active {
+  border-color: #1d4ed8;
+  color: #1e3a8a;
+  background: #eef2ff;
+}
+
+.g90-model-list {
+  display: flex;
+}
+
+.g90-model-card {
+  width: 100%;
+  border: 1px solid #1d4ed8;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.g90-preview-meta {
+  background: #eef2ff;
+  border: 1px solid #cbd5f5;
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 12px;
+}
+
+.g90-preview-row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.g90-preview-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.g90-preview-value {
+  color: var(--text);
+  font-size: 0.87rem;
+}
+
+.g90-persona-preview {
+  margin-top: 12px;
+}
+
+.g90-persona-tags {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.g90-persona-tags span {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  background: #fff;
+}
+
+.result-box {
+  border-color: #cbd5f5;
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(238,242,255,0.9));
+}
+
+.title-suggestions-box {
+  border-color: #cbd5f5;
+  background: #eef2ff;
+}
+
+@media (max-width: 1200px) {
+  .g90-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .g90-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .g90-span-2 {
+    grid-column: auto;
+  }
+}

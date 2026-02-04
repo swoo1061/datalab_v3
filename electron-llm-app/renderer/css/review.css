@@ -381,10 +381,36 @@ body.modal-open {
   white-space: pre-wrap;   /* 줄바꿈 유지 */
   word-break: keep-all;
 
-  /* 박스 느낌 제거 */
-  background: none;
-  border: none;
-  padding: 0;
+  /* 결과를 박스 안에 표시 */
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  padding: 14px;
+  min-height: 220px;
+}
+
+.title-suggestions {
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+
+.title-suggestions strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #0f172a;
+}
+
+.title-suggestions ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.title-suggestions.hidden {
+  display: none;
 }
 
 .review-page .h1 {

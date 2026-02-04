@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | 구공이 리뷰 생성</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/review.css" />
+  <link rel="stylesheet" href="css/gugong_review.css" />
+</head>
+<body>
+
+<div class="app-root">
+  <div id="globalLoading" class="global-loading hidden" aria-live="polite">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <div class="loading-text">리뷰 생성 중입니다…</div>
+      <div class="loading-sub">잠시만 기다려주세요</div>
+    </div>
+  </div>
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope review-page">
+      <section class="review-layout">
+        <div class="card review-left">
+          <div class="card-hd">구공이 리뷰 설정</div>
+          <div class="card-bd">
+
+            <div class="field-grid">
+            <div class="field-group">
+              <div class="field-head">
+                <h3>기본 정보</h3>
+                <p>필수 항목을 먼저 선택하세요.</p>
+              </div>
+
+              <div class="row">
+                <label>병원</label>
+                <select id="clinicSelect" class="select">
+                  <option value="">병원을 선택하세요</option>
+                </select>
+              </div>
+
+              <div class="row">
+                <label>글 목적</label>
+                <div class="chip-group single" id="reviewIntent">
+                  <button data-value="자연스러운 후기" class="active">자연스러운 후기</button>
+                  <button data-value="고민/질문글">고민/질문글</button>
+                  <button data-value="상담 후기">상담 후기</button>
+                </div>
+              </div>
+
+              <div class="row">
+                <label>연령대</label>
+                <div class="chip-group single" id="ageGroup">
+                  <button data-value="20대 초반">20대 초반</button>
+                  <button data-value="20대 중반">20대 중반</button>
+                  <button data-value="20대 후반" class="active">20대 후반</button>
+                  <button data-value="30대 초반">30대 초반</button>
+                  <button data-value="30대 중반">30대 중반</button>
+                  <button data-value="30대 후반">30대 후반</button>
+                  <button data-value="40대 초반">40대 초반</button>
+                  <button data-value="40대 중반">40대 중반</button>
+                  <button data-value="40대 후반">40대 후반</button>
+                  <button data-value="50대 이상">50대 이상</button>
+                </div>
+              </div>
+
+              <div class="row">
+                <label>MBTI</label>
+                <div class="chip-group single" id="mbtiGroup">
+                  <button data-value="ISTJ">ISTJ</button>
+                  <button data-value="ISFJ">ISFJ</button>
+                  <button data-value="INFJ">INFJ</button>
+                  <button data-value="INTJ">INTJ</button>
+                  <button data-value="ISTP">ISTP</button>
+                  <button data-value="ISFP">ISFP</button>
+                  <button data-value="INFP" class="active">INFP</button>
+                  <button data-value="INTP">INTP</button>
+                  <button data-value="ESTP">ESTP</button>
+                  <button data-value="ESFP">ESFP</button>
+                  <button data-value="ENFP">ENFP</button>
+                  <button data-value="ENTP">ENTP</button>
+                  <button data-value="ESTJ">ESTJ</button>
+                  <button data-value="ESFJ">ESFJ</button>
+                  <button data-value="ENFJ">ENFJ</button>
+                  <button data-value="ENTJ">ENTJ</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <div class="field-head">
+                <h3>톤 & 키워드</h3>
+                <p>구공이 전용 입력입니다.</p>
+              </div>
+
+              <div class="row">
+                <label>톤 프리셋</label>
+                <div class="chip-group single" id="tonePreset">
+                  <button data-value="자연스럽고 담백한 톤" class="active">자연/담백</button>
+                  <button data-value="귀엽고 밝은 톤">귀여움</button>
+                  <button data-value="차분하고 솔직한 톤">차분/솔직</button>
+                  <button data-value="친근한 반말 톤">반말</button>
+                  <button data-value="질문형 캐주얼 톤">질문형</button>
+                </div>
+              </div>
+
+              <div class="row">
+                <label>강조 키워드</label>
+                <div class="chip-group multi" id="keywordGroup">
+                  <button>자연스러움</button>
+                  <button>통증 적음</button>
+                  <button>회복 빠름</button>
+                  <button>친절한 상담</button>
+                  <button>가격 만족</button>
+                  <button>대기시간 짧음</button>
+                  <button>재방문 의사</button>
+                  <button>지인 추천</button>
+                </div>
+              </div>
+
+              <div class="row">
+                <label>금지 표현</label>
+                <div class="chip-group multi" id="forbiddenGroup">
+                  <button>광고</button>
+                  <button>협찬</button>
+                  <button>이벤트가</button>
+                  <button>무조건 추천</button>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="field-head">
+                  <h3>모델</h3>
+                  <p>구공이 고정</p>
+                </div>
+                <label>AI 모델</label>
+                <div id="modelList" class="model-list"></div>
+              </div>
+            </div>
+
+            <div class="field-group span-2">
+              <div class="row">
+                <label>페르소나 키워드 (직접 입력)</label>
+                <input
+                  id="personaInput"
+                  class="input"
+                  placeholder="예: 여성, 시술명, 500자 이상"
+                />
+                <div class="hint">쉼표(,)로 구분</div>
+              </div>
+            </div>
+            </div>
+
+            <div class="action-row">
+              <button id="generateReviewBtn" class="btn btn-primary full" onclick="generateReview()">
+                리뷰 생성
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="reviewModal" class="modal modal-lock hidden">
+  <div class="modal-backdrop"></div>
+
+  <div class="modal-panel card">
+    <div class="card-hd">
+      <strong>AI 리뷰 결과</strong>
+      <div class="modal-actions">
+        <button id="copyModalBtn" class="btn btn-secondary btn-sm">전체 복사</button>
+        <button id="saveModalBtn" class="btn btn-secondary btn-sm">수정 저장</button>
+        <button class="close-btn" onclick="closeModal()">X</button>
+      </div>
+    </div>
+
+    <div class="modal-body">
+      <details class="modal-preview" open>
+        <summary>미리보기</summary>
+        <div class="preview-wrap">
+          <ul class="summary" id="summary"></ul>
+          <div class="preview">
+            <strong>프롬프트 미리보기</strong>
+            <div id="previewMeta" class="preview-meta"></div>
+          </div>
+
+          <div class="persona-preview">
+            <strong>페르소나</strong>
+            <div id="personaPreview" class="persona-tags"></div>
+            <pre id="promptPreview" class="prompt-box"></pre>
+          </div>
+        </div>
+      </details>
+
+      <div id="reviewLoading" class="review-loading hidden">
+        AI가 리뷰를 작성 중입니다…
+      </div>
+
+      <div id="titleSuggestions" class="title-suggestions hidden">
+        <strong>제목 추천</strong>
+        <ul id="titleSuggestionList"></ul>
+      </div>
+
+      <div id="modalReview" class="review-output" spellcheck="false"></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/header.js"></script>
+<script src="js/gugong_review.js"></script>
+<script>
+  (async () => {
+    await loadLayout();
+    await loadHeader("구공이 리뷰 생성");
+  })();
+</script>
+</body>
+</html>

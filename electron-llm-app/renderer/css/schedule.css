@@ -122,10 +122,9 @@
   font-size: 10px;
   color: #475569;
   line-height: 1.2;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  display: block;
+  white-space: normal;
+  overflow: visible;
 }
 
 .calendar-cell.clickable {

@@ -3,8 +3,40 @@
 
 병원 정보, 페르소나, 카페 설정을 조합하여 최적화된 프롬프트를 생성합니다.
 """
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 from dataclasses import dataclass
+import re
+from apps.ml.services.ft_prompt_builder import FTPromptBuilder, FTPromptConfig
+
+
+# 말투/톤 키워드 (전역 기준)
+TONE_KEYWORDS = [
+    # 기본
+    "말투", "톤", "대화체", "구어체",
+
+    # 감정
+    "귀여", "발랄", "상냥", "친절", "친근", "편안",
+    "담백", "담담", "차분", "진솔", "솔직", "진지", "공손", "정중",
+    "유머", "위트", "감성", "따뜻",
+
+    # 존댓
+    "존댓", "반말", "혼용",
+    "~요", "~용", "~음", "~당",
+
+    # 군대 말투
+    "군대말투", "다나까", "다나까체",
+
+    # 문체 성향
+    "간결", "단정", "부드럽", "딱딱",
+    "장황", "상세", "구체적",
+]
+
+# 패턴형 말투(별도)
+PATTERN_KEYWORDS = [
+    "ㅋㅋ", "ㅎㅎ", "ㅋㅎ", "ㄹㅇ",
+    "드립", "드립체", "밈", "밈체", "인터넷체", "댓글체",
+    "리액션", "리액션과잉",
+]
 
 
 # 컨텐츠 유형별 가이드
@@ -163,6 +195,78 @@ CONTENT_TYPE_GUIDES = {
         "tone": "만족, 자부심, 확신, 추천 의지"
     }
 }
+
+
+def _parse_keyword_line(raw: str) -> Dict[str, Optional[str]]:
+    """
+    간단 키워드 라인 파서
+    예: "강남12의원, 30대후반 여성, 지방추출, 귀여운말투, 700자이내"
+    """
+    if not raw:
+        return {}
+
+    tokens = [t.strip() for t in re.split(r"[,\n]", raw) if t.strip()]
+    clinic_name = None
+    procedure = None
+    tone = None
+    length_hint = None
+    timing = None
+    concern_parts: List[str] = []
+    extra_parts: List[str] = []
+
+    length_re = re.compile(r"(\d+)\s*자\s*(이내|이하|내외|정도|이상|부터)?")
+    week_re = re.compile(r"(\d+)\s*주\s*(후|차|째)?")
+    age_re = re.compile(r"(\d{1,2})\s*대\s*(초반|중반|후반)?")
+
+    for tok in tokens:
+        # 길이
+        m_len = length_re.search(tok)
+        if m_len:
+            length_hint = f"{m_len.group(1)}자 {m_len.group(2) or ''}".strip()
+            continue
+        # 시점(주 단위)
+        m_week = week_re.search(tok)
+        if m_week:
+            wk = m_week.group(1)
+            timing = f"{wk}주 후"
+            continue
+
+        # 병원명
+        if tok.endswith(("의원", "병원", "클리닉", "성형외과", "의과", "의학", "피부과", "산부인과")):
+            clinic_name = tok
+            continue
+
+        # 성별/연령
+        if "여성" in tok or "남성" in tok or age_re.search(tok):
+            concern_parts.append(tok)
+            continue
+
+        # 말투/톤 (핵심 위주)
+        if any(k in tok for k in TONE_KEYWORDS):
+            tone = tok.strip()
+            continue
+        if any(k in tok for k in PATTERN_KEYWORDS):
+            extra_parts.append(f"패턴:{tok.strip()}")
+            continue
+
+        # 시술명 (남은 토큰 중 첫 번째)
+        if procedure is None:
+            procedure = tok
+        else:
+            extra_parts.append(tok)
+
+    concern = " / ".join(concern_parts) if concern_parts else None
+    context = " / ".join(extra_parts) if extra_parts else None
+
+    return {
+        "clinic_name": clinic_name,
+        "procedure": procedure,
+        "tone": tone,
+        "length_hint": length_hint,
+        "timing": timing,
+        "concern": concern,
+        "context": context,
+    }
 
 
 @dataclass
@@ -966,3 +1070,123 @@ def build_prompt_from_models(
         header_template_id=header_template_id,
         guidelines_template_id=guidelines_template_id,
     )
+
+
+def build_ft_prompt_from_models(
+    clinic,  # ClinicGuide model
+    doctor_code: str,
+    procedure: str,
+    content_type: str = "procedure",
+    content_type_profile=None,  # ContentTypeProfile model
+    persona=None,  # Persona model
+    cafe=None,  # CafeProfile model
+    consultant_name: Optional[str] = None,
+    custom_instructions: Optional[str] = None,
+) -> str:
+    """
+    FT 전용 짧은 프롬프트 생성 (고정 포맷)
+    """
+    if not procedure:
+        procedure = "시술"
+
+    # content_type 정보
+    timing = None
+    tone = None
+    if content_type_profile and hasattr(content_type_profile, "tone"):
+        tone = getattr(content_type_profile, "tone", "") or None
+    if content_type in CONTENT_TYPE_GUIDES:
+        timing = CONTENT_TYPE_GUIDES[content_type].get("timing") or None
+        tone = tone or CONTENT_TYPE_GUIDES[content_type].get("tone") or None
+
+    # persona 말투 요약
+    speech_style = None
+    if persona and hasattr(persona, "__dict__") and hasattr(persona, "name"):
+        honorific_map = {'formal': '존댓말', 'informal': '반말', 'mixed': '혼용'}
+        ending_map = {'yo': '~요체', 'yong': '~용체', 'dang': '~당체', 'eum': '~음체', 'mixed': '혼용'}
+        parts = [
+            honorific_map.get(getattr(persona, "honorific_level", "formal"), ""),
+            ending_map.get(getattr(persona, "sentence_ending", "yo"), ""),
+        ]
+        speech_style = ", ".join([p for p in parts if p])
+
+    # 길이 힌트
+    length_hint = None
+    if cafe and hasattr(cafe, "min_length") and hasattr(cafe, "max_length"):
+        length_hint = f"{cafe.min_length}~{cafe.max_length}자"
+
+    # 병원/의료진
+    clinic_name = getattr(clinic, "name", None) if clinic else None
+    doctor_name = None
+    if clinic and doctor_code:
+        doctor = clinic.get_doctor_by_code(doctor_code)
+        doctor_name = doctor.get("name", "") if doctor else None
+
+    # 상황/고민 요약
+    context = None
+    concern = None
+    if consultant_name:
+        context = f"{consultant_name} 상담"
+
+    # 키워드 라인 파싱 (FT용 간단 입력)
+    parsed = _parse_keyword_line(custom_instructions or "")
+    if parsed.get("clinic_name"):
+        clinic_name = parsed.get("clinic_name")
+    if parsed.get("procedure"):
+        procedure = parsed.get("procedure")
+    if parsed.get("tone"):
+        tone = parsed.get("tone")
+    if parsed.get("length_hint"):
+        length_hint = parsed.get("length_hint")
+    if parsed.get("timing"):
+        timing = parsed.get("timing")
+    if parsed.get("concern"):
+        concern = parsed.get("concern")
+    if parsed.get("context"):
+        context = f"{context} / {parsed.get('context')}" if context else parsed.get("context")
+
+    if custom_instructions and not parsed:
+        context = f"{context} / {custom_instructions}" if context else custom_instructions
+
+    # 플랫폼(카페) 정보는 프롬프트에만 반영
+    if cafe and hasattr(cafe, "name") and cafe.name:
+        platform_text = f"플랫폼: {cafe.name}"
+        context = f"{context} / {platform_text}" if context else platform_text
+
+    tone_summary = None
+
+    min_len = None
+    max_len = None
+    if length_hint:
+        m_range = re.search(r"(\d+)\s*[~\-]\s*(\d+)\s*자", length_hint)
+        if m_range:
+            min_len = int(m_range.group(1))
+            max_len = int(m_range.group(2))
+        else:
+            m_num = re.search(r"(\d+)\s*자", length_hint)
+            if m_num:
+                n = int(m_num.group(1))
+                if "이상" in length_hint or "부터" in length_hint:
+                    min_len = n
+                elif "이내" in length_hint or "이하" in length_hint:
+                    max_len = n
+                elif "내외" in length_hint or "정도" in length_hint:
+                    min_len = max(50, int(n * 0.7))
+                    max_len = int(n * 1.3)
+
+    rules = []
+    avoid = []
+
+    cfg = FTPromptConfig(
+        procedure=procedure,
+        clinic_name=clinic_name,
+        doctor_name=doctor_name,
+        content_type=content_type,
+        timing=timing,
+        concern=concern,
+        context=context,
+        tone=tone_summary,
+        length_hint=length_hint,
+        rules=rules,
+        avoid=avoid,
+    )
+    return FTPromptBuilder(cfg).build_input_prompt()

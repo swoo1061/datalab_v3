@@ -56,6 +56,26 @@
     margin-bottom: 0;
     padding-bottom: 0;
   }
+  .series-titles {
+    margin: 6px 0 10px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    font-size: 0.85rem;
+    line-height: 1.3;
+  }
+  .series-titles-label {
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .series-titles-list {
+    margin: 0 0 0 14px;
+    padding: 0;
+  }
+  .series-titles-list li {
+    margin: 0;
+  }
   .series-title {
     font-weight: 700;
     color: var(--brand);
@@ -611,6 +631,7 @@
         <div class="flex gap-2">
           <button class="btn btn-ghost btn-sm" onclick="togglePromptPreview()">프롬프트 보기</button>
           <button class="btn btn-secondary btn-sm" onclick="copySeriesResult()">복사</button>
+          <button class="btn btn-ghost btn-sm" onclick="saveSeriesEdited()">수정 저장</button>
         </div>
       </div>
 
@@ -1139,9 +1160,97 @@ function formatSeriesOutput(series) {
   return series.map(item => `
     <div class="series-item">
       <div class="series-title">${typeNames[item.type] || item.type} <span style="font-weight:400;color:var(--muted);font-size:0.85rem;">(${item.char_count || item.content.length}자)</span></div>
-      <div>${item.content.replace(/\n/g, '<br>')}</div>
+      ${Array.isArray(item.title_suggestions) && item.title_suggestions.length ? `
+        <div class="series-titles">
+          <div class="series-titles-label">제목 추천</div>
+          <ul class="series-titles-list">
+            ${item.title_suggestions.map(t => `<li>${t}</li>`).join('')}
+          </ul>
+        </div>
+      ` : ''}
+      <div class="series-editable" contenteditable="true" data-review-id="${item.review_id || ''}" style="padding:10px;border:1px solid var(--border);border-radius:8px;background:#fff;">${item.content.replace(/\n/g, '<br>')}</div>
+      <div style="margin-top:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="saveSeriesItem(this)" data-review-id="${item.review_id || ''}">이 항목 저장</button>
+      </div>
     </div>
   `).join('');
+}
+
+async function saveSeriesItem(btn) {
+  const reviewId = btn.dataset.reviewId;
+  const editable = btn.closest('.series-item')?.querySelector('.series-editable');
+  const editedText = (editable?.innerText || '').trim();
+  if (!reviewId) {
+    alert('저장 대상 ID가 없습니다.');
+    return;
+  }
+  if (!editedText) {
+    alert('저장할 내용이 없습니다.');
+    return;
+  }
+
+  try {
+    const response = await fetch('/dashboard/api/generated/save-edit/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      body: JSON.stringify({
+        review_id: reviewId,
+        edited_text: editedText,
+      }),
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    editable.dataset.reviewId = data.review_id;
+    btn.dataset.reviewId = data.review_id;
+    alert('수정본 저장 완료');
+  } catch (error) {
+    alert('수정 저장 실패: ' + error.message);
+  }
+}
+
+async function saveSeriesEdited() {
+  const editables = Array.from(document.querySelectorAll('#series-output .series-editable'));
+  if (!editables.length) {
+    alert('먼저 시리즈를 생성해주세요.');
+    return;
+  }
+
+  let success = 0;
+  for (const el of editables) {
+    const reviewId = el.dataset.reviewId;
+    const editedText = (el.innerText || '').trim();
+    if (!reviewId || !editedText) continue;
+
+    try {
+      const response = await fetch('/dashboard/api/generated/save-edit/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify({
+          review_id: reviewId,
+          edited_text: editedText,
+        }),
+      });
+      const data = await response.json();
+      if (!data.error) {
+        el.dataset.reviewId = data.review_id;
+        success += 1;
+      }
+    } catch (e) {
+      // continue
+    }
+  }
+
+  if (!success) {
+    alert('저장된 수정본이 없습니다.');
+    return;
+  }
+  alert(`${success}개 수정본 저장 완료`);
 }
 
 function copySeriesResult() {

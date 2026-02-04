@@ -47,18 +47,22 @@ contextBridge.exposeInMainWorld("api", {
   /* =========================
      인증
   ========================= */
-  login: async (username, password) => {
+  login: async (username, password, remember = false) => {
     const data = await requestJson("/api/accounts/login/", {
       method: "POST",
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, remember }),
     });
     if (data?.session_key) {
       sessionKey = data.session_key;
+      const expirationDate = remember
+        ? Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30
+        : undefined;
       await ipcRenderer.invoke("set-session-key", data.session_key);
       await ipcRenderer.invoke("set-session-cookie", {
         url: API_BASE,
         name: "sessionid",
         value: data.session_key,
+        expirationDate,
       });
     }
     return data;
@@ -78,6 +82,9 @@ contextBridge.exposeInMainWorld("api", {
   },
 
   quitApp: () => ipcRenderer.invoke("app-quit"),
+  getAppVersion: () => ipcRenderer.invoke("app-get-version"),
+  getUpdateUrl: () => ipcRenderer.invoke("app-get-update-url"),
+  setSessionKey: (key) => ipcRenderer.invoke("set-session-key", key),
 
   getMe: () =>
     requestJson("/api/accounts/me/", {
@@ -133,6 +140,12 @@ contextBridge.exposeInMainWorld("api", {
       body: JSON.stringify(payload),
     }),
 
+  saveEditedReview: (payload) =>
+    requestJson("/api/ml/review/edit/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
   generateGangnamReview: (payload) =>
     requestJson("/api/ml/gangnam_review/", {
       method: "POST",
@@ -142,8 +155,12 @@ contextBridge.exposeInMainWorld("api", {
   /* =========================
      즐겨찾기
   ========================= */
-  getFavorites: () =>
-    requestJson("/api/data/favorites/", { method: "GET" }),
+  getFavorites: (options = {}) => {
+    const params = new URLSearchParams();
+    if (options?.fallback) params.set("fallback", options.fallback);
+    const qs = params.toString();
+    return requestJson(`/api/data/favorites/${qs ? `?${qs}` : ""}`, { method: "GET" });
+  },
 
   addFavorite: (clinicId) =>
     requestJson("/api/data/favorites/", {
@@ -163,7 +180,12 @@ contextBridge.exposeInMainWorld("config", {
 
 contextBridge.exposeInMainWorld("nav", {
   go: (page) => ipcRenderer.invoke("go", page),
+  openExternal: (url) => ipcRenderer.invoke("open-external", url),
+  openKakaoWork: () => ipcRenderer.invoke("open-kakaowork"),
+  openNotion: () => ipcRenderer.invoke("open-notion"),
 });
+
+
 
 contextBridge.exposeInMainWorld("session", {
   getKey: () => ipcRenderer.invoke("get-session-key"),

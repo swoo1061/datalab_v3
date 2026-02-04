@@ -1,6 +1,7 @@
 console.log("?? login.js loaded"); // 디버깅용 로그
 
 const KEY_REMEMBER = "remember_login";
+const KEY_SESSION = "session_key";
 let isSubmitting = false;
 
 window.addEventListener("DOMContentLoaded", async () => {
@@ -21,6 +22,10 @@ window.addEventListener("DOMContentLoaded", async () => {
   if (!saved) return;
 
   try {
+    const storedSession = localStorage.getItem(KEY_SESSION);
+    if (storedSession && window.api?.setSessionKey) {
+      await window.api.setSessionKey(storedSession);
+    }
     await window.api.getMe();
     window.nav.go("my_dashboard");
   } catch {}
@@ -87,11 +92,15 @@ async function login() {
   showMessage("");
 
   try {
-    await window.api.login(username, password);
-
     const remember = document.getElementById("rememberLogin")?.checked;
-    if (remember) localStorage.setItem(KEY_REMEMBER, "true");
-    else localStorage.removeItem(KEY_REMEMBER);
+    const data = await window.api.login(username, password, remember);
+    if (remember) {
+      localStorage.setItem(KEY_REMEMBER, "true");
+      if (data?.session_key) localStorage.setItem(KEY_SESSION, data.session_key);
+    } else {
+      localStorage.removeItem(KEY_REMEMBER);
+      localStorage.removeItem(KEY_SESSION);
+    }
 
     window.nav.go("my_dashboard");
 

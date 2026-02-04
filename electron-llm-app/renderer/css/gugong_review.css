@@ -1,0 +1,36 @@
+:root {
+  --gugong-accent: #1d4ed8;
+  --gugong-accent-2: #1e40af;
+  --gugong-bg: #eef2ff;
+}
+
+.review-page .card {
+  border-color: #c7d2fe;
+  box-shadow: 0 16px 32px rgba(59, 130, 246, 0.14);
+}
+
+.review-page .card-hd {
+  background: linear-gradient(90deg, rgba(219, 234, 254, 0.9), rgba(224, 231, 255, 0.7));
+}
+
+.review-page .btn.btn-primary.full {
+  background: linear-gradient(135deg, var(--gugong-accent), var(--gugong-accent-2));
+}
+
+.review-page .model-card.selected,
+.review-page .chip-group.single button.active,
+.review-page .chip-group.multi button.active {
+  border-color: var(--gugong-accent);
+  color: #1e3a8a;
+}
+
+.review-page .prompt-box,
+.review-page .preview-meta {
+  background: var(--gugong-bg);
+  border-color: #cbd5f5;
+}
+
+.review-page .title-suggestions {
+  border-color: #cbd5f5;
+  background: var(--gugong-bg);
+}

@@ -3,6 +3,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 from django.utils import timezone
+from django.db.models import Q
 from django.utils.dateparse import parse_date, parse_datetime
 from datetime import date, datetime, time
 from django.contrib.auth import get_user_model
@@ -282,16 +283,77 @@ def llm_model_list_api(request):
     )
 
 
+@csrf_exempt
+@require_GET
+def my_clinic_ids_api(request):
+    """
+    Return distinct clinic IDs where the current user has posts within recent months.
+    Query params:
+      - months: int (default 3)
+    """
+    user = request.user
+    if not user or not user.is_authenticated:
+        header_session_key = request.headers.get("X-Sessionid")
+        if header_session_key:
+            try:
+                s = Session.objects.get(
+                    session_key=header_session_key,
+                    expire_date__gte=timezone.now(),
+                )
+                uid = s.get_decoded().get("_auth_user_id")
+                if uid:
+                    UserModel = get_user_model()
+                    user = UserModel.objects.filter(pk=uid).first() or user
+            except Session.DoesNotExist:
+                pass
+    if not user or not user.is_authenticated:
+        return JsonResponse({"error": "not_authenticated"}, status=401)
+
+    try:
+        months = int(request.GET.get("months") or 3)
+    except Exception:
+        months = 3
+    months = max(1, min(months, 24))
+    cutoff = timezone.now() - timezone.timedelta(days=months * 30)
+
+    qs = ClinicPost.objects.filter(assignee=user).filter(
+        Q(published_at__gte=cutoff) | Q(published_at__isnull=True, updated_at__gte=cutoff)
+    )
+    clinic_ids = list(qs.values_list("clinic_id", flat=True).distinct())
+    return JsonResponse({"results": clinic_ids}, status=200)
+
+
 class FavoriteClinicView(APIView):
     authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         qs = FavoriteClinic.objects.filter(user=request.user)
-        return Response(
-            FavoriteClinicSerializer(qs, many=True).data,
-            status=status.HTTP_200_OK
-        )
+        fallback = (request.GET.get("fallback") or "").strip().lower()
+        favorites = FavoriteClinicSerializer(qs, many=True).data
+        if qs.exists() and fallback != "assignee":
+            return Response(favorites, status=status.HTTP_200_OK)
+
+        if fallback == "assignee":
+            assignees = (
+                ClinicAssignee.objects
+                .filter(user=request.user, is_active=True)
+                .select_related("clinic")
+            )
+            assignee_data = [
+                {
+                    "clinic_id": a.clinic_id,
+                    "clinic_name": a.clinic.name if a.clinic else "",
+                    "created_at": None,
+                }
+                for a in assignees
+            ]
+            combined = {item["clinic_id"]: item for item in favorites}
+            for item in assignee_data:
+                combined.setdefault(item["clinic_id"], item)
+            return Response(list(combined.values()), status=status.HTTP_200_OK)
+
+        return Response(favorites, status=status.HTTP_200_OK)
 
     def post(self, request):
         clinic_id = request.data.get("clinic_id")
@@ -341,10 +403,11 @@ class ClinicPostListCreateView(APIView):
         if month:
             try:
                 year, m = map(int, month.split("-"))
-
+                # 월 필터는 "수정일(updated_at)"이 아니라 실제 게시 시점 기준으로 본다.
+                # published_at이 있으면 그 값을 우선, 없으면 created_at으로 폴백.
                 qs = qs.filter(
-                    updated_at__year=year,
-                    updated_at__month=m
+                    Q(published_at__year=year, published_at__month=m) |
+                    Q(published_at__isnull=True, created_at__year=year, created_at__month=m)
                 )
             except ValueError:
                 pass
@@ -401,6 +464,7 @@ class ClinicPostListCreateView(APIView):
             title = "미제목"
 
         review_subtype = payload.get("review_subtype")
+        opinion_subtype = payload.get("opinion_subtype")
         model = payload.get("model") or "gpt-5-mini"
 
         if auto_classify or post_type not in ["opinion", "review"]:
@@ -416,6 +480,8 @@ class ClinicPostListCreateView(APIView):
 
         if post_type == "review" and review_subtype not in ["text", "photo", "consultation"]:
             _, review_subtype = _fallback_classify_post(title, platform)
+        if post_type == "opinion" and opinion_subtype not in ["concern", "hand", "foot"]:
+            opinion_subtype = None
 
         assignee_id = payload.get("assignee") or request.user.id
 
@@ -423,6 +489,7 @@ class ClinicPostListCreateView(APIView):
             clinic=clinic,
             type=post_type,
             review_subtype=review_subtype if post_type == "review" else None,
+            opinion_subtype=opinion_subtype if post_type == "opinion" else None,
             platform=platform,
             title=title,
             url=url,
@@ -536,6 +603,19 @@ class ClinicPostDetailView(APIView):
                 if post.review_subtype != review_subtype:
                     post.review_subtype = review_subtype
                     updated_fields.append("review_subtype")
+
+        if "opinion_subtype" in payload or post.type == "opinion":
+            opinion_subtype = payload.get("opinion_subtype") or post.opinion_subtype
+            if post.type == "review":
+                if post.opinion_subtype is not None:
+                    post.opinion_subtype = None
+                    updated_fields.append("opinion_subtype")
+            else:
+                if opinion_subtype not in ["concern", "hand", "foot"]:
+                    opinion_subtype = None
+                if post.opinion_subtype != opinion_subtype:
+                    post.opinion_subtype = opinion_subtype
+                    updated_fields.append("opinion_subtype")
 
         if "assignee" in payload:
             assignee_value = payload.get("assignee")

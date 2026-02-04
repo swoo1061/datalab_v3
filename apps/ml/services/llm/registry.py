@@ -17,6 +17,16 @@ LLM_MODELS = [
         "cost_level": "중간",
         "recommended": True,
     },
+
+    {
+        "key": "ft:gpt-4.1-2025-04-14:personal::D3gDuLBk",
+        "label": "구공이(V_3)",
+        "vendor": "openai",
+        "speed": "보통",
+        "quality": "고",
+        "cost_level": "중간",
+        "recommended": True,
+    },
     {
         "key": "claude-4.5",
         "label": "Claude Sonnet 4.5",

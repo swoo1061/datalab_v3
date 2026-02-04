@@ -77,14 +77,42 @@ function renderScheduleCalendar({
       .replace(/\s*(매니저|팀장|대표이사|대표)\s*$/g, "")
       .trim();
 
+  const getReviewSubtypeLabel = (item) => {
+    if (!item) return "";
+    if (item.review_subtype === "photo") return "사진";
+    if (item.review_subtype === "text") return "텍스트";
+    if (item.review_subtype === "consultation") return "상담";
+    const titleHint = String(item.title || item.title_display || "").toLowerCase();
+    if (titleHint.includes("상담")) return "상담";
+    return Array.isArray(item.photos) && item.photos.length ? "사진" : "텍스트";
+  };
+
+  const getOpinionSubtypeLabel = (item) => {
+    if (!item) return "고민";
+    if (item.opinion_subtype === "hand") return "손품";
+    if (item.opinion_subtype === "foot") return "발품";
+    return "고민";
+  };
+
+  const getTypeDisplay = (item) => {
+    if (!item) return "";
+    if (item.type === "review") return `후기/${getReviewSubtypeLabel(item)}`;
+    if (item.type === "opinion") return `여론/${getOpinionSubtypeLabel(item)}`;
+    return "";
+  };
+
   const assigneesByDate = new Map();
+  const countsByDate = new Map();
   items.forEach((item) => {
     if (!item.date) return;
     if (item.kind === "memo") return;
     const name = cleanAssignee(item.assignee);
     if (!name) return;
-    if (!assigneesByDate.has(item.date)) assigneesByDate.set(item.date, new Set());
-    assigneesByDate.get(item.date).add(name);
+    const typeLabel = getTypeDisplay(item);
+    const label = typeLabel ? `${name} ${typeLabel}` : name;
+    if (!assigneesByDate.has(item.date)) assigneesByDate.set(item.date, []);
+    assigneesByDate.get(item.date).push(label);
+    countsByDate.set(item.date, (countsByDate.get(item.date) || 0) + 1);
   });
 
   const headerHtml = labels
@@ -98,10 +126,11 @@ function renderScheduleCalendar({
       }
       const count = grouped.get(cell.date)?.length || 0;
       const assignees = assigneesByDate.get(cell.date);
-      const assigneeList = assignees ? Array.from(assignees) : [];
-      const maxNames = 6;
+      const assigneeList = assignees ? [...assignees] : [];
+      const maxNames = 5;
       const displayed = assigneeList.slice(0, maxNames);
-      const extraCount = Math.max(assigneeList.length - maxNames, 0);
+      const totalCount = countsByDate.get(cell.date) || assigneeList.length;
+      const extraCount = Math.max(totalCount - maxNames, 0);
       const assigneeLabel = assigneeList.length
         ? `${displayed.join("<br>")}${extraCount ? `<br>+${extraCount}` : ""}`
         : "";
@@ -156,14 +185,32 @@ function renderScheduleCalendar({
       ? `<a href="${item.url}" target="_blank" rel="noreferrer">${title}</a>`
       : title;
     const platformLabel = item.platform_label || item.platform;
-    const typeLabel = item.type === "review" ? "후기" : item.type === "opinion" ? "여론" : "";
-    const subtypeLabel = item.review_subtype === "photo"
+    const reviewSubtypeLabel = item.review_subtype === "photo"
       ? "사진"
       : item.review_subtype === "text"
         ? "텍스트"
         : item.review_subtype === "consultation"
           ? "상담"
           : "";
+    const opinionSubtypeLabel = item.opinion_subtype === "concern"
+      ? "고민"
+      : item.opinion_subtype === "hand"
+        ? "손품"
+        : item.opinion_subtype === "foot"
+          ? "발품"
+          : "고민";
+    const typeLabel = item.type === "review" ? "후기" : item.type === "opinion" ? "여론" : "";
+    const titleHint = String(item.title || item.title_display || "").toLowerCase();
+    const fallbackReviewSubtype = item.type === "review" && !item.review_subtype
+      ? (titleHint.includes("상담") ? "상담"
+        : (Array.isArray(item.photos) && item.photos.length ? "사진" : "텍스트"))
+      : "";
+    const subtypeLabel = item.type === "review"
+      ? (reviewSubtypeLabel || fallbackReviewSubtype)
+      : item.type === "opinion"
+        ? opinionSubtypeLabel
+        : "";
+    const typeDisplay = typeLabel ? (subtypeLabel ? `${typeLabel}/${subtypeLabel}` : typeLabel) : "";
     let reviewLabel = typeLabel
       ? (subtypeLabel ? `${typeLabel}/${subtypeLabel}` : typeLabel)
       : "";
@@ -195,7 +242,7 @@ function renderScheduleCalendar({
       { label: "클리닉", value: item.clinic || "" },
       { label: "원장님", value: doctorValue },
       { label: "ID", value: item.account || "" },
-      { label: "리뷰 구분", value: reviewLabel },
+      { label: "구분", value: reviewLabel },
       { label: "플랫폼", value: platformLabel || "" },
       { label: "담당자", value: item.assignee || "" },
       { label: "PW", value: item.account_password || "" },
@@ -246,6 +293,32 @@ function renderScheduleCalendar({
       ? `<span>PW: ${item.account_password}</span>`
       : "";
     const platformLabel = item.platform_label || item.platform;
+    const reviewSubtypeLabel = item.review_subtype === "photo"
+      ? "사진"
+      : item.review_subtype === "text"
+        ? "텍스트"
+        : item.review_subtype === "consultation"
+          ? "상담"
+          : "";
+    const opinionSubtypeLabel = item.opinion_subtype === "concern"
+      ? "고민"
+      : item.opinion_subtype === "hand"
+        ? "손품"
+        : item.opinion_subtype === "foot"
+          ? "발품"
+          : "고민";
+    const typeLabel = item.type === "review" ? "후기" : item.type === "opinion" ? "여론" : "";
+    const titleHint = String(item.title || item.title_display || "").toLowerCase();
+    const fallbackReviewSubtype = item.type === "review" && !item.review_subtype
+      ? (titleHint.includes("상담") ? "상담"
+        : (Array.isArray(item.photos) && item.photos.length ? "사진" : "텍스트"))
+      : "";
+    const subtypeLabel = item.type === "review"
+      ? (reviewSubtypeLabel || fallbackReviewSubtype)
+      : item.type === "opinion"
+        ? opinionSubtypeLabel
+        : "";
+    const typeDisplay = typeLabel ? (subtypeLabel ? `${typeLabel}/${subtypeLabel}` : typeLabel) : "";
     const views = Number.isFinite(item.views)
       ? `<span>조회 ${item.views}</span>`
       : "";
@@ -269,6 +342,7 @@ function renderScheduleCalendar({
           <span>${item.date || "-"}</span>
           ${item.clinic ? `<span class="schedule-badge">${item.clinic}</span>` : ""}
           ${platformLabel ? `<span>${platformLabel}</span>` : ""}
+          ${typeDisplay ? `<span>${typeDisplay}</span>` : ""}
           ${item.assignee ? `<span>${item.assignee}</span>` : ""}
           ${account}
           ${accountPassword}

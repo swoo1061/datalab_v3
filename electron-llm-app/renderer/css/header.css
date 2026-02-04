@@ -639,6 +639,10 @@
 }
 
 .notify-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 13px;
   font-weight: 700;
   color: #111827;

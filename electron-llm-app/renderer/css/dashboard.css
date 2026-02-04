@@ -1,12 +1,18 @@
 /* 헤드 */
+.dashboard-page .page-head {
+  justify-content: space-between;
+  text-align: left;
+  min-height: 68px;
+}
+
 .dashboard-page .page-head .h1 {
-  margin: 0;
+  margin-bottom: 0;
   font-size: 20px;
   font-weight: 700;
 }
 
 .dashboard-page .page-head .sub {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 13px;
   color: var(--muted);
 }
@@ -36,9 +42,27 @@
 /* 카드 그리드 */
 .clinic-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 14px;
   overflow: visible;
+}
+
+@media (max-width: 1200px) {
+  .clinic-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .clinic-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .clinic-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
 }
 
 /* 패널 레이아웃 */

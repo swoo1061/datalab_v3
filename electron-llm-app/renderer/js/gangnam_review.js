@@ -373,9 +373,6 @@ document.addEventListener("click", (e) => {
 $("closeReviewModal")?.addEventListener("click", closeReviewResultModal);
 $("confirmReviewBtn")?.addEventListener("click", closeReviewResultModal);
 $("copyAllBtn")?.addEventListener("click", (e) => copyAll(e.currentTarget));
-document
-  .querySelector("#reviewModal .modal-backdrop")
-  ?.addEventListener("click", closeReviewResultModal);
 
 /* =====================================================
    TAG DATA & AUTO SELECT

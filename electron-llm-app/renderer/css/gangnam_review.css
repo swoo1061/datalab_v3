@@ -42,7 +42,9 @@ input, select, textarea {
   font-size: 14px;
 }
 
-input:focus, select:focus, textarea:focus {
+.review-form input:focus,
+.review-form select:focus,
+.review-form textarea:focus {
   outline: none;
   border-color: #ff7a1a;
   box-shadow: 0 0 0 3px rgba(255, 122, 26, 0.16);
@@ -187,7 +189,7 @@ p.form-hint {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .modal.hidden {
@@ -198,7 +200,7 @@ p.form-hint {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 /* ======================

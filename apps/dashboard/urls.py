@@ -12,8 +12,10 @@ urlpatterns = [
 
     # LLM 사용량 통계
     path("usage/", views.llm_usage_dashboard, name="llm_usage"),
+    path("monthly-report/", views.monthly_report, name="monthly_report"),
     path("usage/users/", views.llm_usage_users, name="llm_usage_users"),
     path("usage/models/", views.llm_usage_models, name="llm_usage_models"),
+    path("usage/posts/", views.post_usage_stats, name="post_usage_stats"),
 
     # LLM 사용량 Export
     path("usage/export/csv/", views.export_llm_usage_csv, name="export_llm_usage_csv"),
@@ -32,6 +34,7 @@ urlpatterns = [
     # 리뷰 생성 Basic & PRO
     path("generate/basic/", views.review_generate_basic, name="generate_review_basic"),
     path("generate/basic-plus/", views.review_generate_basic_plus, name="generate_review_basic_plus"),
+    path("generate/gugong/", views.review_generate_gugong, name="generate_review_gugong"),
     path("generate/pro/", views.review_generate_v2, name="generate_review_pro"),
     path("generate/v2/", views.review_generate_v2, name="generate_review_v2"),  # 호환용
 
@@ -41,7 +44,11 @@ urlpatterns = [
     # 생성된 리뷰 관리
     path("generated/", views.generated_review_list, name="generated_list"),
     path("generated/<int:pk>/", views.generated_review_detail, name="generated_detail"),
+    path("api/generated/save-edit/", views.api_save_edited_review, name="api_generated_save_edit"),
     path("api/generated/bulk-delete/", views.api_generated_bulk_delete, name="api_generated_bulk_delete"),
+
+    # 게시글 관리
+    path("posts/", views.post_manage, name="post_manage"),
     
     # 병원 가이드 관리
     path("clinics/", views.clinic_list, name="clinic_list"),

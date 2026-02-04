@@ -42,6 +42,16 @@ def _get_user_from_session_header(request):
         return None
 
 
+def _resolve_request_user(request):
+    user = request.user
+    if user.is_authenticated:
+        return user
+    header_user = _get_user_from_session_header(request)
+    if header_user and header_user.is_authenticated:
+        return header_user
+    return None
+
+
 @csrf_exempt
 def login_api(request):
     if request.method != "POST":
@@ -54,6 +64,7 @@ def login_api(request):
 
     username = data.get("username")
     password = data.get("password")
+    remember = bool(data.get("remember"))
 
     if not username or not password:
         return JsonResponse({"error": "missing credentials"}, status=400)
@@ -69,6 +80,10 @@ def login_api(request):
         if not user:
             return JsonResponse({"error": "invalid credentials"}, status=401)
         login(request, user)
+        if remember:
+            request.session.set_expiry(60 * 60 * 24 * 30)
+        else:
+            request.session.set_expiry(0)
         if not request.session.session_key:
             request.session.save()
         return JsonResponse({"ok": True, "session_key": request.session.session_key})
@@ -87,6 +102,10 @@ def login_api(request):
         return JsonResponse({"error": "invalid credentials"}, status=401)
 
     login(request, user)
+    if remember:
+        request.session.set_expiry(60 * 60 * 24 * 30)
+    else:
+        request.session.set_expiry(0)
     if not request.session.session_key:
         request.session.save()
     return JsonResponse({"ok": True, "session_key": request.session.session_key})
@@ -94,14 +113,10 @@ def login_api(request):
 
 @csrf_exempt
 def me_api(request):
-    user = request.user
-    if not user.is_authenticated:
-        header_user = _get_user_from_session_header(request)
-        if header_user:
-            user = header_user
+    user = _resolve_request_user(request)
 
     # 🔥 redirect 절대 발생 금지
-    if not user.is_authenticated:
+    if not user:
         return JsonResponse(
             {"error": "not_authenticated"},
             status=401
@@ -192,6 +207,37 @@ def api_signup(request):
         )
 
     return JsonResponse({"ok": True})
+
+
+@csrf_exempt
+def users_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": "method not allowed"}, status=405)
+
+    user = _resolve_request_user(request)
+    if not user:
+        return JsonResponse({"error": "not_authenticated"}, status=401)
+
+    q = (request.GET.get("q") or "").strip().lower()
+    qs = User.objects.filter(is_active=True).select_related("profile").order_by("username")
+    rows = []
+    for u in qs:
+        profile = getattr(u, "profile", None)
+        name = getattr(profile, "name", None) or u.get_full_name() or u.username
+        position = getattr(profile, "position", None) or ("admin" if u.is_superuser else "")
+        item = {
+            "id": u.id,
+            "username": u.username,
+            "name": name,
+            "position": position,
+        }
+        if q:
+            hay = f"{item['name']} {item['username']} {item['position']}".lower()
+            if q not in hay:
+                continue
+        rows.append(item)
+
+    return JsonResponse({"count": len(rows), "results": rows}, json_dumps_params={"ensure_ascii": False})
 
 
 

@@ -37,13 +37,12 @@ function getClinicIdFromQuery() {
 async function initClinicGuide() {
   try {
     const clinics = await fetchClinics();
-    renderClinicSelect(clinics);
+    renderClinicNav(clinics);
 
     const clinicIdFromQuery = getClinicIdFromQuery();
 
     if (clinicIdFromQuery) {
       await loadClinic(clinicIdFromQuery);
-      hideClinicSelect();
       return;
     }
 
@@ -59,27 +58,25 @@ async function initClinicGuide() {
 /* ================================
    병원 선택
 ================================ */
-function renderClinicSelect(clinics) {
-  const select = document.getElementById("clinicSelect");
-  if (!select) return;
+function renderClinicNav(clinics) {
+  const wrap = document.getElementById("clinicNavList");
+  const count = document.getElementById("clinicNavCount");
+  if (!wrap) return;
 
-  select.innerHTML = "";
+  wrap.innerHTML = clinics.map((clinic) => `
+    <button type="button" class="clinic-nav-item" data-clinic-id="${clinic.id}">
+      ${clinic.name}
+    </button>
+  `).join("");
+  if (count) count.textContent = String(clinics.length);
 
-  clinics.forEach(c => {
-    const opt = document.createElement("option");
-    opt.value = c.id;
-    opt.textContent = c.name;
-    select.appendChild(opt);
+  wrap.querySelectorAll(".clinic-nav-item").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const clinicId = btn.dataset.clinicId;
+      if (!clinicId) return;
+      await loadClinic(clinicId);
+    });
   });
-
-  select.onchange = async () => {
-    await loadClinic(select.value);
-  };
-}
-
-function hideClinicSelect() {
-  const el = document.getElementById("clinicSelect");
-  if (el) el.style.display = "none";
 }
 
 function setGuideTitle(name) {
@@ -105,6 +102,13 @@ async function loadClinic(clinicId) {
   renderDoctorTabs(currentClinic);
   renderConsultants(currentClinic);
   renderAftercare(currentClinic);
+  syncActiveClinicNav(clinicId);
+}
+
+function syncActiveClinicNav(clinicId) {
+  document.querySelectorAll(".clinic-nav-item").forEach((item) => {
+    item.classList.toggle("active", String(item.dataset.clinicId) === String(clinicId));
+  });
 }
 
 /* ================================

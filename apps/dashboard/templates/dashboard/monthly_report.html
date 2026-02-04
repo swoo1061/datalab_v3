@@ -1,0 +1,376 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}월간 보고서{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --mr-ink: #0f172a;
+    --mr-muted: #475569;
+    --mr-line: #d6deea;
+    --mr-surface: #ffffff;
+    --mr-soft: #f5f8fc;
+    --mr-brand: #0f766e;
+    --mr-brand-2: #14b8a6;
+    --mr-accent: #22c55e;
+  }
+  .mr-title { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em; }
+  .mr-sub { margin: 6px 0 0; color: var(--mr-muted); font-size: 13px; }
+  .mr-filter { display: grid; grid-template-columns: 170px minmax(240px, 1fr); gap: 8px; }
+  .mr-narrow { max-width: 1240px; margin: 0 auto; }
+  .mr-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .mr-kpi { border: 1px solid var(--mr-line); border-radius: 3px; background: linear-gradient(165deg, #fff, var(--mr-soft)); padding: 12px; }
+  .mr-kpi .k { color: var(--mr-muted); font-size: 12px; margin-bottom: 6px; }
+  .mr-kpi .v { font-size: 24px; font-weight: 800; line-height: 1; }
+  .mr-clinic-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .mr-clinic-btn { display: block; text-decoration: none; color: inherit; border: 1px solid var(--mr-line); border-radius: 2px; padding: 12px; background: #fff; transition: 0.12s ease; }
+  .mr-clinic-btn:hover { border-color: var(--mr-brand-2); background: #f8fffe; box-shadow: 0 8px 20px -18px rgba(15, 118, 110, 0.45); }
+  .mr-clinic-name { font-weight: 700; margin-bottom: 8px; }
+  .mr-clinic-meta { color: var(--mr-muted); font-size: 12px; line-height: 1.5; }
+  .mr-tabs { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; margin-bottom: 12px; padding-bottom: 2px; }
+  .mr-tab-btn { border: 1px solid #a8b6c8; border-radius: 2px; padding: 6px 10px; font-size: 12px; font-weight: 700; background: #fff; color: var(--mr-ink); cursor: pointer; white-space: nowrap; }
+  .mr-tab-btn.active { background: linear-gradient(135deg, var(--mr-brand), var(--mr-brand-2)); border-color: var(--mr-brand); color: #fff; }
+  .mr-pane { display: none; }
+  .mr-pane.active { display: block; }
+  .mr-mini { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+  .mr-mini .item { border: 1px solid var(--mr-line); border-radius: 3px; background: #fff; padding: 10px; }
+  .mr-mini .item .k { color: var(--mr-muted); font-size: 12px; margin-bottom: 4px; }
+  .mr-mini .item .v { font-size: 20px; font-weight: 800; }
+  .mr-note { color: var(--mr-muted); font-size: 12px; margin: 0 0 10px; }
+  .mr-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .mr-pane-top { display:grid; grid-template-columns: 65% 35%; gap:12px; margin-bottom:12px; }
+  .mr-pane-top > div { min-width: 0; }
+  .mr-excel-head { background: linear-gradient(90deg, #0f766e, #14b8a6); color:#fff; font-weight:700; padding:6px 9px; font-size:13px; }
+  .mr-excel-title {justify-content: center; display: flex; align-items: center; position: relative; font-size:22px; font-weight:800; margin-bottom:6px; }
+  .mr-excel-metric-head { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .mr-excel-metric-head > div { background: linear-gradient(180deg, #4fd08f, #22c55e); color:#fff; text-align:center; padding:5px 4px; font-weight:700; border-right:1px solid #fff; font-size:12px; }
+  .mr-excel-metric-head > div:last-child { border-right:none; }
+  .mr-excel-metric-val { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid var(--mr-line); border-top:none; }
+  .mr-excel-metric-val > div { text-align:center; padding:8px 4px; font-weight:800; font-size:22px; border-right:1px solid #e5e7eb; }
+  .mr-excel-metric-val > div:last-child { border-right:none; }
+  .mr-delta-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border:1px solid var(--mr-line); border-top:none; }
+  .mr-delta-grid > div { text-align:center; padding:7px 4px; border-right:1px solid #e5e7eb; }
+  .mr-delta-grid > div:last-child { border-right:none; }
+  .mr-delta-label { font-size:12px; color:#374151; margin-bottom:4px; }
+  .mr-delta-val { font-weight:800; font-size:16px; }
+  .mr-up { color:#dc2626; } .mr-down { color:#1d4ed8; } .mr-flat { color:#111827; }
+  .mr-chart-card { border:1px solid var(--mr-line); padding:8px; background: linear-gradient(180deg, #ffffff, #f8fbff); }
+  .mr-chart-title { background: linear-gradient(90deg, #0f766e, #14b8a6); color:#fff; font-weight:700; padding:6px 8px; margin:0px -8px 8px; font-size:12px; letter-spacing:.01em; }
+  .mr-bars {
+    display:flex; align-items:flex-end; gap:8px; height:180px; padding:0 6px;
+    border-bottom:1px solid #dbe5f0;
+    overflow-x: hidden;
+    overflow-y: visible;
+    background-image: repeating-linear-gradient(
+      to top,
+      transparent 0,
+      transparent 37px,
+      rgba(148, 163, 184, .18) 37px,
+      rgba(148, 163, 184, .18) 38px
+    );
+  }
+  .mr-bar-col { flex:1; min-width:0; text-align:center; }
+  .mr-bar {
+    width:68%; max-width:42px; margin:0 auto; min-height:3px;
+    background: linear-gradient(180deg, #cbd5e1, #94a3b8);
+    box-shadow: 0 8px 16px -12px rgba(15, 23, 42, .55);
+    transform-origin: bottom;
+    animation: mrBarGrow .45s ease-out;
+  }
+  .mr-bar.current { background: linear-gradient(180deg, #4ade80, #22c55e); }
+  .mr-pane[data-pane="youtube"] .mr-bar.current { background: linear-gradient(180deg, #f97316, #ef4444); }
+  .mr-pane[data-pane="seongyesa"] .mr-bar.current { background: linear-gradient(180deg, #60a5fa, #3b82f6); }
+  .mr-bar-label { font-size:10px; color:#4b5563; margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mr-bar-value { font-size:10px; font-weight:700; color:#0f172a; margin-bottom:3px; }
+  .mr-monthly-table td, .mr-monthly-table th { font-size: 12px; padding: 6px 8px; }
+  @keyframes mrBarGrow { from { transform: scaleY(.15); } to { transform: scaleY(1); } }
+  .card {
+    border-radius: 4px !important;
+    box-shadow: 0 10px 22px -18px rgba(15, 23, 42, 0.25) !important;
+    border: 1px solid var(--mr-line) !important;
+    background: var(--mr-surface) !important;
+    max-width: 1240px;
+    margin: 0 auto;
+  }
+  .table thead th {
+    background: #eef4fb;
+    color: var(--mr-ink);
+    border-bottom: 1px solid var(--mr-line);
+  }
+  .table tbody td {
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .mr-detail-table th,
+  .mr-detail-table td {
+    font-size: 13px;
+    padding: 7px 8px;
+    vertical-align: middle;
+  }
+  .mr-detail-table td:nth-child(2) {
+    white-space: nowrap;
+    width: 64px;
+  }
+  .mr-detail-table td:nth-child(3) a {
+    font-size: 12px;
+    word-break: break-all;
+  }
+  .mr-detail-table td:nth-child(4) {
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  @media (max-width: 1200px) {
+    .mr-clinic-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 900px) {
+    .mr-filter { grid-template-columns: 1fr; }
+    .mr-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .mr-mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .mr-split { grid-template-columns: 1fr; }
+    .mr-clinic-grid { grid-template-columns: 1fr; }
+    .mr-pane-top { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1 class="mr-title">{{ layout.title }}</h1>
+  <!-- <p class="mr-sub">{{ layout.subtitle }}</p>  -->
+</section>
+
+{% if selected_clinic %}
+<section class="card mr-narrow" style="margin-top:12px;">
+  <form method="get" class="mr-filter" id="monthlyReportForm">
+    <input type="hidden" name="month" value="{{ month }}">
+    <div class="form-input" style="background:#f8fafc;">{{ month|slice:":4" }}년 {{ month|slice:"5:7" }}월</div>
+    <input type="hidden" name="clinic" value="{{ selected_clinic.id }}">
+    <div class="form-input" style="background:#f8fafc;">{{ selected_clinic.name }}</div>
+  </form>
+</section>
+{% endif %}
+
+{% if is_internal_user and not selected_clinic %}
+<section class="card mr-narrow" style="margin-top:12px;">
+  <p class="mr-sub" style="margin:0 0 10px;">병원을 선택하면 해당 병원 월간 보고서가 열립니다.</p>
+  <div class="mr-clinic-grid">
+    {% for c in clinic_picker_rows %}
+      <a class="mr-clinic-btn" href="?month={{ month }}&clinic={{ c.id }}">
+        <div class="mr-clinic-name">{{ c.name }}</div>
+        <div class="mr-clinic-meta">
+          게시글 {{ c.month_posts }}건<br>
+          조회수 {{ c.month_views }} · 댓글 {{ c.month_comments }} · 쪽지 {{ c.month_messages }}
+        </div>
+      </a>
+    {% empty %}
+      <div class="mr-sub">병원 데이터가 없습니다.</div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if selected_clinic %}
+<section class="card mr-narrow" style="margin-top:12px;">
+  <div class="mr-tabs">
+    {% for sec in platform_sections %}
+      <button type="button" class="mr-tab-btn {% if forloop.first %}active{% endif %}" data-tab="{{ sec.code }}">{{ sec.label }}</button>
+    {% empty %}
+      <button type="button" class="mr-tab-btn active" data-tab="empty">플랫폼</button>
+    {% endfor %}
+    <button type="button" class="mr-tab-btn" data-tab="atmosphere">분위기 및 현황</button>
+  </div>
+
+  {% if not platform_sections %}
+  <p class="mr-sub">선택한 월에 게시글이 없습니다.</p>
+    <div class="mr-pane active" data-pane="empty">
+    </div>
+  {% endif %}
+
+  {% for sec in platform_sections %}
+    <div class="mr-pane {% if forloop.first %}active{% endif %}" data-pane="{{ sec.code }}">
+      <div class="mr-excel-title">{{ month|slice:"5:7" }}월 {{ sec.label }} 진행 내역</div>
+      <div class="mr-pane-top">
+        <div>
+          <div class="mr-excel-head" style="margin-top:8px;">진행 현황</div>
+          <div class="mr-excel-metric-head">
+            <div>게시글</div><div>댓글</div><div>조회수</div><div>쪽지발송</div>
+          </div>
+          <div class="mr-excel-metric-val">
+            <div>{{ sec.current.posts }}건</div>
+            <div>{{ sec.current.comments }}건</div>
+            <div>{{ sec.current.views }}회</div>
+            <div>{{ sec.current.messages }}건</div>
+          </div>
+          <div class="mr-excel-head" style="margin-top:8px;">전월 대비 증감률(%)</div>
+          <div class="mr-delta-grid">
+            <div>
+              <div class="mr-delta-label">조회수</div>
+              <div class="mr-delta-val {% if sec.delta.views and sec.delta.views > 0 %}mr-up{% elif sec.delta.views and sec.delta.views < 0 %}mr-down{% else %}mr-flat{% endif %}">
+                {% if sec.delta.views is None %}-{% elif sec.delta.views > 0 %}▲{{ sec.delta.views }}%{% elif sec.delta.views < 0 %}▼{{ sec.delta.views|cut:"-" }}%{% else %}0%{% endif %}
+              </div>
+            </div>
+            <div>
+              <div class="mr-delta-label">댓글</div>
+              <div class="mr-delta-val {% if sec.delta.comments and sec.delta.comments > 0 %}mr-up{% elif sec.delta.comments and sec.delta.comments < 0 %}mr-down{% else %}mr-flat{% endif %}">
+                {% if sec.delta.comments is None %}-{% elif sec.delta.comments > 0 %}▲{{ sec.delta.comments }}%{% elif sec.delta.comments < 0 %}▼{{ sec.delta.comments|cut:"-" }}%{% else %}0%{% endif %}
+              </div>
+            </div>
+            <div>
+              <div class="mr-delta-label">쪽지발송</div>
+              <div class="mr-delta-val {% if sec.delta.messages and sec.delta.messages > 0 %}mr-up{% elif sec.delta.messages and sec.delta.messages < 0 %}mr-down{% else %}mr-flat{% endif %}">
+                {% if sec.delta.messages is None %}-{% elif sec.delta.messages > 0 %}▲{{ sec.delta.messages }}%{% elif sec.delta.messages < 0 %}▼{{ sec.delta.messages|cut:"-" }}%{% else %}0%{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="mr-excel-head" style="margin-top:8px; margin-bottom:0;">2025년~26년 월별 마케팅 진행현황</div>
+          <div class="table-wrap" style="margin-bottom:0;">
+            <table class="table mr-monthly-table">
+              <thead>
+                <tr>
+                  <th>구분</th>
+                  {% for p in sec.series.views_points %}
+                    <th>{{ p.label }}</th>
+                  {% endfor %}
+                  <th>총 합계</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>조회수</td>
+                  {% for p in sec.series.views_points %}
+                    <td>{{ p.value }}</td>
+                  {% endfor %}
+                  <td><strong>{{ sec.series_totals.views }}</strong></td>
+                </tr>
+                <tr>
+                  <td>댓글</td>
+                  {% for p in sec.series.comments_points %}
+                    <td>{{ p.value }}</td>
+                  {% endfor %}
+                  <td><strong>{{ sec.series_totals.comments }}</strong></td>
+                </tr>
+                <tr>
+                  <td>쪽지발송</td>
+                  {% for p in sec.series.message_points %}
+                    <td>{{ p.value }}</td>
+                  {% endfor %}
+                  <td><strong>{{ sec.series_totals.messages }}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <div class="mr-chart-card">
+            <div class="mr-chart-title">월별 조회수</div>
+            <div class="mr-bars">
+              {% for p in sec.series.views_points %}
+                <div class="mr-bar-col">
+                  <div class="mr-bar-value">{{ p.value }}</div>
+                  <div class="mr-bar {% if p.is_current %}current{% endif %}" style="height:{% widthratio p.value sec.series.views_max 150 %}px;"></div>
+                  <div class="mr-bar-label">{{ p.label }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="mr-chart-card" style="margin-top:10px;">
+            <div class="mr-chart-title">월별 쪽지발송</div>
+            <div class="mr-bars">
+              {% for p in sec.series.message_points %}
+                <div class="mr-bar-col">
+                  <div class="mr-bar-value">{{ p.value }}</div>
+                  <div class="mr-bar {% if p.is_current %}current{% endif %}" style="height:{% widthratio p.value sec.series.message_max 150 %}px;"></div>
+                  <div class="mr-bar-label">{{ p.label }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="table mr-detail-table">
+          <thead>
+            {% if sec.code == "naver" %}
+              <tr><th>No</th><th>카페</th><th>링크</th><th>제목</th><th>조회수</th><th>댓글</th><th>쪽지</th><th>LIVE</th></tr>
+            {% elif sec.code == "seongyesa" %}
+              <tr><th>No</th><th>링크</th><th>제목</th><th>조회수</th><th>댓글</th><th>LIVE</th></tr>
+            {% else %}
+              <tr><th>No</th><th>링크</th><th>제목</th><th>조회수</th><th>댓글</th><th>쪽지</th></tr>
+            {% endif %}
+          </thead>
+          <tbody>
+            {% for post in sec.detail_rows %}
+              <tr>
+                {% if sec.code == "naver" %}
+                  <td>{{ forloop.counter }}</td>
+                  <td>{{ post.cafe_name|default:"네이버" }}</td>
+                  <td>{% if post.url %}<a href="{{ post.url }}" target="_blank" rel="noopener">{{ post.url|truncatechars:42 }}</a>{% else %}-{% endif %}</td>
+                  <td>{{ post.title|truncatechars:72 }}</td>
+                  <td>{{ post.views }}</td>
+                  <td>{{ post.comments }}</td>
+                  <td>{{ post.message_count }}</td>
+                  <td>-</td>
+                {% elif sec.code == "seongyesa" %}
+                  <td>{{ forloop.counter }}</td>
+                  <td>{% if post.url %}<a href="{{ post.url }}" target="_blank" rel="noopener">{{ post.url|truncatechars:42 }}</a>{% else %}-{% endif %}</td>
+                  <td>{{ post.title|truncatechars:76 }}</td>
+                  <td>{{ post.views }}</td>
+                  <td>{{ post.comments }}</td>
+                  <td>-</td>
+                {% else %}
+                  <td>{{ forloop.counter }}</td>
+                  <td>{% if post.url %}<a href="{{ post.url }}" target="_blank" rel="noopener">{{ post.url|truncatechars:42 }}</a>{% else %}-{% endif %}</td>
+                  <td>{{ post.title|truncatechars:76 }}</td>
+                  <td>{{ post.views }}</td>
+                  <td>{{ post.comments }}</td>
+                  <td>{{ post.message_count }}</td>
+                {% endif %}
+              </tr>
+            {% empty %}
+              {% if sec.code == "naver" %}
+                <tr><td colspan="8">데이터가 없습니다.</td></tr>
+              {% elif sec.code == "seongyesa" %}
+                <tr><td colspan="6">데이터가 없습니다.</td></tr>
+              {% else %}
+                <tr><td colspan="6">데이터가 없습니다.</td></tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endfor %}
+
+  <div class="mr-pane" data-pane="atmosphere">
+    <p class="mr-note">월간 상위 키워드</p>
+    {% if top_keywords %}
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        {% for kw in top_keywords %}
+          <span style="padding:4px 8px; border:1px solid #d1d5db;">{{ kw }}</span>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="mr-sub">현황 데이터가 없습니다.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const buttons = document.querySelectorAll(".mr-tab-btn");
+    const panes = document.querySelectorAll(".mr-pane");
+    buttons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.dataset.tab;
+        buttons.forEach((b) => b.classList.remove("active"));
+        panes.forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        const pane = document.querySelector('.mr-pane[data-pane="' + key + '"]');
+        if (pane) pane.classList.add("active");
+      });
+    });
+  })();
+</script>
+{% endblock %}

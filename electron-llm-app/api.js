@@ -41,7 +41,7 @@ module.exports = {
     console.log("📡 generateReview called");
 
     const res = await axios.post(
-      `${BASE_URL}/api/ml/generate/review/`, // 🔥 수정됨
+      `${BASE_URL}/api/ml/review/`,
       payload,
       { timeout: 30000 }
     );

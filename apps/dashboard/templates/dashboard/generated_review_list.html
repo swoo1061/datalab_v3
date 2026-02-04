@@ -47,6 +47,17 @@ tr.selected {
 </div>
 
 <div class="card">
+  <div style="display:flex; gap:8px; margin-bottom:12px; padding: 0 4px;">
+    <a href="?kind=all" class="btn btn-sm {% if kind == 'all' %}btn-primary{% else %}btn-ghost{% endif %}">
+      전체 ({{ counts.all|default:0 }})
+    </a>
+    <a href="?kind=original" class="btn btn-sm {% if kind == 'original' %}btn-primary{% else %}btn-ghost{% endif %}">
+      생성본 ({{ counts.original|default:0 }})
+    </a>
+    <a href="?kind=edited" class="btn btn-sm {% if kind == 'edited' %}btn-primary{% else %}btn-ghost{% endif %}">
+      수정본 ({{ counts.edited|default:0 }})
+    </a>
+  </div>
   {% if reviews %}
     <!-- 일괄 작업 바 -->
     <div class="bulk-actions hidden" id="bulkActions">
@@ -66,13 +77,11 @@ tr.selected {
             <th class="checkbox-cell">
               <input type="checkbox" id="selectAll" title="전체 선택">
             </th>
-            <th>병원</th>
-            <th>원장</th>
-            <th>시술</th>
-            <th>페르소나</th>
-            <th>글자수</th>
-            <th>상태</th>
             <th>생성일</th>
+            <th>구분</th>
+            <th>글자수</th>
+            <th>사용한 모델</th>
+            <th>병원</th>
             <th></th>
           </tr>
         </thead>
@@ -83,35 +92,25 @@ tr.selected {
               <input type="checkbox" class="row-checkbox" value="{{ review.pk }}">
             </td>
             <td>
-              <strong>{{ review.clinic.name|default:"-" }}</strong>
+              <span class="text-sm text-muted">
+                {{ review.created_at|date:"Y-m-d H:i" }}
+              </span>
             </td>
             <td>
-              {% if review.doctor_code %}
-                <span class="tag tag-primary">{{ review.doctor_code }}</span>
+              {% if review.status == 'edited' %}
+                <span class="tag" style="background:#fee2e2; color:#991b1b;">수정본</span>
               {% else %}
-                -
+                <span class="tag tag-muted">생성본</span>
               {% endif %}
-            </td>
-            <td>{{ review.procedure|default:"-" }}</td>
-            <td class="text-sm text-muted">
-              {{ review.persona.name|default:"기본" }}
             </td>
             <td class="text-sm">
               {{ review.generated_text|length }}자
             </td>
             <td>
-              {% if review.status == 'uploaded' %}
-                <span class="tag tag-success">업로드완료</span>
-              {% elif review.status == 'edited' %}
-                <span class="tag tag-warning">수정됨</span>
-              {% elif review.status == 'rejected' %}
-                <span class="tag" style="background: #fee2e2; color: #dc2626;">반려</span>
-              {% else %}
-                <span class="tag tag-muted">생성됨</span>
-              {% endif %}
+              <span class="tag tag-muted">{{ review.model_display|default:review.model_used|default:"-" }}</span>
             </td>
-            <td class="text-sm text-muted">
-              {{ review.created_at|date:"m/d H:i" }}
+            <td>
+              <strong>{{ review.clinic.name|default:"-" }}</strong>
             </td>
             <td>
               <a href="{% url 'dashboard:generated_detail' review.pk %}" class="btn btn-ghost btn-sm">

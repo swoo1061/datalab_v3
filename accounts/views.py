@@ -2,6 +2,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.contrib.auth.decorators import login_required
 from .forms import SignupForm
 from .models import UserProfile
 from django.urls import reverse
@@ -34,7 +35,16 @@ def login_view(request):
 
         # 4️⃣ 로그인 성공
         login(request, user)
-        return redirect(reverse("dashboard:index"))
+
+        profile = getattr(user, "profile", None)
+        is_internal = (
+            user.is_superuser
+            or user.groups.filter(name="staff").exists()
+            or (profile and profile.position in {"manager", "leader", "ceo"})
+        )
+        if is_internal:
+            return redirect(reverse("dashboard:index"))
+        return redirect(reverse("dashboard:monthly_report"))
 
     return render(request, "accounts/login.html")
 
@@ -70,4 +80,18 @@ def signup_view(request):
         form = SignupForm()
 
     return render(request, "accounts/signup.html", {"form": form})
+
+
+@login_required
+def doctor_report_view(request):
+    user = request.user
+    profile = getattr(user, "profile", None)
+    is_internal = (
+        user.is_superuser
+        or user.groups.filter(name="staff").exists()
+        or (profile and profile.position in {"manager", "leader", "ceo"})
+    )
+    if is_internal:
+        return redirect("dashboard:index")
+    return redirect("dashboard:monthly_report")
 

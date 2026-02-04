@@ -7,9 +7,14 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from apps.ml.services.llm_service import generate_review_with_prompt
+from apps.ml.services.llm_service import (
+    generate_review_with_prompt_enforced,
+    generate_title_suggestions,
+    apply_review_type_guard,
+)
+from apps.ml.services.prompt_generator import build_ft_prompt_from_models, build_prompt_from_models
 from apps.ml.services.usage_logger import log_llm_usage
-from apps.data.models import PromptTemplate
+from apps.data.models import PromptTemplate, GeneratedReview, ClinicGuide, Persona
 
 MODEL_ALIAS_MAP = {
     "gpt-5-mini": "gpt-5-mini",
@@ -18,6 +23,12 @@ MODEL_ALIAS_MAP = {
     "gpt-4.1": "gpt-4.1",
     "claude-4.5": "claude-sonnet-4-5-20250929",
     "claude-opus": "claude-opus-4-5-20251101",
+    # "ft:gpt-3.5-turbo-0125:personal::D2AzRPLe": "ft:gpt-3.5-turbo-0125:personal::D2AzRPLe", --- IGNORE ---
+    # "ft:gpt-4.1-2025-04-14:personal::D3C9lMYD": "ft:gpt-4.1-2025-04-14:personal::D3C9lMYD", --- IGNORE ---
+    # Legacy aliases -> current Gugong model
+    "ft:gpt-4.1-2025-04-14:personal::D3J40yRV": "ft:gpt-4.1-2025-04-14:personal::D3gDuLBk",
+    "ft:gpt-4.1-2025-04-14:personal:D3gDuLBk:": "ft:gpt-4.1-2025-04-14:personal::D3gDuLBk",
+    "ft:gpt-4.1-2025-04-14:personal::D3gDuLBk": "ft:gpt-4.1-2025-04-14:personal::D3gDuLBk",
 }
 
 def _resolve_request_user(request):
@@ -64,14 +75,50 @@ def review_generate_api(request):
 
     prompt = context.get("prompt")
     if not prompt:
-        return JsonResponse({"error": "missing prompt"}, status=400)
+        # FT 모델이면 짧은 프롬프트 생성
+        if str(model).startswith("ft:"):
+            clinic = None
+            clinic_id = context.get("clinic_id")
+            if clinic_id:
+                clinic = ClinicGuide.objects.filter(pk=clinic_id).first()
+
+            persona = None
+            personas = context.get("personas") or []
+            if isinstance(personas, str):
+                personas = [p.strip() for p in personas.split(",") if p.strip()]
+            if personas:
+                persona = Persona.objects.filter(name=personas[0]).first()
+
+            prompt = build_ft_prompt_from_models(
+                clinic=clinic,
+                doctor_code=context.get("doctor_code") or None,
+                procedure=context.get("procedure") or "시술",
+                content_type=context.get("content_type") or "procedure",
+                content_type_profile=None,
+                persona=persona,
+                cafe=None,
+                consultant_name=context.get("consultant_name"),
+                custom_instructions=context.get("custom_instructions"),
+            )
+        else:
+            return JsonResponse({"error": "missing prompt"}, status=400)
+
+    prompt = apply_review_type_guard(prompt)
+
+    print("[DEBUG] ml/views_api build_ft_prompt_from_models prompt preview:")
+    print(prompt)
+
+    keywords_used = context.get("keywords") or []
+    if isinstance(keywords_used, str):
+        keywords_used = [k.strip() for k in keywords_used.split(",") if k.strip()]
 
     try:
-        result = generate_review_with_prompt(
+        result = generate_review_with_prompt_enforced(
             prompt=prompt,
             model=model,
             max_tokens=1200,
             return_usage=True,
+            keywords=keywords_used,
         )
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
@@ -80,9 +127,40 @@ def review_generate_api(request):
     if user and isinstance(result, dict):
         log_llm_usage(user=user, model=model, usage=result)
 
+    # 생성 리뷰 저장 (앱/웹 공통 관리)
+    clinic = None
+    persona = None
+    clinic_id = context.get("clinic_id")
+    if clinic_id:
+        clinic = ClinicGuide.objects.filter(pk=clinic_id).first()
+    personas = context.get("personas") or []
+    if isinstance(personas, str):
+        personas = [p.strip() for p in personas.split(",") if p.strip()]
+    if personas:
+        persona = Persona.objects.filter(name=personas[0]).first()
+    review_text = result["text"] if isinstance(result, dict) else result
+    title_suggestions = generate_title_suggestions(review_text, model=model)
+
+    generated_review = GeneratedReview.objects.create(
+        clinic=clinic,
+        persona=persona,
+        cafe=None,
+        doctor_code="",
+        doctor_name="",
+        procedure="",
+        generated_text=review_text,
+        prompt_used=prompt,
+        model_used=model,
+        keywords_used=keywords_used,
+        persona_text=persona.name if persona else "",
+        title_suggestions=title_suggestions,
+    )
+
     return JsonResponse({
-        "review_text": result["text"] if isinstance(result, dict) else result,
+        "review_text": review_text,
         "model": model,
+        "review_id": generated_review.id,
+        "title_suggestions": title_suggestions,
         "usage": {
             "input_tokens": result.get("input_tokens", 0),
             "output_tokens": result.get("output_tokens", 0),
@@ -90,6 +168,65 @@ def review_generate_api(request):
             "total_tokens": result.get("total_tokens", 0),
             "cost_usd": result.get("cost_usd", 0),
         } if isinstance(result, dict) else None,
+    })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def review_save_edit_api(request):
+    """앱/웹 공통 수정본 저장 API"""
+    try:
+        data = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"error": "invalid json"}, status=400)
+
+    review_id = data.get("review_id")
+    edited_text = (data.get("edited_text") or "").strip()
+    title_suggestions = data.get("title_suggestions")
+    regenerate_titles = bool(data.get("regenerate_titles", False))
+
+    if not review_id or not edited_text:
+        return JsonResponse({"error": "review_id and edited_text required"}, status=400)
+
+    original = GeneratedReview.objects.filter(pk=review_id).first()
+    if not original:
+        return JsonResponse({"error": "review not found"}, status=404)
+
+    # 수정 저장은 빠른 응답이 목적이라 기본적으로 기존 제목을 재사용한다.
+    # 제목 재생성이 필요하면 regenerate_titles=true 로 명시한다.
+    if not isinstance(title_suggestions, list):
+        if regenerate_titles:
+            title_suggestions = generate_title_suggestions(
+                edited_text,
+                model=original.model_used or "gpt-5-mini",
+            )
+        else:
+            title_suggestions = list(original.title_suggestions or [])
+
+    edited = GeneratedReview.objects.create(
+        clinic=original.clinic,
+        persona=original.persona,
+        cafe=original.cafe,
+        doctor_code=original.doctor_code,
+        doctor_name=original.doctor_name,
+        procedure=original.procedure,
+        generated_text=edited_text,
+        prompt_used=f"[수정본 저장] 원본 #{original.id}\n\n{original.prompt_used}",
+        model_used=original.model_used,
+        keywords_used=original.keywords_used,
+        persona_text=original.persona_text,
+        title_suggestions=title_suggestions,
+        status="edited",
+    )
+
+    return JsonResponse({
+        "success": True,
+        "review_id": edited.id,
+        "review_text": edited.generated_text,
+        "char_count": len(edited.generated_text),
+        "status": edited.status,
+        "model": edited.model_used,
+        "title_suggestions": edited.title_suggestions,
     })
 
 @csrf_exempt
@@ -246,8 +383,10 @@ JSON 출력:"""
         except KeyError:
             pass
 
+    prompt = apply_review_type_guard(prompt)
+
     try:
-        result = generate_review_with_prompt(
+        result = generate_review_with_prompt_enforced(
             prompt, model=model, return_usage=True, temperature=temperature, max_tokens=900
         )
 
@@ -357,6 +496,8 @@ JSON 출력:"""
         if user:
             log_llm_usage(user=user, model=model, usage=result)
 
+        title_suggestions = generate_title_suggestions(result_review, model=model)
+
         return JsonResponse({
             "success": True,
             "procedure_date": procedure_date_str,
@@ -370,6 +511,7 @@ JSON 출력:"""
             "bad_reason": bad_reason,
             "rating": parsed.get("rating", rating),
             "additional": additional,
+            "title_suggestions": title_suggestions,
             "usage": {
                 "input_tokens": result["input_tokens"],
                 "output_tokens": result["output_tokens"],

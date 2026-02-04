@@ -12,6 +12,10 @@ from .decorators import dashboard_required
 from apps.ml.services.usage_logger import log_llm_usage
 import json
 import re
+from collections import Counter
+from urllib.parse import urlparse
+
+from apps.ml.services.llm.registry import LLM_MODELS
 
 import csv
 from openpyxl import Workbook
@@ -19,22 +23,60 @@ from django.db import models
 from datetime import datetime, timedelta
 import calendar
 from django.utils import timezone
-from django.db.models import Sum, Count
-from django.db.models.functions import TruncDate
+from django.db.models import Sum, Count, Min, Max, Q
+from django.db.models.functions import TruncDate, TruncMonth, Coalesce
 
 from apps.data.models import (
     Review, Campaign, ImageAsset,
-    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile, LLMUsageLog, ClinicDoctor, ClinicPrice, AccessLog
+    Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile, LLMUsageLog, ClinicDoctor, ClinicPrice, AccessLog,
+    ClinicPost, CrawledPostContent
 )
+from apps.data.models_worklog import DailyWorkLog
+from accounts.models import UserProfile
 from apps.ml.services.clinic_normalizer import normalize_clinic_payload
 from apps.ml.services.clinic_md_llm import parse_clinic_md_with_llm
-from apps.ml.services.llm_service import generate_review, generate_review_advanced
-from apps.ml.services.prompt_generator import build_review_prompt, build_prompt_from_models
+from apps.ml.services.llm_service import (
+    generate_review,
+    generate_review_advanced,
+    generate_review_with_prompt_enforced,
+    generate_title_suggestions,
+    apply_review_type_guard,
+)
+from apps.ml.services.prompt_generator import build_review_prompt, build_prompt_from_models, build_ft_prompt_from_models
 from apps.ml.services.clinic_parser import parse_clinic_content
+from .services.monthly_report_layouts import get_monthly_report_layout
 
 # =====================================================
 # 기존 뷰 (호환성 유지)
 # =====================================================
+
+def _model_display_map():
+    mapping = {}
+    try:
+        for item in LLM_MODELS:
+            key = item.get("key")
+            label = item.get("label")
+            if key and label:
+                mapping[key] = label
+    except Exception:
+        pass
+    return mapping
+
+
+def _get_model_display(model_id: str) -> str:
+    if not model_id:
+        return "-"
+    mapping = _model_display_map()
+    return mapping.get(model_id, model_id)
+
+
+def _is_internal_user(user):
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser or user.groups.filter(name="staff").exists():
+        return True
+    profile = getattr(user, "profile", None)
+    return bool(profile and profile.position in {"manager", "leader", "ceo"})
 
 @dashboard_required
 def is_staff(user):
@@ -58,16 +100,54 @@ def _get_usage_range(request, default_days=30):
         start, end = end, start
     return start, end
 
+
+def _get_keywords_used(cafe):
+    if not cafe:
+        return []
+    try:
+        return list(cafe.required_keywords or [])
+    except Exception:
+        return []
+
+
+def _build_persona_text(persona):
+    if not persona:
+        return ""
+    if isinstance(persona, str):
+        return persona.strip()
+    if isinstance(persona, dict):
+        parts = []
+        for key in ("age", "gender", "job", "personality", "tone", "experience"):
+            value = persona.get(key)
+            if value:
+                parts.append(str(value))
+        return ", ".join(parts)
+    return ""
+
 @dashboard_required
 def index(request):
     """대시보드 홈"""
+    today = timezone.now().date()
     total_reviews = Review.objects.count()
     generated_count = GeneratedReview.objects.count()
     clinics_count = ClinicGuide.objects.filter(is_active=True).count()
-    
+
     recent_generated = GeneratedReview.objects.all()[:5]
     campaigns = Campaign.objects.all()[:6]
-    
+    recent_posts = ClinicPost.objects.select_related("clinic", "assignee").order_by("-created_at")[:6]
+    recent_llm = LLMUsageLog.objects.select_related("user").order_by("-created_at")[:8]
+
+    today_posts_qs = ClinicPost.objects.filter(created_at__date=today)
+    today_posts = today_posts_qs.count()
+    today_opinion = today_posts_qs.filter(type="opinion").count()
+    today_review = today_posts_qs.filter(type="review").count()
+
+    llm_today = LLMUsageLog.objects.filter(created_at__date=today).aggregate(
+        calls=Count("id"),
+        tokens=Sum("total_tokens"),
+        cost_krw=Sum("cost_krw"),
+    )
+
     context = {
         "total_reviews": total_reviews,
         "generated_reviews": generated_count,
@@ -75,8 +155,361 @@ def index(request):
         "model_version": "v2.0",
         "campaigns": campaigns,
         "recent_generated": recent_generated,
+        "recent_posts": recent_posts,
+        "recent_llm": recent_llm,
+        "today": today,
+        "today_posts": today_posts,
+        "today_opinion": today_opinion,
+        "today_review": today_review,
+        "today_generated": GeneratedReview.objects.filter(created_at__date=today).count(),
+        "today_llm_calls": llm_today.get("calls") or 0,
+        "today_llm_tokens": llm_today.get("tokens") or 0,
+        "today_llm_cost": llm_today.get("cost_krw") or 0,
     }
+    for review in recent_generated:
+        review.model_display = _get_model_display(review.model_used)
+    for log in recent_llm:
+        log.model_display = _get_model_display(log.model)
     return render(request, "dashboard/index.html", context)
+
+
+@login_required
+def monthly_report(request):
+    today = timezone.localdate()
+    is_internal_user = _is_internal_user(request.user)
+    month_str = (request.GET.get("month") or today.strftime("%Y-%m")).strip()
+    clinic_id = (request.GET.get("clinic") or "").strip()
+    clear_clinic = (request.GET.get("clear_clinic") or "").strip() == "1"
+    session_key = "monthly_report_clinic_id"
+
+    # 원장(외부) 계정은 본인 병원만 강제 적용
+    if not is_internal_user:
+        assigned = (
+            ClinicGuide.objects.filter(
+                assignees__user=request.user,
+                assignees__is_active=True,
+                is_active=True,
+            )
+            .order_by("name")
+            .first()
+        )
+        clinic_id = str(assigned.id) if assigned else ""
+    else:
+        # 내부 사용자: 월간보고서 첫 진입은 항상 병원 선택 화면으로 시작
+        if clear_clinic:
+            request.session.pop(session_key, None)
+        if clinic_id and clinic_id.isdigit():
+            request.session[session_key] = int(clinic_id)
+        elif not clinic_id:
+            clinic_id = ""
+
+    try:
+        month_start = datetime.strptime(month_str, "%Y-%m").date().replace(day=1)
+    except Exception:
+        month_start = today.replace(day=1)
+        month_str = month_start.strftime("%Y-%m")
+
+    if month_start.month == 12:
+        next_month = month_start.replace(year=month_start.year + 1, month=1, day=1)
+    else:
+        next_month = month_start.replace(month=month_start.month + 1, day=1)
+    if month_start.month == 1:
+        prev_month_start = month_start.replace(year=month_start.year - 1, month=12, day=1)
+    else:
+        prev_month_start = month_start.replace(month=month_start.month - 1, day=1)
+
+    clinics = ClinicGuide.objects.filter(is_active=True).order_by("name")
+    selected_clinic = ClinicGuide.objects.filter(pk=clinic_id).first() if clinic_id else None
+
+    base_post_qs = ClinicPost.objects.select_related("clinic", "assignee", "assignee__profile").filter(
+        created_at__date__gte=month_start,
+        created_at__date__lt=next_month,
+    )
+    if selected_clinic:
+        post_qs = base_post_qs.filter(clinic=selected_clinic)
+    else:
+        post_qs = ClinicPost.objects.none()
+
+    layout = get_monthly_report_layout(selected_clinic.name if selected_clinic else None)
+
+    # 병원 선택 카드(내부 사용자용)
+    clinic_picker_rows = list(
+        clinics.annotate(
+            month_posts=Count(
+                "posts",
+                filter=Q(posts__created_at__date__gte=month_start, posts__created_at__date__lt=next_month),
+            ),
+            month_views=Coalesce(
+                Sum("posts__views", filter=Q(posts__created_at__date__gte=month_start, posts__created_at__date__lt=next_month)),
+                0,
+            ),
+            month_comments=Coalesce(
+                Sum("posts__comments", filter=Q(posts__created_at__date__gte=month_start, posts__created_at__date__lt=next_month)),
+                0,
+            ),
+            month_messages=Coalesce(
+                Sum("posts__message_count", filter=Q(posts__created_at__date__gte=month_start, posts__created_at__date__lt=next_month)),
+                0,
+            ),
+        )
+    )
+
+    total = {
+        "posts": post_qs.count(),
+        "comments": post_qs.aggregate(v=Coalesce(Sum("comments"), 0))["v"] or 0,
+        "views": post_qs.aggregate(v=Coalesce(Sum("views"), 0))["v"] or 0,
+        "messages": post_qs.aggregate(v=Coalesce(Sum("message_count"), 0))["v"] or 0,
+    }
+
+    EXCLUDED_PLATFORM_CODES = {"dadamo", "all"}
+    NAVER_CAFE_NAME_BY_KEY = {
+        "feko": "여우야",
+        "fox5282": "A+ 여우야",
+        "juliett00": "성형위키",
+        "luxury009": "가아사",
+        "knife67": "재잘재잘",
+        "suddes": "여생남정",
+        "newsmaker": "지살사",
+        "imsanbu": "맘스홀릭",
+        "cosmania": "파우더룸",
+        "parisienlook": "시트먼트",
+        "geahwa73": "안양군의왕과천맘",
+    }
+
+    def _extract_naver_cafe_key(url):
+        if not url:
+            return ""
+        try:
+            parsed = urlparse(url)
+            if "cafe.naver.com" not in (parsed.netloc or "").lower():
+                return ""
+            path = (parsed.path or "").strip("/")
+            if not path:
+                return ""
+            return path.split("/")[0].strip().lower()
+        except Exception:
+            return ""
+
+    def _normalize_platform(code):
+        raw = (code or "").strip()
+        low = raw.lower()
+        if low in EXCLUDED_PLATFORM_CODES:
+            return None
+        if raw in {"네이버"} or "naver" in low:
+            return "naver"
+        if raw in {"성예사"} or "sung" in low or "seong" in low:
+            return "seongyesa"
+        if raw in {"유튜브"} or "youtube" in low:
+            return "youtube"
+        if raw in {"전체"} or low == "all":
+            return "all"
+        return low or "etc"
+
+    raw_platform_rows = list(
+        post_qs.order_by().values("platform").annotate(
+            total=Count("id"),
+            views=Coalesce(Sum("views"), 0),
+            comments=Coalesce(Sum("comments"), 0),
+            messages=Coalesce(Sum("message_count"), 0),
+        ).order_by("-total", "platform")
+    )
+    platform_code_groups = {}
+    platform_rows_map = {}
+    for row in raw_platform_rows:
+        raw_code = row.get("platform")
+        norm = _normalize_platform(raw_code)
+        if not norm:
+            continue
+        platform_code_groups.setdefault(norm, set()).add(raw_code)
+        bucket = platform_rows_map.setdefault(
+            norm,
+            {"platform": norm, "total": 0, "views": 0, "comments": 0, "messages": 0},
+        )
+        bucket["total"] += row.get("total") or 0
+        bucket["views"] += row.get("views") or 0
+        bucket["comments"] += row.get("comments") or 0
+        bucket["messages"] += row.get("messages") or 0
+    platform_rows = sorted(
+        list(platform_rows_map.values()),
+        key=lambda r: (-r["total"], r["platform"]),
+    )
+    # 선택 월 데이터가 0이어도, 해당 병원이 실제 사용하는 플랫폼 탭은 유지
+    if selected_clinic and not platform_rows:
+        used_platforms = list(
+            ClinicPost.objects.filter(clinic=selected_clinic)
+            .order_by()
+            .values_list("platform", flat=True)
+            .distinct()
+        )
+        for raw_code in used_platforms:
+            norm = _normalize_platform(raw_code)
+            if not norm:
+                continue
+            platform_code_groups.setdefault(norm, set()).add(raw_code)
+        platform_rows = [{"platform": p, "total": 0, "views": 0, "comments": 0, "messages": 0} for p in platform_code_groups.keys()]
+
+    context = {
+        "month": month_str,
+        "clinic_id": clinic_id,
+        "clinics": clinics,
+        "selected_clinic": selected_clinic,
+        "clinic_picker_rows": clinic_picker_rows,
+        "total": total,
+        "layout": layout,
+        "platform_rows": platform_rows,
+        "is_internal_user": is_internal_user,
+        "clear_clinic": clear_clinic,
+    }
+
+    # 게시글 리스트 데이터와 동일 소스 기반: 플랫폼별 탭 데이터 구성
+    if selected_clinic:
+        platform_label_map = dict(ClinicPost.PLATFORM_CHOICES)
+        display_label_map = {
+            "naver": "네이버",
+            "seongyesa": "성예사",
+            "youtube": "유튜브",
+            "all": "전체",
+            "etc": "기타",
+        }
+        platform_sections = []
+
+        def _platform_delta(platform_codes):
+            codes = platform_codes if isinstance(platform_codes, (list, tuple, set)) else [platform_codes]
+            cur = post_qs.filter(platform__in=codes)
+            prev = ClinicPost.objects.filter(
+                clinic=selected_clinic,
+                platform__in=codes,
+                created_at__date__gte=prev_month_start,
+                created_at__date__lt=month_start,
+            )
+            current = {
+                "posts": cur.count(),
+                "comments": cur.aggregate(v=Coalesce(Sum("comments"), 0))["v"] or 0,
+                "views": cur.aggregate(v=Coalesce(Sum("views"), 0))["v"] or 0,
+                "messages": cur.aggregate(v=Coalesce(Sum("message_count"), 0))["v"] or 0,
+            }
+            prev_vals = {
+                "posts": prev.count(),
+                "comments": prev.aggregate(v=Coalesce(Sum("comments"), 0))["v"] or 0,
+                "views": prev.aggregate(v=Coalesce(Sum("views"), 0))["v"] or 0,
+                "messages": prev.aggregate(v=Coalesce(Sum("message_count"), 0))["v"] or 0,
+            }
+            delta = {}
+            for key in ("posts", "comments", "views", "messages"):
+                pv = prev_vals[key]
+                cv = current[key]
+                delta[key] = round(((cv - pv) / pv) * 100, 1) if pv else None
+            return current, delta
+
+        def _monthly_series(platform_codes, months=6):
+            codes = platform_codes if isinstance(platform_codes, (list, tuple, set)) else [platform_codes]
+            cursor = month_start
+            points = []
+            for _ in range(months):
+                points.append(cursor)
+                if cursor.month == 1:
+                    cursor = cursor.replace(year=cursor.year - 1, month=12, day=1)
+                else:
+                    cursor = cursor.replace(month=cursor.month - 1, day=1)
+            points.reverse()
+
+            views_points = []
+            comments_points = []
+            message_points = []
+            for s in points:
+                if s.month == 12:
+                    e = s.replace(year=s.year + 1, month=1, day=1)
+                else:
+                    e = s.replace(month=s.month + 1, day=1)
+                q = ClinicPost.objects.filter(
+                    clinic=selected_clinic,
+                    platform__in=codes,
+                    created_at__date__gte=s,
+                    created_at__date__lt=e,
+                )
+                views = q.aggregate(v=Coalesce(Sum("views"), 0))["v"] or 0
+                comments = q.aggregate(v=Coalesce(Sum("comments"), 0))["v"] or 0
+                messages = q.aggregate(v=Coalesce(Sum("message_count"), 0))["v"] or 0
+                month_label = f"{s.month}월"
+                is_current = s.year == month_start.year and s.month == month_start.month
+                views_points.append({
+                    "label": month_label,
+                    "value": views,
+                    "is_current": is_current,
+                })
+                comments_points.append({
+                    "label": month_label,
+                    "value": comments,
+                    "is_current": is_current,
+                })
+                message_points.append({
+                    "label": month_label,
+                    "value": messages,
+                    "is_current": is_current,
+                })
+
+            return {
+                "views_points": views_points,
+                "comments_points": comments_points,
+                "message_points": message_points,
+                "views_max": max([p["value"] for p in views_points] + [1]),
+                "comments_max": max([p["value"] for p in comments_points] + [1]),
+                "message_max": max([p["value"] for p in message_points] + [1]),
+            }
+
+        for prow in platform_rows:
+            code = prow.get("platform")
+            raw_codes = list(platform_code_groups.get(code, []))
+            cur_qs = post_qs.filter(platform__in=raw_codes).select_related("assignee", "assignee__profile") if raw_codes else post_qs.none()
+            current, delta = _platform_delta(raw_codes if raw_codes else [code])
+            series = _monthly_series(raw_codes if raw_codes else [code])
+            views_total = sum(p["value"] for p in series.get("views_points", []))
+            comments_total = sum(p["value"] for p in series.get("comments_points", []))
+            messages_total = sum(p["value"] for p in series.get("message_points", []))
+            detail_rows = list(cur_qs.order_by("-created_at")[:40])
+            if code == "naver":
+                for post in detail_rows:
+                    cafe_key = _extract_naver_cafe_key(getattr(post, "url", ""))
+                    setattr(post, "cafe_key", cafe_key)
+                    setattr(post, "cafe_name", NAVER_CAFE_NAME_BY_KEY.get(cafe_key, cafe_key or "네이버"))
+            platform_sections.append({
+                "code": code,
+                "label": display_label_map.get(code, platform_label_map.get(code, code)),
+                "current": current,
+                "delta": delta,
+                "series": series,
+                "series_totals": {
+                    "views": views_total,
+                    "comments": comments_total,
+                    "messages": messages_total,
+                },
+                "detail_rows": detail_rows,
+                "opinion_rows": cur_qs.filter(type="opinion").order_by("-created_at")[:20],
+                "review_rows": cur_qs.filter(type="review").order_by("-created_at")[:20],
+            })
+
+        # 분위기/현황 텍스트용: 최근 제목 키워드
+        titles = list(post_qs.values_list("title", flat=True)[:120])
+        token_counter = Counter()
+        for title in titles:
+            if not title:
+                continue
+            for tok in re.findall(r"[가-힣A-Za-z0-9]{2,}", title):
+                if tok.lower() in {"후기", "병원", "상담", "진행", "작성", "리뷰"}:
+                    continue
+                token_counter[tok] += 1
+        top_keywords = [k for k, _ in token_counter.most_common(12)]
+
+        # 탭은 실제 데이터가 있는 플랫폼만 (원하는 순서로 정렬)
+        preferred_order = {"naver": 0, "seongyesa": 1, "youtube": 2, "gn_jp": 3, "gangnam": 4, "all": 5, "etc": 99}
+        platform_sections.sort(key=lambda s: (preferred_order.get(s["code"], 50), s["label"]))
+        context["platform_sections"] = platform_sections
+        context["top_keywords"] = top_keywords
+    else:
+        context["platform_sections"] = []
+        context["top_keywords"] = []
+
+    return render(request, "dashboard/monthly_report.html", context)
 
 @dashboard_required
 def upload_view(request):
@@ -84,13 +517,73 @@ def upload_view(request):
 
 @dashboard_required
 def review_list(request):
-    reviews = Review.objects.all().order_by("-created_at")[:200]
-    return render(request, "dashboard/review_list.html", {"reviews": reviews})
+    reviews_qs = Review.objects.all().order_by("-created_at")
+    crawled_qs = (
+        CrawledPostContent.objects
+        .select_related("post")
+        .order_by("-fetched_at")
+    )
+
+    from django.core.paginator import Paginator
+    reviews_page = request.GET.get("reviews_page") or 1
+    crawled_page = request.GET.get("crawled_page") or 1
+    reviews = Paginator(reviews_qs, 50).get_page(reviews_page)
+    crawled = Paginator(crawled_qs, 50).get_page(crawled_page)
+    return render(
+        request,
+        "dashboard/review_list.html",
+        {"reviews": reviews, "crawled": crawled},
+    )
 
 @dashboard_required
 def review_detail(request, pk):
     review = get_object_or_404(Review, pk=pk)
     return render(request, "dashboard/review_detail.html", {"r": review})
+
+@dashboard_required
+def post_manage(request):
+    type_filter = "all"
+    clinic_id = request.GET.get("clinic", "")
+    sort = request.GET.get("sort", "latest")
+
+    order_by = "-created_at" if sort != "oldest" else "created_at"
+    qs = ClinicPost.objects.select_related("clinic", "assignee").order_by(order_by)
+    if clinic_id:
+        qs = qs.filter(clinic_id=clinic_id)
+
+    clinic_map = {}
+    for post in qs:
+        clinic_key = post.clinic_id or 0
+        bucket = clinic_map.get(clinic_key)
+        if not bucket:
+            bucket = {
+                "clinic": post.clinic,
+                "posts": [],
+                "total": 0,
+                "opinion": 0,
+                "review": 0,
+            }
+            clinic_map[clinic_key] = bucket
+        bucket["posts"].append(post)
+        bucket["total"] += 1
+        if post.type == "opinion":
+            bucket["opinion"] += 1
+        else:
+            bucket["review"] += 1
+
+    clinic_groups = list(clinic_map.values())
+    clinic_groups.sort(key=lambda r: (-r["total"], r["clinic"].name if r["clinic"] else ""))
+
+    clinics = ClinicGuide.objects.filter(is_active=True).order_by("name")
+
+    context = {
+        "type_filter": type_filter,
+        "clinic_id": clinic_id,
+        "sort": sort,
+        "clinics": clinics,
+        "clinic_groups": clinic_groups,
+    }
+    return render(request, "dashboard/post_manage.html", context)
 
 @dashboard_required
 def review_generate_legacy(request):
@@ -115,7 +608,17 @@ def review_generate_legacy(request):
         cleaned_text=generated[:1000],
         metadata={"generated_by": "llm", "clinic": clinic}
     )
-    return JsonResponse({"review": generated, "review_id": rev.id})
+    title_suggestions = generate_title_suggestions(
+        generated,
+        model="ft:gpt-4.1-2025-04-14:personal::D3C9lMYD",
+    )
+    return JsonResponse({
+        "review": generated,
+        "review_id": rev.id,
+        "title_suggestions": title_suggestions,
+        "model_used": "ft:gpt-4.1-2025-04-14:personal::D3C9lMYD",
+        "model_label": _get_model_display("ft:gpt-4.1-2025-04-14:personal::D3C9lMYD"),
+    })
 
 @dashboard_required
 def image_browser(request):
@@ -188,6 +691,12 @@ def review_generate_basic(request):
     }
     return render(request, "dashboard/review_generate_basic.html", context)
 
+
+@dashboard_required
+def review_generate_gugong(request):
+    """구공이 전용 리뷰 생성 페이지"""
+    return render(request, "dashboard/review_generate_gugong.html")
+
 @dashboard_required
 @require_http_methods(["POST"])
 def api_generate_review_basic(request):
@@ -229,20 +738,66 @@ def api_generate_review_basic(request):
 
 자연스러운 후기를 작성해주세요:"""
 
+    # 길이 힌트 파싱 (예: "700자 이상")
+    length_hint = None
+    min_len = None
+    max_len = None
+    m_len = re.search(r"(\d+)\s*자\s*(이내|이하|내외|정도|이상|부터)?", user_input)
+    if m_len:
+        length_hint = f"{m_len.group(1)}자 {m_len.group(2) or ''}".strip()
+        n = int(m_len.group(1))
+        suffix = m_len.group(2) or ""
+        if suffix in {"이상", "부터"}:
+            min_len = n
+        elif suffix in {"이내", "이하"}:
+            max_len = n
+        elif suffix in {"내외", "정도"}:
+            min_len = max(50, int(n * 0.7))
+            max_len = int(n * 1.3)
+
+    # 길이 규칙을 사용자 입력에 보강
+    if length_hint:
+        extra = [f"길이: {length_hint}"]
+        if min_len:
+            extra.append(f"규칙: 최소 {min_len}자 이상")
+        if max_len:
+            extra.append(f"규칙: 최대 {max_len}자 이하")
+        user_input = f"{user_input}\n" + "\n".join(extra)
+
     base_prompt = template.content if template else DEFAULT_BASIC_PROMPT
     prompt = base_prompt.format(user_input=user_input)
 
+    prompt = apply_review_type_guard(prompt)
+
+    print("[DEBUG] api_generate_review_basic prompt preview:")
+    print(prompt)
+
     try:
-        from apps.ml.services.llm_service import generate_review_with_prompt
+        from apps.ml.services.llm_service import generate_review_with_prompt_enforced
         from apps.ml.services.usage_logger import log_llm_usage
 
         # 🔥 LLM 호출
-        result = generate_review_with_prompt(
+        result = generate_review_with_prompt_enforced(
             prompt,
             model=model,
             return_usage=True
         )
         review_text = result["text"]
+
+        # 길이 최소 기준 미달 시 1회 재생성
+        if min_len and len(review_text) < min_len:
+            retry_prompt = (
+                prompt
+                + f"\n\n[중요] 이전 결과가 {len(review_text)}자로 너무 짧습니다. "
+                  f"반드시 {min_len}자 이상으로 다시 작성하세요."
+            )
+            retry_result = generate_review_with_prompt_enforced(
+                retry_prompt,
+                model=model,
+                return_usage=True
+            )
+            review_text = retry_result["text"]
+            result = retry_result
 
         # ✅ STEP 3 핵심: 사용량 로그 기록
         log_llm_usage(
@@ -251,10 +806,16 @@ def api_generate_review_basic(request):
             usage=result
         )
 
+        title_suggestions = generate_title_suggestions(review_text, model=model)
+
         # DB 저장
         generated_review = GeneratedReview.objects.create(
             generated_text=review_text,
             prompt_used=prompt,
+            model_used=model,
+            keywords_used=[],
+            persona_text="",
+            title_suggestions=title_suggestions,
         )
 
         cost_krw = result["cost_usd"] * 1450
@@ -265,6 +826,8 @@ def api_generate_review_basic(request):
             "review": review_text,
             "char_count": len(review_text),
             "model_used": model,
+            "model_label": _get_model_display(model),
+            "title_suggestions": title_suggestions,
             "input_tokens": result["input_tokens"],
             "output_tokens": result["output_tokens"],
             "cached_input_tokens": result.get("cached_input_tokens", 0),
@@ -383,29 +946,64 @@ def api_generate_review(request):
 
     try:
         # 프롬프트 생성
-        prompt = build_prompt_from_models(
-            clinic=clinic,
-            doctor_code=doctor_code,
-            procedure=procedure,
-            content_type=content_type if content_type not in ["", "__none__"] else "procedure",
-            content_type_profile=content_type_profile,  # ContentTypeProfile 모델 전달
-            persona=persona,
-            cafe=cafe,
-            consultant_name=consultant_name,
-            custom_instructions=custom_instructions,
-            header_template_id=header_template_id,
-            guidelines_template_id=guidelines_template_id,
-        )
+        is_ft_model = str(model).startswith("ft:")
+        if is_ft_model:
+            prompt = build_ft_prompt_from_models(
+                clinic=clinic,
+                doctor_code=doctor_code,
+                procedure=procedure,
+                content_type=content_type if content_type not in ["", "__none__"] else "procedure",
+                content_type_profile=content_type_profile,
+                persona=persona,
+                cafe=cafe,
+                consultant_name=consultant_name,
+                custom_instructions=custom_instructions,
+            )
+        else:
+            prompt = build_prompt_from_models(
+                clinic=clinic,
+                doctor_code=doctor_code,
+                procedure=procedure,
+                content_type=content_type if content_type not in ["", "__none__"] else "procedure",
+                content_type_profile=content_type_profile,  # ContentTypeProfile 모델 전달
+                persona=persona,
+                cafe=cafe,
+                consultant_name=consultant_name,
+                custom_instructions=custom_instructions,
+                header_template_id=header_template_id,
+                guidelines_template_id=guidelines_template_id,
+            )
+
+        prompt = apply_review_type_guard(prompt)
+
+        print("[DEBUG] build_ft_prompt_from_models prompt preview:")
+        print(prompt)
 
         # 리뷰 생성 (선택된 모델 사용)
-        from apps.ml.services.llm_service import generate_review_with_prompt
-        review_text = generate_review_with_prompt(prompt, model=model)
+        from apps.ml.services.llm_service import generate_review_with_prompt_enforced
+        keywords_used = _get_keywords_used(cafe)
+        result = generate_review_with_prompt_enforced(
+            prompt,
+            model=model,
+            keywords=keywords_used,
+            return_usage=True,
+        )
+        review_text = result["text"] if isinstance(result, dict) else str(result)
+        if isinstance(result, dict):
+            log_llm_usage(user=request.user, model=model, usage=result)
 
         # DB 저장
         doctor_name = ""
         if clinic and doctor_code:
             doctor = clinic.get_doctor_by_code(doctor_code)
             doctor_name = doctor.get('name', '') if doctor else ''
+
+        title_style = cafe.title_style if cafe else ""
+        title_suggestions = generate_title_suggestions(
+            review_text,
+            model=model,
+            title_style=title_style,
+        )
 
         generated_review = GeneratedReview.objects.create(
             clinic=clinic,
@@ -416,6 +1014,10 @@ def api_generate_review(request):
             procedure=procedure or "",
             generated_text=review_text,
             prompt_used=prompt,
+            model_used=model,
+            keywords_used=keywords_used,
+            persona_text=persona.name if persona else "",
+            title_suggestions=title_suggestions,
         )
 
         return JsonResponse({
@@ -425,6 +1027,14 @@ def api_generate_review(request):
             "prompt_preview": prompt,  # 전체 프롬프트 전송
             "char_count": len(review_text),
             "model_used": model,
+            "model_label": _get_model_display(model),
+            "title_suggestions": title_suggestions,
+            "input_tokens": result.get("input_tokens", 0) if isinstance(result, dict) else 0,
+            "output_tokens": result.get("output_tokens", 0) if isinstance(result, dict) else 0,
+            "cached_input_tokens": result.get("cached_input_tokens", 0) if isinstance(result, dict) else 0,
+            "total_tokens": result.get("total_tokens", 0) if isinstance(result, dict) else 0,
+            "cost_usd": round(result.get("cost_usd", 0), 6) if isinstance(result, dict) else 0,
+            "cost_krw": round(result.get("cost_usd", 0) * 1450, 2) if isinstance(result, dict) else 0,
         })
 
     except Exception as e:
@@ -460,6 +1070,8 @@ def api_regenerate_review(request):
             model=model,
         )
 
+        title_suggestions = generate_title_suggestions(new_text, model=model)
+
         # 새 버전으로 저장
         new_review = GeneratedReview.objects.create(
             clinic=original.clinic,
@@ -470,6 +1082,11 @@ def api_regenerate_review(request):
             procedure=original.procedure,
             generated_text=new_text,
             prompt_used=f"[재생성] 피드백: {feedback}\n\n{original.prompt_used}",
+            model_used=model,
+            keywords_used=original.keywords_used,
+            persona_text=original.persona_text,
+            title_suggestions=title_suggestions,
+            status="edited",
         )
 
         return JsonResponse({
@@ -478,6 +1095,8 @@ def api_regenerate_review(request):
             "review": new_text,
             "char_count": len(new_text),
             "model_used": model,
+            "model_label": _get_model_display(model),
+            "title_suggestions": title_suggestions,
         })
 
     except Exception as e:
@@ -608,26 +1227,35 @@ def api_generate_review_from_prompt(request):
         return JsonResponse({"error": "prompt는 필수입니다."}, status=400)
 
     try:
-        from apps.ml.services.llm_service import generate_review_with_prompt
-        result = generate_review_with_prompt(prompt, model=model, return_usage=True)
+        from apps.ml.services.llm_service import generate_review_with_prompt_enforced
+        prompt = apply_review_type_guard(prompt)
+        result = generate_review_with_prompt_enforced(prompt, model=model, return_usage=True)
         review_text = result["text"]
+        log_llm_usage(user=request.user, model=model, usage=result)
+
+        title_suggestions = generate_title_suggestions(review_text, model=model)
 
         # DB 저장
         generated_review = GeneratedReview.objects.create(
             generated_text=review_text,
             prompt_used=prompt,
+            model_used=model,
+            keywords_used=[],
+            persona_text="",
+            title_suggestions=title_suggestions,
         )
 
         # 원화 환산 (1 USD = 약 1,450 KRW)
         cost_krw = result["cost_usd"] * 1450
-
         return JsonResponse({
             "success": True,
             "review_id": generated_review.id,
             "review": review_text,
             "char_count": len(review_text),
             "model_used": model,
+            "model_label": _get_model_display(model),
             "prompt_preview": prompt[:500] + "..." if len(prompt) > 500 else prompt,
+            "title_suggestions": title_suggestions,
             "input_tokens": result["input_tokens"],
             "output_tokens": result["output_tokens"],
             "cached_input_tokens": result.get("cached_input_tokens", 0),
@@ -648,14 +1276,90 @@ def api_generate_review_from_prompt(request):
 @dashboard_required
 def generated_review_list(request):
     """생성된 리뷰 목록"""
-    reviews = GeneratedReview.objects.select_related('clinic', 'persona', 'cafe').all()[:100]
-    return render(request, "dashboard/generated_review_list.html", {"reviews": reviews})
+    kind = (request.GET.get("kind") or "all").strip().lower()
+    base_qs = GeneratedReview.objects.select_related('clinic', 'persona', 'cafe')
+    if kind == "edited":
+        reviews = base_qs.filter(status="edited")[:100]
+    elif kind == "original":
+        reviews = base_qs.exclude(status="edited")[:100]
+    else:
+        reviews = base_qs.all()[:100]
+
+    counts = {
+        "all": base_qs.count(),
+        "original": base_qs.exclude(status="edited").count(),
+        "edited": base_qs.filter(status="edited").count(),
+    }
+    for review in reviews:
+        review.model_display = _get_model_display(review.model_used)
+    return render(
+        request,
+        "dashboard/generated_review_list.html",
+        {"reviews": reviews, "kind": kind, "counts": counts},
+    )
 
 @dashboard_required
 def generated_review_detail(request, pk):
     """생성된 리뷰 상세"""
     review = get_object_or_404(GeneratedReview, pk=pk)
+    review.model_display = _get_model_display(review.model_used)
     return render(request, "dashboard/generated_review_detail.html", {"review": review})
+
+@dashboard_required
+@require_http_methods(["POST"])
+def api_save_edited_review(request):
+    """생성 결과를 수정본으로 저장"""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        data = request.POST.dict()
+
+    review_id = data.get("review_id")
+    edited_text = (data.get("edited_text") or "").strip()
+    title_suggestions = data.get("title_suggestions")
+    regenerate_titles = bool(data.get("regenerate_titles", False))
+
+    if not review_id or not edited_text:
+        return JsonResponse({"error": "review_id와 edited_text는 필수입니다."}, status=400)
+
+    original = get_object_or_404(GeneratedReview, pk=review_id)
+    # 수정 저장은 즉시 응답이 중요하므로 기본값은 기존 제목 재사용.
+    # 필요할 때만 regenerate_titles=true 로 제목을 재생성한다.
+    if not isinstance(title_suggestions, list):
+        if regenerate_titles:
+            title_suggestions = generate_title_suggestions(
+                edited_text,
+                model=original.model_used or "gpt-5-mini",
+            )
+        else:
+            title_suggestions = list(original.title_suggestions or [])
+
+    edited = GeneratedReview.objects.create(
+        clinic=original.clinic,
+        persona=original.persona,
+        cafe=original.cafe,
+        doctor_code=original.doctor_code,
+        doctor_name=original.doctor_name,
+        procedure=original.procedure,
+        generated_text=edited_text,
+        prompt_used=f"[수정본 저장] 원본 #{original.id}\n\n{original.prompt_used}",
+        model_used=original.model_used,
+        keywords_used=original.keywords_used,
+        persona_text=original.persona_text,
+        title_suggestions=title_suggestions,
+        status="edited",
+    )
+
+    return JsonResponse({
+        "success": True,
+        "review_id": edited.id,
+        "review": edited.generated_text,
+        "char_count": len(edited.generated_text),
+        "status": edited.status,
+        "model_used": edited.model_used,
+        "model_label": _get_model_display(edited.model_used),
+        "title_suggestions": edited.title_suggestions,
+    })
 
 @dashboard_required
 @require_http_methods(["POST"])
@@ -1711,18 +2415,30 @@ def llm_usage_users(request):
         .order_by("-total_tokens")
     )
 
-    top_users = list(by_user[:10])
+    by_user_list = list(by_user)
+    top_users = by_user_list[:10]
     user_labels = [u["user__username"] or "-" for u in top_users]
     user_tokens = [int(u["total_tokens"] or 0) for u in top_users]
     user_costs = [float(u["total_cost"] or 0) for u in top_users]
 
+    total_calls = sum(int(u["count"] or 0) for u in by_user_list)
+    total_tokens = sum(int(u["total_tokens"] or 0) for u in by_user_list)
+    total_cost = sum(float(u["total_cost"] or 0) for u in by_user_list)
+    user_count = len(by_user_list)
+    top_user = by_user_list[0] if by_user_list else None
+
     context = {
         "start_date": start_date,
         "end_date": end_date,
-        "by_user": by_user,
+        "by_user": by_user_list,
         "user_labels": user_labels,
         "user_tokens": user_tokens,
         "user_costs": user_costs,
+        "total_calls": total_calls,
+        "total_tokens": total_tokens,
+        "total_cost": total_cost,
+        "user_count": user_count,
+        "top_user": top_user,
     }
     return render(request, "dashboard/llm_usage_users.html", context)
 
@@ -1747,19 +2463,310 @@ def llm_usage_models(request):
         .order_by("-total_tokens")
     )
 
-    model_labels = [m["model"] for m in by_model]
-    model_tokens = [int(m["total_tokens"] or 0) for m in by_model]
-    model_costs = [float(m["total_cost"] or 0) for m in by_model]
+    by_model_list = list(by_model)
+    for row in by_model_list:
+        row["model_display"] = _get_model_display(row.get("model"))
+
+    model_labels = [m.get("model_display") or m.get("model") for m in by_model_list]
+    model_tokens = [int(m["total_tokens"] or 0) for m in by_model_list]
+    model_costs = [float(m["total_cost"] or 0) for m in by_model_list]
+
+    total_calls = sum(int(m["count"] or 0) for m in by_model_list)
+    total_tokens = sum(int(m["total_tokens"] or 0) for m in by_model_list)
+    total_cost = sum(float(m["total_cost"] or 0) for m in by_model_list)
+    model_count = len(by_model_list)
+    top_model = by_model_list[0] if by_model_list else None
 
     context = {
         "start_date": start_date,
         "end_date": end_date,
-        "by_model": by_model,
+        "by_model": by_model_list,
         "model_labels": model_labels,
         "model_tokens": model_tokens,
         "model_costs": model_costs,
+        "total_calls": total_calls,
+        "total_tokens": total_tokens,
+        "total_cost": total_cost,
+        "model_count": model_count,
+        "top_model": top_model,
     }
     return render(request, "dashboard/llm_usage_models.html", context)
+
+
+@dashboard_required
+def post_usage_stats(request):
+    """직원/병원별 여론·후기 월별 통계"""
+    has_date_filter = bool(request.GET.get("start") or request.GET.get("end"))
+    start_date, end_date = (None, None)
+    if has_date_filter:
+        start_date, end_date = _get_usage_range(request, default_days=90)
+    clinic_id = request.GET.get("clinic") or ""
+    assignee_id = request.GET.get("assignee") or ""
+
+    qs = ClinicPost.objects.select_related("clinic", "assignee").annotate(
+        posted_at=Coalesce("published_at", "created_at"),
+        month=TruncMonth(Coalesce("published_at", "created_at")),
+    )
+
+    if has_date_filter and start_date and end_date:
+        qs = qs.filter(
+            posted_at__date__gte=start_date,
+            posted_at__date__lte=end_date,
+        )
+
+    if clinic_id:
+        qs = qs.filter(clinic_id=clinic_id)
+    if assignee_id:
+        qs = qs.filter(assignee_id=assignee_id)
+
+    if not has_date_filter:
+        date_range = qs.aggregate(
+            min_date=Min("posted_at"),
+            max_date=Max("posted_at"),
+        )
+        min_date = date_range.get("min_date")
+        max_date = date_range.get("max_date")
+        if min_date and max_date:
+            start_date = min_date.date()
+            end_date = max_date.date()
+        else:
+            today = timezone.now().date()
+            start_date = today
+            end_date = today
+
+    by_group = (
+        qs.values("assignee_id", "assignee__username", "clinic_id", "clinic__name", "month", "type")
+        .annotate(count=Count("id"))
+        .order_by("assignee__username", "clinic__name", "month")
+    )
+
+    # 월 리스트 생성
+    months = []
+    cursor = start_date.replace(day=1)
+    end_cursor = end_date.replace(day=1)
+    while cursor <= end_cursor:
+        months.append(cursor)
+        if cursor.month == 12:
+            cursor = cursor.replace(year=cursor.year + 1, month=1)
+        else:
+            cursor = cursor.replace(month=cursor.month + 1)
+
+    # 집계 구조 구성
+    month_keys = [m.strftime("%Y-%m") for m in months]
+    rows = {}
+    for item in by_group:
+        key = (item["assignee_id"], item["clinic_id"])
+        row = rows.get(key)
+        if not row:
+            row = {
+                "assignee_id": item["assignee_id"],
+                "assignee": item["assignee__username"] or "-",
+                "clinic_id": item["clinic_id"],
+                "clinic": item["clinic__name"] or "-",
+                "months": {mk: {"opinion": 0, "review": 0} for mk in month_keys},
+                "total_opinion": 0,
+                "total_review": 0,
+                "total": 0,
+            }
+            rows[key] = row
+
+        month_key = item["month"].strftime("%Y-%m") if item["month"] else None
+        if month_key and month_key in row["months"]:
+            row["months"][month_key][item["type"]] = item["count"]
+        if item["type"] == "opinion":
+            row["total_opinion"] += item["count"]
+        else:
+            row["total_review"] += item["count"]
+        row["total"] += item["count"]
+
+    rows_list = []
+    for row in rows.values():
+        row["month_cells"] = [row["months"][mk] for mk in month_keys]
+        rows_list.append(row)
+    rows_list.sort(key=lambda r: (-r["total"], r["assignee"], r["clinic"]))
+
+    total_opinion = sum(r["total_opinion"] for r in rows_list)
+    total_review = sum(r["total_review"] for r in rows_list)
+    total_posts = total_opinion + total_review
+
+    # Top clinic / assignee
+    clinic_totals = {}
+    assignee_totals = {}
+    for r in rows_list:
+        clinic_totals[r["clinic"]] = clinic_totals.get(r["clinic"], 0) + r["total"]
+        assignee_totals[r["assignee"]] = assignee_totals.get(r["assignee"], 0) + r["total"]
+    top_clinic = max(clinic_totals.items(), key=lambda x: x[1]) if clinic_totals else ("-", 0)
+    top_assignee = max(assignee_totals.items(), key=lambda x: x[1]) if assignee_totals else ("-", 0)
+
+    # 월별 합계
+    month_labels = [m.strftime("%Y-%m") for m in months]
+    month_opinion = [0 for _ in month_labels]
+    month_review = [0 for _ in month_labels]
+    month_index = {label: idx for idx, label in enumerate(month_labels)}
+    for row in rows_list:
+        for label, cell in row["months"].items():
+            idx = month_index.get(label)
+            if idx is None:
+                continue
+            month_opinion[idx] += int(cell["opinion"] or 0)
+            month_review[idx] += int(cell["review"] or 0)
+
+    # 직원별 합계 (전체) - assignee_id 기준으로 통합
+    assignee_map = {}
+    role_counts = {}
+    excluded_names = {"강미선", "문나래", "홍채이", "admin", "-"}
+    assignee_aliases = {
+        "차예나매니저": "차예나",
+    }
+    suffixes = ("매니저", "실장", "팀장", "직원", "담당", "담당자", "관리자")
+
+    def _normalize_assignee_name(name):
+        if not name:
+            return "-"
+        value = str(name).strip()
+        value = assignee_aliases.get(value, value)
+        # 공백/특수문자 제거 (한글/영문/숫자만 유지)
+        value = re.sub(r"[^0-9A-Za-z가-힣]", "", value)
+        value = assignee_aliases.get(value, value)
+        # 직책 접미사 제거
+        for suffix in suffixes:
+            if value.endswith(suffix):
+                value = value[: -len(suffix)]
+                break
+        return value or "-"
+
+    def _extract_role(name):
+        if not name:
+            return ""
+        value = str(name).strip()
+        value = assignee_aliases.get(value, value)
+        # 공백/특수문자 제거
+        value = re.sub(r"[^0-9A-Za-z가-힣]", "", value)
+        for suffix in suffixes:
+            if value.endswith(suffix):
+                return suffix
+        return ""
+    for row in rows_list:
+        if row["assignee"] in excluded_names:
+            continue
+        assignee_id = row["assignee_id"]
+        raw_name = row["assignee"] or "-"
+        display_name = _normalize_assignee_name(raw_name)
+        key = display_name
+        role = _extract_role(raw_name)
+        if role:
+            role_counts.setdefault(key, {})
+            role_counts[key][role] = role_counts[key].get(role, 0) + 1
+        if key not in assignee_map:
+            assignee_map[key] = {
+                "id": assignee_id,
+                "name": display_name,
+                "months": {mk: {"opinion": 0, "review": 0} for mk in month_keys},
+            }
+        # 이름 갱신 (빈값이면 기존 유지)
+        if display_name and assignee_map[key]["name"] == "-":
+            assignee_map[key]["name"] = display_name
+        for mk in month_keys:
+            cell = row["months"].get(mk, {"opinion": 0, "review": 0})
+            assignee_map[key]["months"][mk]["opinion"] += int(cell.get("opinion", 0))
+            assignee_map[key]["months"][mk]["review"] += int(cell.get("review", 0))
+
+    # 직원별 병원/월별 상세
+    assignee_detail_map = {}
+    for row in rows_list:
+        raw_name = row["assignee"] or "-"
+        display_name = _normalize_assignee_name(raw_name)
+        if raw_name in excluded_names or display_name in excluded_names:
+            continue
+        clinic_name = row["clinic"] or "-"
+        detail = assignee_detail_map.setdefault(display_name, {"clinics": {}})
+        clinic_bucket = detail["clinics"].setdefault(
+            clinic_name,
+            {
+                "name": clinic_name,
+                "months": {mk: {"opinion": 0, "review": 0} for mk in month_keys},
+                "total_opinion": 0,
+                "total_review": 0,
+                "total": 0,
+            },
+        )
+        for mk in month_keys:
+            cell = row["months"].get(mk, {"opinion": 0, "review": 0})
+            clinic_bucket["months"][mk]["opinion"] += int(cell.get("opinion", 0))
+            clinic_bucket["months"][mk]["review"] += int(cell.get("review", 0))
+        clinic_bucket["total_opinion"] += row["total_opinion"]
+        clinic_bucket["total_review"] += row["total_review"]
+        clinic_bucket["total"] += row["total"]
+
+    assignee_charts = []
+    assignee_ids = [r["assignee_id"] for r in rows_list if r.get("assignee_id")]
+    role_label_map = dict(UserProfile.POSITION_CHOICES)
+    role_by_user = {
+        p["user_id"]: role_label_map.get(p["position"], p["position"])
+        for p in UserProfile.objects.filter(user_id__in=assignee_ids).values("user_id", "position")
+    }
+    for key, data in assignee_map.items():
+        opinion_series = [data["months"][mk]["opinion"] for mk in month_keys]
+        review_series = [data["months"][mk]["review"] for mk in month_keys]
+        opinion_total = sum(opinion_series)
+        review_total = sum(review_series)
+        role = role_by_user.get(data["id"], "")
+        if not role and key in role_counts:
+            role = max(role_counts[key].items(), key=lambda x: x[1])[0]
+        clinics_payload = []
+        detail = assignee_detail_map.get(data["name"], {})
+        for clinic in detail.get("clinics", {}).values():
+            clinics_payload.append({
+                "name": clinic["name"],
+                "opinion": [clinic["months"][mk]["opinion"] for mk in month_keys],
+                "review": [clinic["months"][mk]["review"] for mk in month_keys],
+                "opinion_total": clinic["total_opinion"],
+                "review_total": clinic["total_review"],
+                "total": clinic["total"],
+            })
+        clinics_payload.sort(key=lambda r: (-r["total"], r["name"]))
+        assignee_charts.append({
+            "name": data["name"],
+            "role": role,
+            "opinion": opinion_series,
+            "review": review_series,
+            "opinion_total": opinion_total,
+            "review_total": review_total,
+            "total": opinion_total + review_total,
+            "clinics": clinics_payload,
+        })
+    assignee_charts.sort(key=lambda r: (r["name"] == "-", r["name"]))
+
+    clinics = ClinicGuide.objects.filter(is_active=True).order_by("name")
+    assignees = (
+        ClinicPost.objects.select_related("assignee")
+        .values("assignee_id", "assignee__username")
+        .distinct()
+        .order_by("assignee__username")
+    )
+
+    context = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "months": months,
+        "month_keys": month_keys,
+        "rows": rows_list,
+        "total_columns": 5 + len(months),
+        "total_posts": total_posts,
+        "total_opinion": total_opinion,
+        "total_review": total_review,
+        "top_clinic": top_clinic,
+        "top_assignee": top_assignee,
+        "month_labels": month_labels,
+        "month_opinion": month_opinion,
+        "month_review": month_review,
+        "assignee_charts": assignee_charts,
+        "clinics": clinics,
+        "assignees": assignees,
+        "selected_clinic": clinic_id,
+        "selected_assignee": assignee_id,
+    }
+    return render(request, "dashboard/post_usage_stats.html", context)
 
 @dashboard_required
 def export_llm_usage_csv(request):
@@ -2123,10 +3130,11 @@ def api_generate_series(request):
     )
 
     try:
-        from apps.ml.services.llm_service import generate_review_with_prompt
+        from apps.ml.services.llm_service import generate_review_with_prompt_enforced
+        series_prompt = apply_review_type_guard(series_prompt)
         # max_tokens를 8000으로 늘려서 긴 시리즈도 생성 가능
         # temperature 파라미터 추가로 창의성 조절
-        result = generate_review_with_prompt(
+        result = generate_review_with_prompt_enforced(
             series_prompt,
             model=model,
             max_tokens=8000,
@@ -2134,6 +3142,7 @@ def api_generate_series(request):
             temperature=temperature
         )
         generated_text = result["text"]
+        log_llm_usage(user=request.user, model=model, usage=result)
 
         # 파싱: ======= 구분자로 분리
         parts = re.split(r'\n=+\n', generated_text)
@@ -2169,7 +3178,31 @@ def api_generate_series(request):
                 "type": type_code,
                 "content": content,
                 "char_count": len(content),
+                "title_suggestions": generate_title_suggestions(content, model=model),
             })
+
+        # 생성 리뷰 저장 (Basic+)
+        persona_text = _build_persona_text(persona)
+        keywords_used = list(content_types)
+        saved_ids = []
+        for item in series:
+            type_label = type_names.get(item["type"], item["type"])
+            created = GeneratedReview.objects.create(
+                clinic=None,
+                persona=None,
+                cafe=None,
+                doctor_code="",
+                doctor_name="",
+                procedure=type_label,
+                generated_text=item["content"],
+                prompt_used=series_prompt,
+                model_used=model,
+                keywords_used=keywords_used,
+                persona_text=persona_text,
+                title_suggestions=item.get("title_suggestions") or [],
+            )
+            saved_ids.append(created.id)
+            item["review_id"] = created.id
 
         # 원화 환산
         cost_krw = result["cost_usd"] * 1450
@@ -2177,6 +3210,7 @@ def api_generate_series(request):
         return JsonResponse({
             "success": True,
             "series": series,
+            "saved_ids": saved_ids,
             "prompt": series_prompt,  # 프롬프트도 반환
             "usage": {
                 "input_tokens": result["input_tokens"],
@@ -2227,8 +3261,9 @@ def api_generate_reply(request):
 답변:"""
 
     try:
-        from apps.ml.services.llm_service import generate_review_with_prompt
-        result = generate_review_with_prompt(reply_prompt, model=model, return_usage=True)
+        from apps.ml.services.llm_service import generate_review_with_prompt_enforced
+        result = generate_review_with_prompt_enforced(reply_prompt, model=model, return_usage=True)
+        log_llm_usage(user=request.user, model=model, usage=result)
 
         return JsonResponse({
             "success": True,
@@ -2280,8 +3315,9 @@ def api_generate_with_style(request):
 새 글:"""
 
     try:
-        from apps.ml.services.llm_service import generate_review_with_prompt
-        result = generate_review_with_prompt(style_prompt, model=model, return_usage=True)
+        from apps.ml.services.llm_service import generate_review_with_prompt_enforced
+        result = generate_review_with_prompt_enforced(style_prompt, model=model, return_usage=True)
+        log_llm_usage(user=request.user, model=model, usage=result)
 
         # 원화 환산
         cost_krw = result["cost_usd"] * 1450
@@ -2289,6 +3325,7 @@ def api_generate_with_style(request):
         return JsonResponse({
             "success": True,
             "content": result["text"],
+            "title_suggestions": title_suggestions,
             "usage": {
                 "input_tokens": result["input_tokens"],
                 "output_tokens": result["output_tokens"],
@@ -2725,8 +3762,9 @@ JSON 출력:"""
 
     result = None
     try:
-        from apps.ml.services.llm_service import generate_review_with_prompt
-        result = generate_review_with_prompt(prompt, model=model, return_usage=True, temperature=temperature)
+        from apps.ml.services.llm_service import generate_review_with_prompt_enforced
+        prompt = apply_review_type_guard(prompt)
+        result = generate_review_with_prompt_enforced(prompt, model=model, return_usage=True, temperature=temperature)
 
         # JSON 파싱
         response_text = result["text"].strip()
@@ -2753,6 +3791,9 @@ JSON 출력:"""
             "bad_reason": parsed.get("bad_reason", ""),
             "rating": parsed.get("rating", rating),
             "additional": parsed.get("additional", ""),
+            "title_suggestions": title_suggestions,
+            "model_used": model,
+            "model_label": _get_model_display(model),
             "usage": {
                 "input_tokens": result["input_tokens"],
                 "output_tokens": result["output_tokens"],

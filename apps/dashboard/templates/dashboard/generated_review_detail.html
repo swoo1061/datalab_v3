@@ -22,6 +22,19 @@
       <h3 class="card-title">📝 리뷰 내용</h3>
       <span class="tag tag-primary">{{ review.generated_text|length }}자</span>
     </div>
+
+    <div class="title-suggestions-box">
+      <div class="title-suggestions-label">제목 추천</div>
+      {% if review.title_suggestions %}
+        <ul class="title-suggestions-list">
+          {% for t in review.title_suggestions %}
+            <li>{{ t }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="title-suggestions-empty">-</div>
+      {% endif %}
+    </div>
     
     <div class="result-box" id="reviewText">{{ review.generated_text }}</div>
     
@@ -48,46 +61,39 @@
   <div>
     <div class="card">
       <div class="card-header">
-        <h3 class="card-title">ℹ️ 생성 정보</h3>
+        <h3 class="card-title">ℹ️ 요약 정보</h3>
       </div>
       
       <div style="display: grid; gap: 16px;">
         <div>
-          <div class="text-sm text-muted">병원</div>
+          <div class="text-sm text-muted">페르소나</div>
           <div>
-            {% if review.clinic %}
-              <a href="{% url 'dashboard:clinic_detail' review.clinic.pk %}">
-                {{ review.clinic.name }}
-              </a>
+            {% if review.persona %}
+              {{ review.persona.name }}
+            {% elif review.persona_text %}
+              {{ review.persona_text }}
+            {% else %}
+              기본 페르소나
+            {% endif %}
+          </div>
+        </div>
+
+        <div>
+          <div class="text-sm text-muted">사용 키워드</div>
+          <div>
+            {% if review.keywords_used %}
+              {{ review.keywords_used|join:", " }}
             {% else %}
               -
             {% endif %}
           </div>
         </div>
-        
+
         <div>
-          <div class="text-sm text-muted">담당 원장</div>
-          <div>
-            <span class="tag tag-primary">{{ review.doctor_code }}</span>
-            {{ review.doctor_name }}
-          </div>
+        <div class="text-sm text-muted">사용한 모델</div>
+        <div>{{ review.model_display|default:review.model_used|default:"-" }}</div>
         </div>
-        
-        <div>
-          <div class="text-sm text-muted">시술</div>
-          <div>{{ review.procedure }}</div>
-        </div>
-        
-        <div>
-          <div class="text-sm text-muted">페르소나</div>
-          <div>{{ review.persona.name|default:"기본 페르소나" }}</div>
-        </div>
-        
-        <div>
-          <div class="text-sm text-muted">타겟 카페</div>
-          <div>{{ review.cafe.name|default:"기본 설정" }}</div>
-        </div>
-        
+
         <div>
           <div class="text-sm text-muted">생성일시</div>
           <div>{{ review.created_at|date:"Y-m-d H:i:s" }}</div>

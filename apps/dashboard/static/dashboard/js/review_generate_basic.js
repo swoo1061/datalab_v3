@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+  let currentReviewId = null;
   const userInput = document.getElementById('userInput');
   const resultBox = document.getElementById('resultBox');
   const charCount = document.getElementById('charCount');
@@ -8,6 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const generateBtn = document.getElementById('generateBtn');
   const promptEditor = document.getElementById('promptEditor');
   const promptCard = document.getElementById('promptCard');
+  const MBTI_RE = /\b(ISTJ|ISFJ|INFJ|INTJ|ISTP|ISFP|INFP|INTP|ESTP|ESFP|ENFP|ENTP|ESTJ|ESFJ|ENFJ|ENTJ)\b/i;
+  function extractMbti(text) {
+    const m = String(text || "").match(MBTI_RE);
+    return m ? m[1].toUpperCase() : null;
+  }
+  const titleSuggestionsBox = document.getElementById('titleSuggestionsBox');
+  const titleSuggestionsList = document.getElementById('titleSuggestionsList');
+  resultBox.contentEditable = 'true';
+  resultBox.spellcheck = false;
 
   // CSRF 토큰
   function getCookie(name) {
@@ -40,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 리뷰 생성
   generateBtn.addEventListener('click', async function () {
-    const input = userInput.value.trim();
+    let input = userInput.value.trim();
     const selectedModel =
       document.querySelector('input[name="model"]:checked')?.value
       || 'claude-sonnet-4-5-20250929';
@@ -48,6 +58,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!input) {
       alert('리뷰 정보를 입력해주세요.');
       return;
+    }
+
+    const mbti = extractMbti(input);
+    if (selectedModel === 'ft:gpt-4.1-2025-04-14:personal::D3gDuLBk' && mbti) {
+      input = `${input}\nMBTI: ${mbti}`;
     }
 
     loadingCard.style.display = 'block';
@@ -77,6 +92,16 @@ document.addEventListener('DOMContentLoaded', () => {
       resultBox.textContent = result.review;
       resultBox.style.color = '';
       charCount.textContent = `${result.char_count}자`;
+      currentReviewId = result.review_id || null;
+      if (Array.isArray(result.title_suggestions) && result.title_suggestions.length) {
+        titleSuggestionsList.innerHTML = result.title_suggestions
+          .map(t => `<li>${t}</li>`)
+          .join('');
+        titleSuggestionsBox.style.display = '';
+      } else {
+        titleSuggestionsList.innerHTML = '';
+        titleSuggestionsBox.style.display = 'none';
+      }
 
       // 토큰/비용 표시
       if (result.total_tokens) {
@@ -149,6 +174,16 @@ document.addEventListener('DOMContentLoaded', () => {
       resultBox.textContent = result.review;
       resultBox.style.color = '';
       charCount.textContent = `${result.char_count}자`;
+      currentReviewId = result.review_id || null;
+      if (Array.isArray(result.title_suggestions) && result.title_suggestions.length) {
+        titleSuggestionsList.innerHTML = result.title_suggestions
+          .map(t => `<li>${t}</li>`)
+          .join('');
+        titleSuggestionsBox.style.display = '';
+      } else {
+        titleSuggestionsList.innerHTML = '';
+        titleSuggestionsBox.style.display = 'none';
+      }
 
       loadingCard.style.display = 'none';
 
@@ -175,10 +210,51 @@ document.addEventListener('DOMContentLoaded', () => {
     resultBox.textContent = '리뷰가 여기에 표시됩니다.';
     resultBox.style.color = 'var(--muted)';
     charCount.textContent = '0자';
+    titleSuggestionsList.innerHTML = '';
+    titleSuggestionsBox.style.display = 'none';
     tokenInfo.style.display = 'none';
     costInfo.style.display = 'none';
     promptEditor.value = '';
     promptCard.open = false;
+    currentReviewId = null;
+  });
+
+  // 수정 저장
+  document.getElementById('saveEditedBtn')?.addEventListener('click', async function () {
+    const edited = resultBox.textContent.trim();
+    if (!currentReviewId) {
+      alert('먼저 리뷰를 생성해주세요.');
+      return;
+    }
+    if (!edited) {
+      alert('저장할 내용이 없습니다.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/dashboard/api/generated/save-edit/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+          review_id: currentReviewId,
+          edited_text: edited
+        })
+      });
+      const result = await response.json();
+      if (result.error) throw new Error(result.error);
+      currentReviewId = result.review_id;
+      charCount.textContent = `${result.char_count}자`;
+      if (Array.isArray(result.title_suggestions) && result.title_suggestions.length) {
+        titleSuggestionsList.innerHTML = result.title_suggestions.map(t => `<li>${t}</li>`).join('');
+        titleSuggestionsBox.style.display = '';
+      }
+      alert('수정본이 저장되었습니다.');
+    } catch (err) {
+      alert('수정 저장 실패: ' + err.message);
+    }
   });
 });
 // 프롬프트 복사

@@ -1,0 +1,333 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}게시글 관리{% endblock %}
+
+{% block content %}
+<style>
+  .post-manage-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    padding: 20px;
+    border-radius: 16px;
+    background: linear-gradient(140deg, rgba(255,255,255,0.9), rgba(240,248,255,0.9));
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 20px 40px -28px rgba(15, 23, 42, 0.35);
+  }
+  .post-manage-hero h1 { margin: 0; font-size: 22px; letter-spacing: -0.3px; }
+  .post-manage-hero p { margin: 6px 0 0; color: var(--muted); }
+  .post-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .filter-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(240,248,255,0.95));
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 18px 28px -24px rgba(15, 23, 42, 0.35);
+  }
+  .filter-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1f2937;
+  }
+  .filter-hint {
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .clinic-select-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.04);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+  }
+  .clinic-select-label {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .clinic-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 999px;
+    padding: 8px 36px 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    min-width: 220px;
+    box-shadow: 0 12px 24px -20px rgba(15, 23, 42, 0.4);
+    background-image: linear-gradient(45deg, transparent 50%, #64748b 50%),
+      linear-gradient(135deg, #64748b 50%, transparent 50%),
+      linear-gradient(to right, rgba(15, 23, 42, 0.06), rgba(15, 23, 42, 0.06));
+    background-position: calc(100% - 18px) 55%, calc(100% - 12px) 55%, calc(100% - 44px) 50%;
+    background-size: 6px 6px, 6px 6px, 1px 60%;
+    background-repeat: no-repeat;
+  }
+  .clinic-select:focus {
+    outline: none;
+    border-color: rgba(37, 99, 235, 0.4);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  .pill-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.8);
+    border: 1px solid var(--border);
+  }
+  .pill-row .type-pill {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: #fff;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 12px;
+    transition: all .2s ease;
+  }
+  .pill-row .type-pill.active {
+    background: linear-gradient(135deg, rgba(14,165,164,0.2), rgba(56,189,248,0.2));
+    border-color: rgba(14,165,164,0.35);
+  }
+  .clinic-card {
+    margin-top: 18px;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255,255,255,0.95);
+    box-shadow: 0 18px 36px -28px rgba(15, 23, 42, 0.35);
+  }
+  .clinic-card-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 16px 18px;
+    background: linear-gradient(90deg, rgba(15,23,42,0.02), rgba(59,130,246,0.06));
+  }
+  .clinic-stats {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .clinic-stats .stat-chip {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.06);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .post-table table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 6px;
+  }
+  .post-table thead th {
+    text-align: left;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 0 12px 6px;
+  }
+  .post-table tbody tr {
+    background: #fff;
+    box-shadow: 0 10px 20px -18px rgba(15, 23, 42, 0.35);
+  }
+  .post-table tbody td {
+    padding: 10px 12px;
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  .post-table tbody tr td:first-child { border-radius: 12px 0 0 12px; }
+  .post-table tbody tr td:last-child { border-radius: 0 12px 12px 0; }
+  .badge-soft {
+    display: inline-flex;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(14, 165, 164, 0.12);
+    color: #0f766e;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-soft.review {
+    background: rgba(59, 130, 246, 0.12);
+    color: #1d4ed8;
+  }
+  .post-title {
+    max-width: 380px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>
+
+<div class="post-manage-hero">
+  <div>
+    <h1>게시글 관리</h1>
+    <p>여론/후기 분리 · 병원별 그룹 · 빠른 현황 확인</p>
+  </div>
+  <div class="clinic-stats">
+    <span class="stat-chip">병원 {{ clinics|length }}</span>
+    <span class="stat-chip">타입 {{ type_filter|default:"opinion" }}</span>
+  </div>
+</div>
+
+<div class="post-filters">
+  <div class="filter-card">
+    <div>
+      <div class="filter-title">병원 필터</div>
+      <div class="filter-hint">담당 병원별 게시글을 빠르게 확인하세요.</div>
+    </div>
+    <div class="clinic-select-wrap">
+      <span class="clinic-select-label">병원</span>
+      <select id="postClinicSelect" class="clinic-select">
+        {% for c in clinics %}
+          <option value="{{ c.id }}" {% if clinic_id|add:'' == c.id|add:'' %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="clinic-select-wrap">
+      <span class="clinic-select-label">정렬</span>
+      <select id="postSortSelect" class="clinic-select">
+        <option value="latest" {% if sort == "latest" %}selected{% endif %}>최신글</option>
+        <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>오래된글</option>
+      </select>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    const select = document.getElementById("postClinicSelect");
+    const sortSelect = document.getElementById("postSortSelect");
+    if (!select || !sortSelect) return;
+    const params = new URLSearchParams(window.location.search || "");
+    const clinic = params.get("clinic");
+    const sort = params.get("sort");
+    if (!clinic) return;
+    // Force selected value from URL to avoid fallback to first option.
+    select.value = clinic;
+    if (sort) sortSelect.value = sort;
+
+    const navigate = () => {
+      const next = new URLSearchParams();
+      if (select.value) next.set("clinic", select.value);
+      if (sortSelect.value) next.set("sort", sortSelect.value);
+      location.href = `?${next.toString()}`;
+    };
+
+    select.addEventListener("change", navigate);
+    sortSelect.addEventListener("change", navigate);
+  })();
+</script>
+
+{% for group in clinic_groups %}
+  <div class="clinic-card">
+    <div class="clinic-card-head">
+      <div>
+        <div class="card-title">{{ group.clinic.name|default:"-" }}</div>
+        <div class="text-sm text-muted">총 {{ group.total }}건</div>
+      </div>
+      <div class="clinic-stats">
+        <span class="stat-chip">여론 {{ group.opinion }}</span>
+        <span class="stat-chip">후기 {{ group.review }}</span>
+      </div>
+    </div>
+    <div class="grid-2" style="gap: 12px; padding: 0 12px 12px;">
+      <div class="post-table">
+        <div class="text-sm text-muted" style="padding: 8px 4px;">여론</div>
+        <table>
+          <thead>
+            <tr>
+              <th>날짜</th>
+              <th>세부유형</th>
+              <th>제목</th>
+              <th>플랫폼</th>
+              <th>작성자</th>
+              <th>조회</th>
+              <th>댓글</th>
+              <th>쪽지</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for post in group.posts %}
+              {% if post.type == 'opinion' %}
+              <tr>
+                <td class="text-muted text-sm">{{ post.created_at|date:"m/d H:i" }}</td>
+                <td>{{ post.get_opinion_subtype_display|default:"-" }}</td>
+                <td class="post-title">{{ post.title|default:"-" }}</td>
+                <td>{{ post.get_platform_display }}</td>
+                <td>
+                  {% if post.assignee %}
+                    {{ post.assignee.profile.name|default:post.assignee.username }}
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+                <td>{{ post.views }}</td>
+                <td>{{ post.comments }}</td>
+                <td>{{ post.message_count }}</td>
+              </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="post-table">
+        <div class="text-sm text-muted" style="padding: 8px 4px;">후기</div>
+        <table>
+          <thead>
+            <tr>
+              <th>날짜</th>
+              <th>세부유형</th>
+              <th>제목</th>
+              <th>플랫폼</th>
+              <th>작성자</th>
+              <th>조회</th>
+              <th>댓글</th>
+              <th>쪽지</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for post in group.posts %}
+              {% if post.type == 'review' %}
+              <tr>
+                <td class="text-muted text-sm">{{ post.created_at|date:"m/d H:i" }}</td>
+                <td>{{ post.get_review_subtype_display|default:"-" }}</td>
+                <td class="post-title">{{ post.title|default:"-" }}</td>
+                <td>{{ post.get_platform_display }}</td>
+                <td>
+                  {% if post.assignee %}
+                    {{ post.assignee.profile.name|default:post.assignee.username }}
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+                <td>{{ post.views }}</td>
+                <td>{{ post.comments }}</td>
+                <td>{{ post.message_count }}</td>
+              </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% empty %}
+  <div class="text-muted text-center" style="padding:40px;">데이터가 없습니다.</div>
+{% endfor %}
+{% endblock %}

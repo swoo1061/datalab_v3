@@ -109,6 +109,10 @@ STATICFILES_DIRS = [
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Auto-update files (Electron)
+UPDATES_URL = "/updates/"
+UPDATES_ROOT = BASE_DIR / "updates"
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -181,9 +185,10 @@ ALLOWED_HOSTS = ["*"]
 
 SESSION_COOKIE_NAME = "sessionid"
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = "None"
+# 로컬 HTTP에서는 SameSite=None 쿠키가 차단될 수 있어 세션이 유지되지 않음
+SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = False
 
 

@@ -12,8 +12,9 @@
   <link rel="stylesheet" href="css/my_dashboard.css" />
   <link rel="stylesheet" href="css/schedule.css" />
   <link rel="stylesheet" href="css/calendar_dashboard.css" />
+  <link rel="stylesheet" href="css/business_mode.css" />
 </head>
-<body class="theme-vivid">
+<body class="theme-vivid tone-sidebar">
 
 <div class="app-root">
   <!-- 사이드바 -->
@@ -27,34 +28,154 @@
         <section class="page-canvas">
 
             <header class="page-head">
-            <h1 class="h1">나의 대시보드</h1>
-            <p class="sub">개인공간</p>
+              <div>
+                <h1 class="h1">나의 대시보드</h1>
+                <p class="sub">개인공간</p>
+              </div>
             </header>
 
-            <div class="dashboard-panels">
-              <section class="dashboard-panel card">
-                <div class="card-hd">담당 병원</div>
-                <div class="card-bd">
+            <div class="my-workspace-layout">
+              <aside class="my-section-nav card" id="mySectionNav" aria-label="대시보드 섹션">
+                <button type="button" class="my-section-nav-btn active" data-section-key="attendance">
+                  <span class="nav-step">01</span>
+                  <span class="nav-label">출퇴근</span>
+                </button>
+                <button type="button" class="my-section-nav-btn" data-section-key="clinic">
+                  <span class="nav-step">02</span>
+                  <span class="nav-label">담당 병원</span>
+                </button>
+                <button type="button" class="my-section-nav-btn" data-section-key="week">
+                  <span class="nav-step">03</span>
+                  <span class="nav-label">월간 작업</span>
+                </button>
+                <button type="button" class="my-section-nav-btn" data-section-key="memo">
+                  <span class="nav-step">04</span>
+                  <span class="nav-label">메모장</span>
+                </button>
+              </aside>
+
+              <div id="myDashboardSections" class="dashboard-panels sections-stack">
+              <section class="section-block card" data-section-key="attendance" draggable="false">
+                <button type="button" class="section-toggle" data-target="myAttendanceSection" aria-expanded="true">
+                  <span class="section-title">출퇴근 관리</span>
+                  <span class="section-drag-handle" aria-label="섹션 이동">⠿</span>
+                </button>
+                <div id="myAttendanceSection" class="section-body open">
+                  <div class="attendance-wrap">
+                    <div class="attendance-actions">
+                      <div class="attendance-state">
+                        <strong id="attTodayStatus">상태 확인 중...</strong>
+                        <p id="attTodayMeta" class="muted">-</p>
+                      </div>
+                      <div class="attendance-buttons">
+                        <button class="btn primary" id="attCheckInBtn" type="button">출근</button>
+                        <button class="btn" id="attCheckOutBtn" type="button">퇴근</button>
+                        <button class="btn" id="attCorrectionOpenBtn" type="button">정정 요청</button>
+                      </div>
+                    </div>
+                    <div class="attendance-summary" id="attSummary">
+                      <span>이번달 근무일 0일</span>
+                      <span>총 0시간 0분</span>
+                      <span>평균 0시간 0분</span>
+                    </div>
+                    <div class="attendance-corrections" id="attCorrections"></div>
+                    <div class="attendance-list" id="attList"></div>
+                  </div>
+                </div>
+              </section>
+              <section class="section-block dashboard-panel card" data-section-key="clinic" draggable="false">
+                <button type="button" class="section-toggle" data-target="myClinicSection" aria-expanded="true">
+                  <span class="section-title">담당 병원</span>
+                  <span class="section-drag-handle" aria-label="섹션 이동">⠿</span>
+                </button>
+                <div id="myClinicSection" class="section-body open">
                   <section id="myClinicGrid" class="clinic-grid"></section>
                 </div>
               </section>
-            </div>
-            <div class="week-panel">
-              <div class="week-head">
-                <div class="week-title">주간 작업 목록</div>
-                <div class="week-controls">
-                  <button class="btn" id="weekPrevBtn">이번 주</button>
-                  <span id="weekLabel" class="week-label"></span>
-                  <button class="btn" id="weekNextBtn">다음 주</button>
+              <section class="section-block week-panel card" data-section-key="week" draggable="false">
+                <button type="button" class="section-toggle" data-target="myWeekSection" aria-expanded="true">
+                  <span class="section-title">월간 작업 목록</span>
+                  <span class="section-drag-handle" aria-label="섹션 이동">⠿</span>
+                </button>
+                <div id="myWeekSection" class="section-body open">
+                  <div class="week-head">
+                    <!-- <div class="week-title">월간 작업 목록</div> -->
+                    <div class="week-controls">
+                      <div class="month-nav" id="myMonthNav">
+                        <button class="month-btn" id="weekPrevBtn" type="button">◀</button>
+                        <div id="weekLabel" class="month-label">-</div>
+                        <button class="month-btn" id="weekNextBtn" type="button">▶</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="card-bd">
+                    <div id="myWeekCalendar" class="week-calendar compact"></div>
+                  </div>
                 </div>
-              </div>
-              <div class="card-bd">
-                <div id="myWeekCalendar" class="week-calendar compact"></div>
-              </div>
+              </section>
+              <section class="section-block memo-panel card" data-section-key="memo" draggable="false">
+                <button type="button" class="section-toggle" data-target="myMemoSection" aria-expanded="true">
+                  <span class="section-title">메모장</span>
+                  <span class="section-drag-handle" aria-label="섹션 이동">⠿</span>
+                </button>
+                <div id="myMemoSection" class="section-body open">
+                  <div class="calendar-memo-panel" id="myMemoPanel">
+                    <div class="memo-list-panel">
+                      <div class="memo-list-head">
+                        <div class="memo-title">
+                          <strong>메모 리스트</strong>
+                        </div>
+                        <div class="memo-actions">
+                          <button class="btn primary" id="myMemoOpen">메모 작성</button>
+                        </div>
+                      </div>
+                      <div id="myMemoList" class="memo-list"></div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
             </div>
 
         </section>
         </main>
+  </div>
+</div>
+
+<div id="attCorrectionModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">출퇴근 정정 요청</div>
+        <div class="modal-sub">요청 시 대표님 계정으로 알림이 전송됩니다.</div>
+      </div>
+      <button class="modal-close" data-close="true">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid">
+        <div class="ai-field">
+          <label>대상일</label>
+          <input id="attReqDate" class="input" type="date" />
+        </div>
+        <div class="ai-field">
+          <label>요청 출근시각</label>
+          <input id="attReqCheckIn" class="input" type="datetime-local" />
+        </div>
+        <div class="ai-field">
+          <label>요청 퇴근시각</label>
+          <input id="attReqCheckOut" class="input" type="datetime-local" />
+        </div>
+        <div class="ai-field span-2">
+          <label>정정 사유</label>
+          <textarea id="attReqReason" class="input" placeholder="예: 외근 후 시스템 지연으로 퇴근 입력 누락"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-close="true">취소</button>
+      <button class="btn primary" id="attReqSubmitBtn">요청 보내기</button>
+    </div>
   </div>
 </div>
 
@@ -77,6 +198,51 @@
   <div class="photo-preview-card">
     <!-- <button class="photo-preview-close" data-close="true" aria-label="닫기">✖️</button> -->
     <img id="photoPreviewImage" alt="preview" />
+  </div>
+</div>
+
+<div id="myMemoModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">메모 작성</div>
+        <div class="modal-sub">선택한 날짜에 메모를 추가합니다.</div>
+      </div>
+      <button class="modal-close" data-close="true">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid">
+        <div class="ai-field span-2">
+          <label>내용</label>
+          <textarea id="myMemoContent" class="input" placeholder="메모를 입력하세요"></textarea>
+        </div>
+        <div class="ai-field">
+          <label>병원</label>
+          <select id="myMemoClinicSelect" class="select"></select>
+        </div>
+        <div class="ai-field">
+          <label>플랫폼</label>
+          <select id="myMemoPlatform" class="select"></select>
+        </div>
+        <div class="ai-field">
+          <label>알림 시간</label>
+          <input id="myMemoRemind" class="input" type="datetime-local" />
+        </div>
+        <div class="ai-field">
+          <label>ID</label>
+          <input id="myMemoAccount" class="input" />
+        </div>
+        <div class="ai-field">
+          <label>PW</label>
+          <input id="myMemoPassword" class="input" type="password" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-close="true">취소</button>
+      <button class="btn primary" id="myMemoSave">저장</button>
+    </div>
   </div>
 </div>
 

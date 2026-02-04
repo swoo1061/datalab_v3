@@ -16,23 +16,135 @@ function toggleNav(el) {
 /* ================================
    현재 페이지 active 처리
 ================================ */
-document.addEventListener("DOMContentLoaded", () => {
+function applySidebarActiveState() {
   const current = document.body.dataset.nav; // ex: clinic
-  if (!current) return;
+  if (current) {
+    document.querySelectorAll(".nav-sub a").forEach(a => {
+      if (a.dataset.nav === current) {
+        a.classList.add("active");
 
-  document.querySelectorAll(".nav-sub a").forEach(a => {
-    if (a.dataset.nav === current) {
-      a.classList.add("active");
+        const group = a.closest(".nav-group");
+        if (group) group.classList.add("open");
+      }
+    });
+  }
+}
 
-      const group = a.closest(".nav-group");
-      if (group) group.classList.add("open");
+async function openKakaoWorkShortcut() {
+  if (window.nav?.openKakaoWork) {
+    try {
+      await window.nav.openKakaoWork();
+      return;
+    } catch (e) {
+      window.showAlert?.("카카오워크 앱 실행에 실패했습니다.");
+      return;
     }
-  });
+  }
+  window.showAlert?.("카카오워크 앱 실행 기능을 사용할 수 없습니다.");
+}
+
+/* ================================
+   Notion Shortcut (추가)
+================================ */
+function openNotionShortcut() {
+  if (window.nav?.openNotion) {
+    try {
+      window.nav.openNotion();
+      return;
+    } catch (e) {
+      window.showAlert?.("노션 실행에 실패했습니다.");
+      return;
+    }
+  }
+  window.showAlert?.("노션 앱 실행 기능을 사용할 수 없습니다.");
+}
+
+/* ================================
+   Sidebar Shortcut Click (이벤트 위임)
+================================ */
+// Sidebar는 동적 로드(loadLayout)라서 이벤트 위임으로 클릭을 안정적으로 처리.
+document.addEventListener("click", (e) => {
+  const kakaoBtn = e.target?.closest?.("#kakaoWorkShortcut");
+  if (kakaoBtn) {
+    e.preventDefault();
+    openKakaoWorkShortcut();
+    return;
+  }
+
+  const notionBtn = e.target?.closest?.("#notionShortcut");
+  if (notionBtn) {
+    e.preventDefault();
+    openNotionShortcut();
+    return;
+  }
 });
+
 
 /* ================================
    브랜드 이동
 ================================ */
 function goDashboard() {
-  location.href = "dashboard.html";
+  location.href = "my_dashboard.html";
+}
+
+async function buildSidebarAuthHeaders() {
+  const headers = {};
+  try {
+    const sessionKey = await window.session?.getKey?.();
+    if (sessionKey) headers["X-Sessionid"] = sessionKey;
+  } catch (e) {
+    // ignore
+  }
+  return headers;
+}
+
+async function refreshSidebarNotificationBadge() {
+  const badge = document.getElementById("sidebarNotifyBadge");
+  if (!badge) return;
+  try {
+    const headers = await buildSidebarAuthHeaders();
+    const base = window.API_BASE || window?.config?.apiBase || "http://127.0.0.1:8000";
+    const res = await fetch(`${base}/api/data/notifications/?limit=1`, {
+      credentials: "include",
+      headers,
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    let unread = Number(data?.unread_count || 0);
+    try {
+      const mres = await fetch(`${base}/api/data/messages/?box=inbox&limit=1`, {
+        credentials: "include",
+        headers,
+      });
+      if (mres.ok) {
+        const mdata = await mres.json();
+        unread += Number(mdata?.unread_count || 0);
+      }
+    } catch (e) {
+      // ignore
+    }
+    if (unread > 0) {
+      badge.classList.remove("hidden");
+      badge.textContent = unread > 99 ? "99+" : String(unread);
+    } else {
+      badge.classList.add("hidden");
+    }
+  } catch (e) {
+    // ignore network/auth errors for sidebar badge
+  }
+}
+
+function initSidebarNotifyBadge() {
+  refreshSidebarNotificationBadge();
+  setInterval(refreshSidebarNotificationBadge, 30000);
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    applySidebarActiveState();
+    initSidebarNotifyBadge();
+  });
+} else {
+  applySidebarActiveState();
+  initSidebarNotifyBadge();
 }

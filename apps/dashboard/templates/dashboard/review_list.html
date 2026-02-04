@@ -9,46 +9,65 @@
   </div>
 </div>
 
-<div class="card">
-  {% if reviews %}
+
+<div class="card" style="margin-top: 20px;">
+  <div class="page-header" style="padding: 16px 16px 0;">
+    <div>
+      <h2 class="page-title" style="font-size: 1.1rem;">🧾 크롤링 본문</h2>
+      <p class="page-subtitle">CrawledPostContent에 저장된 페이지 본문</p>
+    </div>
+  </div>
+  {% if crawled %}
     <div class="table-container">
       <table>
         <thead>
           <tr>
             <th>ID</th>
-            <th>출처</th>
-            <th>내용</th>
-            <th>감정</th>
-            <th>언어</th>
+            <th>플랫폼</th>
+            <th>제목</th>
+            <th>본문</th>
+            <th>상태</th>
             <th>수집일</th>
           </tr>
         </thead>
         <tbody>
-          {% for r in reviews %}
+          {% for c in crawled %}
           <tr>
-            <td>{{ r.id }}</td>
-            <td><span class="tag tag-muted">{{ r.source|default:"-" }}</span></td>
-            <td>{{ r.original_text|truncatechars:80 }}</td>
+            <td>{{ c.id }}</td>
+            <td><span class="tag tag-muted">{{ c.platform|default:"-" }}</span></td>
             <td>
-              {% if r.sentiment == 'positive' %}
-                <span class="tag tag-success">긍정</span>
-              {% elif r.sentiment == 'negative' %}
-                <span class="tag" style="background:#fee2e2;color:#dc2626;">부정</span>
+              {% if c.url %}
+                <a href="{{ c.url }}" target="_blank" rel="noreferrer">{{ c.title|default:"-"|truncatechars:40 }}</a>
               {% else %}
-                <span class="tag tag-muted">{{ r.sentiment|default:"-" }}</span>
+                {{ c.title|default:"-"|truncatechars:40 }}
               {% endif %}
             </td>
-            <td>{{ r.language }}</td>
-            <td class="text-sm text-muted">{{ r.created_at|date:"m/d" }}</td>
+            <td>{{ c.content|default:""|truncatechars:120 }}</td>
+            <td><span class="tag tag-muted">{{ c.status|default:"-" }}</span></td>
+            <td class="text-sm text-muted">{{ c.fetched_at|date:"m/d H:i" }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    <div class="pagination" style="margin: 12px 16px 16px; display: flex; gap: 8px; flex-wrap: wrap;">
+      {% if crawled.has_previous %}
+        <a class="tag tag-muted" href="?reviews_page={{ reviews.number }}&crawled_page={{ crawled.previous_page_number }}">이전</a>
+      {% endif %}
+      {% for num in crawled.paginator.page_range %}
+        {% if num == crawled.number %}
+          <span class="tag" style="background:#111827;color:#fff;">{{ num }}</span>
+        {% else %}
+          <a class="tag tag-muted" href="?reviews_page={{ reviews.number }}&crawled_page={{ num }}">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if crawled.has_next %}
+        <a class="tag tag-muted" href="?reviews_page={{ reviews.number }}&crawled_page={{ crawled.next_page_number }}">다음</a>
+      {% endif %}
+    </div>
   {% else %}
-    <div class="text-center" style="padding: 60px;">
-      <p style="font-size: 3rem; margin-bottom: 16px;">📋</p>
-      <p class="text-muted">수집된 리뷰가 없습니다</p>
+    <div class="text-center" style="padding: 40px;">
+      <p class="text-muted">크롤링 본문이 없습니다</p>
     </div>
   {% endif %}
 </div>

@@ -69,6 +69,7 @@ function releaseBlockingLayers() {
 
 // If a drag/resize state gets stuck, clear it when focusing inputs.
 function closeStuckOverlays(exceptTarget) {
+  if (document.querySelector(".modal.modal-lock:not(.hidden)")) return;
   const keep = exceptTarget?.closest?.(".modal, .profile-info-modal, .notify-dropdown, .profile-popup");
   if (keep) return;
 
@@ -118,6 +119,227 @@ function clearStuckInteractionState() {
   document.body.classList.remove("resizing-panel");
   document.querySelectorAll(".dragging").forEach((el) => el.classList.remove("dragging"));
 }
+
+const GLASS_SELECT_VERSION = "5";
+const GLASS_CLINIC_SELECT_IDS = [
+  "postClinicSelect",
+  "postSortSelect",
+  "calendarClinicSelect",
+  "calendarMemoClinicSelect",
+  "clinicSelect",
+  "myMemoClinicSelect",
+  "detailClinicSelect",
+  "hospitalSelect",
+];
+
+function buildGlassSelectOption(opt, select, menu, labelEl) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "glass-select-option";
+  btn.textContent = opt.textContent;
+  btn.dataset.value = opt.value;
+  btn.disabled = opt.disabled;
+  if (opt.selected) btn.classList.add("active");
+
+  btn.addEventListener("click", () => {
+    if (opt.disabled) return;
+    select.value = opt.value;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    labelEl.textContent = opt.textContent;
+    menu.querySelectorAll(".glass-select-option").forEach((el) => el.classList.remove("active"));
+    btn.classList.add("active");
+    select.closest(".glass-select")?.classList.remove("open");
+  });
+
+  return btn;
+}
+
+function syncGlassSelect(select, menu, labelEl) {
+  menu.innerHTML = "";
+  const options = Array.from(select.options || []);
+  options.forEach((opt) => menu.appendChild(buildGlassSelectOption(opt, select, menu, labelEl)));
+
+  const selected = select.options?.[select.selectedIndex];
+  labelEl.textContent = selected?.textContent || "선택";
+}
+
+function enhanceGlassSelect(select) {
+  if (!select || select.dataset.glassEnhanced === "true") return;
+  if (select.closest(".glass-select")) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "glass-select";
+
+  if (select.classList.contains("inline-select")) {
+    wrapper.classList.add("is-inline");
+    wrapper.classList.add("glass-block");
+  }
+
+  const parent = select.parentElement;
+  if (!parent) return;
+
+  parent.insertBefore(wrapper, select);
+  wrapper.appendChild(select);
+
+  select.classList.add("glass-native");
+  select.dataset.glassEnhanced = "true";
+  select.dataset.glassVersion = GLASS_SELECT_VERSION;
+  select.style.display = "none";
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "glass-select-trigger";
+  trigger.setAttribute("aria-haspopup", "listbox");
+  trigger.setAttribute("aria-expanded", "false");
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "glass-select-label";
+  const caret = document.createElement("span");
+  caret.className = "glass-select-caret";
+  caret.textContent = "▾";
+
+  trigger.appendChild(labelEl);
+  trigger.appendChild(caret);
+
+  const menu = document.createElement("div");
+  menu.className = "glass-select-menu";
+  menu.setAttribute("role", "listbox");
+  menu.style.position = "fixed";
+  menu.style.zIndex = "4000";
+  menu.style.visibility = "hidden";
+
+  wrapper.appendChild(trigger);
+  const portal = getGlassSelectPortal();
+  portal.appendChild(menu);
+  if (select.id) menu.dataset.glassFor = select.id;
+
+  const positionMenu = () => {
+    const rect = trigger.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const gap = 8;
+    const minLeft = 8;
+    const minTop = 8;
+    const maxLeft = window.innerWidth - menuRect.width - minLeft;
+    const maxTop = window.innerHeight - menuRect.height - minTop;
+
+    let left = rect.left;
+    if (left > maxLeft) left = Math.max(minLeft, maxLeft);
+    if (left < minLeft) left = minLeft;
+
+    let top = rect.bottom + gap;
+    if (top > maxTop && rect.top - menuRect.height - gap >= minTop) {
+      top = rect.top - menuRect.height - gap;
+    }
+
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+    menu.style.minWidth = `${rect.width}px`;
+  };
+
+  const closeMenu = () => updateOpenState(false);
+
+  const updateOpenState = (open) => {
+    wrapper.classList.toggle("open", open);
+    trigger.setAttribute("aria-expanded", String(open));
+
+    if (open) {
+      menu.style.display = "grid";
+      menu.style.visibility = "visible";
+      requestAnimationFrame(positionMenu);
+      setTimeout(positionMenu, 0);
+      window.addEventListener("resize", positionMenu);
+      window.addEventListener("scroll", positionMenu, true);
+    } else {
+      menu.style.display = "none";
+      menu.style.visibility = "hidden";
+      window.removeEventListener("resize", positionMenu);
+      window.removeEventListener("scroll", positionMenu, true);
+    }
+  };
+
+  trigger.addEventListener("click", () => {
+    const next = !wrapper.classList.contains("open");
+    updateOpenState(next);
+  });
+
+  trigger.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      updateOpenState(!wrapper.classList.contains("open"));
+    }
+
+    if (e.key === "Escape") {
+      updateOpenState(false);
+      trigger.blur();
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (wrapper.contains(e.target) || menu.contains(e.target)) return;
+    closeMenu();
+  });
+
+  select.addEventListener("change", () => {
+    const selected = select.options?.[select.selectedIndex];
+    labelEl.textContent = selected?.textContent || "선택";
+    menu.querySelectorAll(".glass-select-option").forEach((el) => {
+      el.classList.toggle("active", el.dataset.value === select.value);
+    });
+  });
+
+  const observer = new MutationObserver(() => {
+    syncGlassSelect(select, menu, labelEl);
+    if (wrapper.classList.contains("open")) {
+      requestAnimationFrame(positionMenu);
+    }
+  });
+  observer.observe(select, { childList: true, subtree: true });
+
+  syncGlassSelect(select, menu, labelEl);
+
+  const computed = getComputedStyle(select);
+  const width = select.offsetWidth || parseFloat(computed.width) || 0;
+  if (width) wrapper.style.minWidth = `${width}px`;
+}
+
+function getGlassSelectPortal() {
+  let portal = document.getElementById("glassSelectPortal");
+  if (portal) return portal;
+
+  portal = document.createElement("div");
+  portal.id = "glassSelectPortal";
+  document.body.appendChild(portal);
+  return portal;
+}
+
+function initGlassSelects(root = document) {
+  GLASS_CLINIC_SELECT_IDS.forEach((id) => {
+    const el = root.getElementById ? root.getElementById(id) : document.getElementById(id);
+    if (!el) return;
+    if (el.dataset.glassEnhanced === "true" && el.dataset.glassVersion !== GLASS_SELECT_VERSION) {
+      const wrapper = el.closest(".glass-select");
+      const existingMenu = el.id
+        ? document.querySelector(`.glass-select-menu[data-glass-for="${el.id}"]`)
+        : null;
+      if (existingMenu) existingMenu.remove();
+      if (wrapper && wrapper.parentElement) {
+        wrapper.parentElement.insertBefore(el, wrapper);
+        wrapper.remove();
+      }
+      el.classList.remove("glass-native");
+      el.style.display = "";
+      delete el.dataset.glassEnhanced;
+      delete el.dataset.glassVersion;
+    }
+    enhanceGlassSelect(el);
+  });
+}
+
+window.initGlassSelects = initGlassSelects;
+
+document.addEventListener("DOMContentLoaded", () => {
+  initGlassSelects();
+});
 
 window.addEventListener("blur", clearStuckInteractionState);
 window.addEventListener("resize", clearStuckInteractionState);
@@ -259,6 +481,15 @@ function hexToRgbString(hex) {
   return `${r}, ${g}, ${b}`;
 }
 
+function mixWithWhite(rgbString, ratio = 0.9) {
+  const parts = String(rgbString || "")
+    .split(",")
+    .map((v) => Number.parseInt(v.trim(), 10));
+  if (parts.length !== 3 || parts.some((v) => Number.isNaN(v))) return "#ffffff";
+  const mix = (v) => Math.round(v * (1 - ratio) + 255 * ratio);
+  return `rgb(${mix(parts[0])}, ${mix(parts[1])}, ${mix(parts[2])})`;
+}
+
 function getUserStorageKey(suffix) {
   const userKey = localStorage.getItem("currentUserKey");
   if (!userKey) return suffix;
@@ -296,17 +527,33 @@ function migrateUserStorage(suffix) {
 }
 
 function applyCustomThemeVars() {
-  const root = document.body;
-  if (!root) return;
-  const primary = readUserStorage("themePrimary") || "#4f46e5";
-  const accent = readUserStorage("themeAccent") || "#0e7490";
-  const primaryRgb = hexToRgbString(primary) || "79, 70, 229";
-  const accentRgb = hexToRgbString(accent) || "14, 116, 144";
+  const root = document.documentElement;
+  const body = document.body;
+  if (!root || !body) return;
+  const storedPrimary = readUserStorage("themePrimary");
+  const storedAccent = readUserStorage("themeAccent");
+  const primary = storedPrimary || "#ffffff";
+  const accent = storedAccent || "#ffffff";
+  const primaryRgb = hexToRgbString(primary) || "255, 255, 255";
+  const accentRgb = hexToRgbString(accent) || "255, 255, 255";
 
   root.style.setProperty("--theme-primary", primary);
   root.style.setProperty("--theme-accent", accent);
   root.style.setProperty("--theme-primary-rgb", primaryRgb);
   root.style.setProperty("--theme-accent-rgb", accentRgb);
+  body.style.setProperty("--theme-primary", primary);
+  body.style.setProperty("--theme-accent", accent);
+  body.style.setProperty("--theme-primary-rgb", primaryRgb);
+  body.style.setProperty("--theme-accent-rgb", accentRgb);
+
+  const hasCustom = Boolean(storedPrimary || storedAccent);
+  const nextBg = hasCustom ? mixWithWhite(accentRgb, 0.94) : "#ffffff";
+  const nextSurface2 = hasCustom ? mixWithWhite(primaryRgb, 0.97) : "#ffffff";
+
+  root.style.setProperty("--bg", "#ffffff");
+  root.style.setProperty("--surface", "#ffffff");
+  root.style.setProperty("--surface-2", nextSurface2);
+  body.style.backgroundColor = nextBg;
 
   const isNearWhite = (hex) => {
     const cleaned = String(hex || "").trim().replace("#", "");

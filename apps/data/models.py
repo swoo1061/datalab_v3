@@ -857,6 +857,10 @@ class GeneratedReview(models.Model):
     # 생성 결과
     generated_text = models.TextField(verbose_name="생성된 리뷰")
     prompt_used = models.TextField(blank=True, verbose_name="사용된 프롬프트")
+    model_used = models.CharField(max_length=100, blank=True, default="", verbose_name="사용한 모델")
+    keywords_used = JSONField(default=list, blank=True, verbose_name="사용 키워드")
+    persona_text = models.CharField(max_length=200, blank=True, default="", verbose_name="페르소나 텍스트")
+    title_suggestions = JSONField(default=list, blank=True, verbose_name="제목 추천")
     
     # 상태
     status = models.CharField(
@@ -1020,6 +1024,11 @@ class ClinicPost(models.Model):
         ("photo", "사진 후기"),
         ("consultation", "상담 후기"),
     ]
+    OPINION_SUBTYPE_CHOICES = [
+        ("concern", "고민"),
+        ("hand", "손품"),
+        ("foot", "발품"),
+    ]
 
     PLATFORM_CHOICES = [
         ("all", "전체"),
@@ -1074,6 +1083,13 @@ class ClinicPost(models.Model):
         blank=True,
         db_index=True,
     )
+    opinion_subtype = models.CharField(
+        max_length=20,
+        choices=OPINION_SUBTYPE_CHOICES,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     doctor_name = models.CharField(max_length=50, blank=True, default="", verbose_name="담당 원장명")
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1102,6 +1118,39 @@ class ClinicPostPhoto(models.Model):
 
     def __str__(self):
         return f"Photo {self.pk} for post {self.post_id}"
+
+
+class CrawledPostContent(models.Model):
+    STATUS_CHOICES = [
+        ("success", "성공"),
+        ("skipped", "스킵"),
+        ("failed", "실패"),
+    ]
+
+    post = models.ForeignKey(
+        ClinicPost,
+        on_delete=models.CASCADE,
+        related_name="crawled_contents",
+    )
+    url = models.URLField(max_length=1000)
+    platform = models.CharField(max_length=30, default="", db_index=True)
+    title = models.CharField(max_length=500, blank=True, default="")
+    content = models.TextField(blank=True, default="")
+    views = models.IntegerField(null=True, blank=True)
+    comments = models.IntegerField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="success", db_index=True)
+    error_message = models.TextField(blank=True, default="")
+    fetched_at = models.DateTimeField(auto_now_add=True)
+    content_length = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ["-fetched_at"]
+        indexes = [
+            models.Index(fields=["platform", "-fetched_at"]),
+        ]
+
+    def __str__(self):
+        return f"Crawled {self.post_id} ({self.status})"
 
 
 class CalendarMemo(models.Model):
@@ -1156,3 +1205,5 @@ class ClinicAssignee(models.Model):
         return f"{self.clinic.name} - {self.user.username}"
 
 from .models_worklog import DailyWorkLog
+from .models_attendance import AttendanceRecord, AttendanceCorrectionRequest
+from .models_message import InternalMessage

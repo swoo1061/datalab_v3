@@ -179,11 +179,11 @@ function openThemeSettings() {
   if (!modal) return;
   modal.classList.remove("hidden");
   const primary = window.readUserStorage
-    ? window.readUserStorage("themePrimary") || "#4f46e5"
-    : localStorage.getItem("themePrimary") || "#4f46e5";
+    ? window.readUserStorage("themePrimary") || "#ffffff"
+    : localStorage.getItem("themePrimary") || "#ffffff";
   const accent = window.readUserStorage
-    ? window.readUserStorage("themeAccent") || "#0e7490"
-    : localStorage.getItem("themeAccent") || "#0e7490";
+    ? window.readUserStorage("themeAccent") || "#ffffff"
+    : localStorage.getItem("themeAccent") || "#ffffff";
   const primaryInput = document.getElementById("themePrimaryInput");
   const accentInput = document.getElementById("themeAccentInput");
   const nameInput = document.getElementById("themeCustomName");
@@ -287,8 +287,9 @@ function bindThemeSettingsModal() {
 
   resetBtn?.addEventListener("click", () => {
     window.resetCustomThemeColors?.();
-    if (primaryInput) primaryInput.value = "#4f46e5";
-    if (accentInput) accentInput.value = "#0e7490";
+    if (primaryInput) primaryInput.value = "#ffffff";
+    if (accentInput) accentInput.value = "#ffffff";
+    applyTheme("classic");
   });
 
   manageBtn?.addEventListener("click", () => {
@@ -314,8 +315,8 @@ function bindThemeSettingsModal() {
     presets.push({
       id: Date.now(),
       name,
-      primary: primaryInput?.value || "#4f46e5",
-      accent: accentInput?.value || "#0e7490",
+      primary: primaryInput?.value || "#ffffff",
+      accent: accentInput?.value || "#ffffff",
     });
     saveThemePresets(presets);
     if (nameInput) nameInput.value = "";
@@ -431,6 +432,7 @@ function bindNotifications() {
   const empty = document.getElementById("notifyEmpty");
   const detail = document.getElementById("notifyDetail");
   const backBtn = document.getElementById("notifyBack");
+  const openCenterBtn = document.getElementById("notifyOpenCenter");
 
   if (!button || !dropdown || !list || !empty || !detail || !backBtn) return;
 
@@ -459,6 +461,15 @@ function bindNotifications() {
     empty.classList.toggle("hidden", list.children.length > 0);
   });
 
+  openCenterBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (window.nav?.go) {
+      window.nav.go("notifications_center");
+    } else {
+      window.location.href = "notifications_center.html";
+    }
+  });
+
   if (notifyPollTimer) clearInterval(notifyPollTimer);
   notifyPollTimer = setInterval(refreshNotifications, 30000);
   refreshNotifications();
@@ -478,8 +489,22 @@ async function refreshNotifications() {
     });
     if (!res.ok) throw new Error("notification fetch failed");
     const data = await res.json();
+    let unreadMail = 0;
+    try {
+      const mres = await fetch(`${window.API_BASE}/api/data/messages/?box=inbox&limit=1`, {
+        credentials: "include",
+        headers,
+      });
+      if (mres.ok) {
+        const mdata = await mres.json();
+        unreadMail = Number(mdata?.unread_count || 0);
+      }
+    } catch (e) {
+      // ignore mail unread fetch errors
+    }
     const items = data.results || [];
-    const unreadCount = Number.isFinite(data.unread_count) ? data.unread_count : items.filter((i) => !i.is_read).length;
+    const unreadNotify = Number.isFinite(data.unread_count) ? data.unread_count : items.filter((i) => !i.is_read).length;
+    const unreadCount = unreadNotify + unreadMail;
     renderNotifications(items);
 
     if (unreadCount > 0) {

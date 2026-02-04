@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.data.models import ClinicGuide, FavoriteClinic, ClinicPost, CalendarMemo
+from apps.data.models import ClinicGuide, FavoriteClinic, ClinicPost, CalendarMemo, InternalMessage
 
 
 class FavoriteClinicSerializer(serializers.ModelSerializer):
@@ -13,6 +13,7 @@ class FavoriteClinicSerializer(serializers.ModelSerializer):
 class ClinicPostSerializer(serializers.ModelSerializer):
     platform_label = serializers.SerializerMethodField()
     review_subtype_label = serializers.SerializerMethodField()
+    opinion_subtype_label = serializers.SerializerMethodField()
     assignee = serializers.IntegerField(source="assignee_id", read_only=True)
     assignee_name = serializers.SerializerMethodField()
     photos = serializers.SerializerMethodField()
@@ -26,6 +27,8 @@ class ClinicPostSerializer(serializers.ModelSerializer):
             "platform_label",
             "review_subtype",
             "review_subtype_label",
+            "opinion_subtype",
+            "opinion_subtype_label",
             "doctor_name",
             "assignee",
             "assignee_name",
@@ -51,6 +54,11 @@ class ClinicPostSerializer(serializers.ModelSerializer):
         if not obj.review_subtype:
             return None
         return obj.get_review_subtype_display()
+
+    def get_opinion_subtype_label(self, obj):
+        if not obj.opinion_subtype:
+            return None
+        return obj.get_opinion_subtype_display()
 
     def get_assignee_name(self, obj):
         if not obj.assignee:
@@ -132,3 +140,39 @@ class CalendarMemoSerializer(serializers.ModelSerializer):
             label = position_label_map.get(position, position)
             return f"{profile.name} {label}".strip() if label else profile.name
         return obj.user.get_full_name() or obj.user.username
+
+
+class InternalMessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.SerializerMethodField()
+    recipient_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InternalMessage
+        fields = [
+            "id",
+            "sender",
+            "sender_name",
+            "recipient",
+            "recipient_name",
+            "subject",
+            "content",
+            "is_read",
+            "read_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "sender", "is_read", "read_at", "created_at", "updated_at"]
+
+    def _display_name(self, user):
+        if not user:
+            return "-"
+        profile = getattr(user, "profile", None)
+        if profile and getattr(profile, "name", None):
+            return profile.name
+        return user.get_full_name() or user.username
+
+    def get_sender_name(self, obj):
+        return self._display_name(obj.sender)
+
+    def get_recipient_name(self, obj):
+        return self._display_name(obj.recipient)

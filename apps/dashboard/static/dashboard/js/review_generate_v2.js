@@ -24,6 +24,15 @@ const promptCard = document.getElementById('promptCard');
 const generatePromptBtn = document.getElementById('generatePromptBtn');
 const generateReviewBtn = document.getElementById('generateReviewBtn');
 const editCard = document.getElementById('editCard');
+const titleSuggestionsBox = document.getElementById('titleSuggestionsBox');
+const titleSuggestionsList = document.getElementById('titleSuggestionsList');
+resultBox.contentEditable = 'true';
+resultBox.spellcheck = false;
+const MBTI_RE = /\b(ISTJ|ISFJ|INFJ|INTJ|ISTP|ISFP|INFP|INTP|ESTP|ESFP|ENFP|ENTP|ESTJ|ESFJ|ENFJ|ENTJ)\b/i;
+function extractMbti(text) {
+  const m = String(text || "").match(MBTI_RE);
+  return m ? m[1].toUpperCase() : null;
+}
 
 // CSRF 토큰
 function getCookie(name) {
@@ -220,6 +229,20 @@ function collectFormData() {
   data.header_template_id = headerTemplateSelect.value || null;
   data.guidelines_template_id = guidelinesTemplateSelect.value || null;
 
+  // MBTI (구공이 모델에만 반영) - persona/custom 입력에서 추출
+  if (data.model === 'ft:gpt-4.1-2025-04-14:personal::D3gDuLBk') {
+    const fromPersona = extractMbti(data.persona_custom || '');
+    const fromInstructions = extractMbti(data.custom_instructions || '');
+    const mbti = fromPersona || fromInstructions;
+    if (mbti) {
+      data.custom_instructions = (data.custom_instructions || '').trim();
+      const mbtiLine = `MBTI: ${mbti}`;
+      data.custom_instructions = data.custom_instructions
+        ? `${data.custom_instructions}\n${mbtiLine}`
+        : mbtiLine;
+    }
+  }
+
   return data;
 }
 
@@ -293,6 +316,15 @@ generateReviewBtn.addEventListener('click', async function() {
     resultBox.style.color = '';  // 원래 색상으로 복원
     charCount.textContent = `${result.char_count}자`;
     currentReviewId = result.review_id;
+    if (Array.isArray(result.title_suggestions) && result.title_suggestions.length) {
+      titleSuggestionsList.innerHTML = result.title_suggestions
+        .map(t => `<li>${t}</li>`)
+        .join('');
+      titleSuggestionsBox.style.display = '';
+    } else {
+      titleSuggestionsList.innerHTML = '';
+      titleSuggestionsBox.style.display = 'none';
+    }
 
     // 토큰/비용 표시
     if (result.total_tokens) {
@@ -316,9 +348,10 @@ generateReviewBtn.addEventListener('click', async function() {
 
     // 사용한 모델 표시
     const modelUsed = document.getElementById('modelUsed');
-    if (result.model_used) {
-      const isOpenAI = result.model_used.startsWith('gpt');
-      modelUsed.textContent = isOpenAI ? `🤖 ${result.model_used}` : `🟣 ${result.model_used}`;
+    const modelLabel = result.model_label || result.model_used;
+    if (modelLabel) {
+      const isOpenAI = (result.model_used || '').startsWith('gpt');
+      modelUsed.textContent = isOpenAI ? `🤖 ${modelLabel}` : `🟣 ${modelLabel}`;
       modelUsed.style.display = 'inline-block';
     }
 
@@ -388,6 +421,15 @@ document.getElementById('regenerateBtn').addEventListener('click', async functio
     resultBox.style.color = '';  // 원래 색상으로 복원
     charCount.textContent = `${result.char_count}자`;
     currentReviewId = result.review_id;
+    if (Array.isArray(result.title_suggestions) && result.title_suggestions.length) {
+      titleSuggestionsList.innerHTML = result.title_suggestions
+        .map(t => `<li>${t}</li>`)
+        .join('');
+      titleSuggestionsBox.style.display = '';
+    } else {
+      titleSuggestionsList.innerHTML = '';
+      titleSuggestionsBox.style.display = 'none';
+    }
 
     // 토큰/비용 표시
     if (result.total_tokens) {
@@ -406,9 +448,10 @@ document.getElementById('regenerateBtn').addEventListener('click', async functio
 
     // 사용한 모델 표시
     const modelUsed = document.getElementById('modelUsed');
-    if (result.model_used) {
-      const isOpenAI = result.model_used.startsWith('gpt');
-      modelUsed.textContent = isOpenAI ? `🤖 ${result.model_used}` : `🟣 ${result.model_used}`;
+    const modelLabel = result.model_label || result.model_used;
+    if (modelLabel) {
+      const isOpenAI = (result.model_used || '').startsWith('gpt');
+      modelUsed.textContent = isOpenAI ? `🤖 ${modelLabel}` : `🟣 ${modelLabel}`;
       modelUsed.style.display = 'inline-block';
     }
 
@@ -436,6 +479,53 @@ document.getElementById('editBtn').addEventListener('click', function() {
 });
 document.getElementById('cancelEditBtn').addEventListener('click', function() {
   editCard.style.display = 'none';
+});
+
+// 수정본 저장
+document.getElementById('saveEditedBtn')?.addEventListener('click', async function() {
+  const edited = resultBox.textContent.trim();
+  if (!currentReviewId) {
+    alert('먼저 리뷰를 생성해주세요.');
+    return;
+  }
+  if (!edited) {
+    alert('저장할 내용이 없습니다.');
+    return;
+  }
+
+  try {
+    const response = await fetch('/dashboard/api/generated/save-edit/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({
+        review_id: currentReviewId,
+        edited_text: edited
+      })
+    });
+
+    const result = await response.json();
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    currentReviewId = result.review_id;
+    charCount.textContent = `${result.char_count}자`;
+    if (Array.isArray(result.title_suggestions) && result.title_suggestions.length) {
+      titleSuggestionsList.innerHTML = result.title_suggestions
+        .map(t => `<li>${t}</li>`)
+        .join('');
+      titleSuggestionsBox.style.display = '';
+    } else {
+      titleSuggestionsList.innerHTML = '';
+      titleSuggestionsBox.style.display = 'none';
+    }
+    alert('수정본이 저장되었습니다.');
+  } catch (err) {
+    alert('수정 저장 실패: ' + err.message);
+  }
 });
 
 // 수정 반영 재생성
@@ -479,6 +569,15 @@ document.getElementById('submitFeedbackBtn').addEventListener('click', async fun
     charCount.textContent = `${result.char_count}자`;
     currentReviewId = result.review_id;
     document.getElementById('feedbackInput').value = '';
+    if (Array.isArray(result.title_suggestions) && result.title_suggestions.length) {
+      titleSuggestionsList.innerHTML = result.title_suggestions
+        .map(t => `<li>${t}</li>`)
+        .join('');
+      titleSuggestionsBox.style.display = '';
+    } else {
+      titleSuggestionsList.innerHTML = '';
+      titleSuggestionsBox.style.display = 'none';
+    }
 
     // 토큰/비용 표시
     if (result.total_tokens) {
@@ -525,6 +624,8 @@ document.getElementById('resetBtn').addEventListener('click', function() {
   costInfo.style.display = 'none';
   document.getElementById('modelUsed').style.display = 'none';
   currentReviewId = null;
+  titleSuggestionsList.innerHTML = '';
+  titleSuggestionsBox.style.display = 'none';
 
   // 프롬프트 영역 초기화
   promptEditor.value = '';
@@ -655,7 +756,7 @@ function renderResult(data) {
     <h3>생성된 리뷰</h3>
     <pre>${data.review}</pre>
     <div class="meta">
-      <span>모델: ${data.model_used}</span>
+      <span>모델: ${data.model_label || data.model_used}</span>
       <span>글자수: ${data.char_count}</span>
     </div>
   `;

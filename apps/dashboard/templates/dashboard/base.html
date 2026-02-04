@@ -20,24 +20,7 @@
     <header class="topbar">
       <a href="{% url 'core:home' %}" class="logo">Datalab90</a>
       <nav class="topnav" aria-label="주요 메뉴">
-        <div class="topnav-item">
-          <button class="topnav-trigger" type="button">통계</button>
-          <div class="topnav-panel">
-            <a href="{% url 'dashboard:index' %}" class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">
-              대시보드
-            </a>
-            <a href="{% url 'dashboard:llm_usage' %}" class="{% if request.resolver_match.url_name == 'llm_usage' %}active{% endif %}">
-              LLM 사용량 통계
-            </a>
-            <a href="{% url 'dashboard:llm_usage_users' %}" class="{% if request.resolver_match.url_name == 'llm_usage_users' %}active{% endif %}">
-              직원별 사용량
-            </a>
-            <a href="{% url 'dashboard:llm_usage_models' %}" class="{% if request.resolver_match.url_name == 'llm_usage_models' %}active{% endif %}">
-              모델별 사용량
-            </a>
-          </div>
-        </div>
-
+        
         <div class="topnav-item">
           <button class="topnav-trigger" type="button">리뷰 생성</button>
           <div class="topnav-panel">
@@ -47,24 +30,24 @@
             <a href="{% url 'dashboard:generate_review_basic_plus' %}" class="{% if 'basic_plus' in request.resolver_match.url_name %}active{% endif %}">
               Basic+
             </a>
+            <a href="{% url 'dashboard:generate_review_gugong' %}" class="{% if request.resolver_match.url_name == 'generate_review_gugong' %}active{% endif %}">
+              구공이
+            </a>
             <a href="{% url 'dashboard:generate_review_pro' %}" class="{% if 'pro' in request.resolver_match.url_name or 'v2' in request.resolver_match.url_name %}active{% endif %}">
               PRO
             </a>
-            <a href="{% url 'dashboard:generated_list' %}" class="{% if 'generated' in request.resolver_match.url_name %}active{% endif %}">
-              생성 목록
-            </a>
           </div>
         </div>
-
+        
         <div class="topnav-item">
-          <button class="topnav-trigger" type="button">앱 리뷰</button>
+          <button class="topnav-trigger" type="button">앱 리뷰 생성</button>
           <div class="topnav-panel">
             <a href="{% url 'dashboard:app_review_gangnam' %}" class="{% if 'gangnam' in request.resolver_match.url_name %}active{% endif %}">
               강남언니
             </a>
           </div>
         </div>
-
+        
         <div class="topnav-item">
           <button class="topnav-trigger" type="button">프리셋 관리</button>
           <div class="topnav-panel">
@@ -82,18 +65,48 @@
             </a>
           </div>
         </div>
-
+        
+        <div class="topnav-item">
+          <button class="topnav-trigger" type="button">통계</button>
+          <div class="topnav-panel">
+            <a href="{% url 'dashboard:index' %}" class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+              대시보드
+            </a>
+            <a href="{% url 'dashboard:llm_usage' %}" class="{% if request.resolver_match.url_name == 'llm_usage' %}active{% endif %}">
+              LLM 사용량 통계
+            </a>
+            <a href="{% url 'dashboard:llm_usage_users' %}" class="{% if request.resolver_match.url_name == 'llm_usage_users' %}active{% endif %}">
+              직원별 모델 사용량
+            </a>
+            <a href="{% url 'dashboard:llm_usage_models' %}" class="{% if request.resolver_match.url_name == 'llm_usage_models' %}active{% endif %}">
+              모델별 사용량
+            </a>
+            <a href="{% url 'dashboard:post_usage_stats' %}" class="{% if request.resolver_match.url_name == 'post_usage_stats' %}active{% endif %}">
+              직원별 작업 통계
+            </a>
+            <a href="{% url 'dashboard:monthly_report' %}" class="{% if request.resolver_match.url_name == 'monthly_report' %}active{% endif %}">
+              월간 보고서
+            </a>
+          </div>
+        </div>
+        
         <div class="topnav-item">
           <button class="topnav-trigger" type="button">데이터 관리</button>
           <div class="topnav-panel">
             <a href="{% url 'dashboard:clinic_list' %}" class="{% if 'clinic' in request.resolver_match.url_name %}active{% endif %}">
               병원 가이드
             </a>
+            <a href="{% url 'dashboard:generated_list' %}" class="{% if 'generated' in request.resolver_match.url_name %}active{% endif %}">
+              AI리뷰 관리
+            </a>
             <a href="{% url 'dashboard:reviews_list' %}" class="{% if request.resolver_match.url_name == 'reviews_list' %}active{% endif %}">
-              수집 리뷰
+              수집한 리뷰
+            </a>
+            <a href="{% url 'dashboard:post_manage' %}" class="{% if request.resolver_match.url_name == 'post_manage' %}active{% endif %}">
+              게시글 관리
             </a>
             <a href="{% url 'dashboard:image_browser' %}" class="{% if request.resolver_match.url_name == 'image_browser' %}active{% endif %}">
-              이미지
+              이미지 관리
             </a>
           </div>
         </div>
