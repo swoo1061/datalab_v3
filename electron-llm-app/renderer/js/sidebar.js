@@ -30,6 +30,53 @@ function applySidebarActiveState() {
   }
 }
 
+let sidebarCurrentRole = "";
+
+function normalizeRole(me) {
+  const raw = String(
+    me?.position ?? me?.role ?? me?.position_code ?? me?.position_key ?? ""
+  )
+    .trim()
+    .toLowerCase();
+  const map = {
+    admin: "admin",
+    ceo: "ceo",
+    manager: "manager",
+    leader: "leader",
+    "계정": "admin",
+    "관리자": "admin",
+    "대표": "ceo",
+    "대표이사": "ceo",
+    "매니저": "manager",
+    "팀장": "leader",
+  };
+  return map[raw] || raw;
+}
+
+async function applySidebarRoleAccess() {
+  const roleOnlyLinks = document.querySelectorAll(".nav-sub a[data-role-only]");
+  if (!roleOnlyLinks.length) return;
+
+  let myRole = "";
+  try {
+    const me = await window.api?.getMe?.();
+    myRole = normalizeRole(me);
+  } catch (e) {
+    myRole = "";
+  }
+  sidebarCurrentRole = myRole;
+
+  roleOnlyLinks.forEach((link) => {
+    const allow = String(link.dataset.roleOnly || "")
+      .split(",")
+      .map((x) => x.trim().toLowerCase())
+      .filter(Boolean);
+
+    const visible = allow.includes(myRole);
+    link.classList.toggle("hidden", !visible);
+  });
+}
+
 async function openKakaoWorkShortcut() {
   if (window.nav?.openKakaoWork) {
     try {
@@ -63,7 +110,7 @@ function openNotionShortcut() {
    Sidebar Shortcut Click (이벤트 위임)
 ================================ */
 // Sidebar는 동적 로드(loadLayout)라서 이벤트 위임으로 클릭을 안정적으로 처리.
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
   const kakaoBtn = e.target?.closest?.("#kakaoWorkShortcut");
   if (kakaoBtn) {
     e.preventDefault();
@@ -76,6 +123,33 @@ document.addEventListener("click", (e) => {
     e.preventDefault();
     openNotionShortcut();
     return;
+  }
+
+  const restrictedLink = e.target?.closest?.(".nav-sub a[data-role-only]");
+  if (restrictedLink) {
+    const allow = String(restrictedLink.dataset.roleOnly || "")
+      .split(",")
+      .map((x) => x.trim().toLowerCase())
+      .filter(Boolean);
+
+    let role = sidebarCurrentRole;
+    if (!role) {
+      try {
+        const me = await window.api?.getMe?.();
+        role = normalizeRole(me);
+        sidebarCurrentRole = role;
+      } catch (err) {
+        role = "";
+      }
+    }
+
+    // 역할을 아직 판별 못한 경우엔 여기서 차단하지 않고 app.js 접근제어로 위임
+    if (role && !allow.includes(role)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof window.showAccessDenied === "function") window.showAccessDenied();
+      else window.showAlert?.("접근 불가");
+    }
   }
 });
 
@@ -141,10 +215,12 @@ function initSidebarNotifyBadge() {
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
+    applySidebarRoleAccess();
     applySidebarActiveState();
     initSidebarNotifyBadge();
   });
 } else {
+  applySidebarRoleAccess();
   applySidebarActiveState();
   initSidebarNotifyBadge();
 }

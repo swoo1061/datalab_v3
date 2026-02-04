@@ -48,6 +48,20 @@ body {
   scrollbar-width: none;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .page-scope {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+
+  body:not(.page-ready) .page-scope,
+  body.page-transitioning .page-scope {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 .app-main::-webkit-scrollbar,
 .page-scope::-webkit-scrollbar {
   width: 0;
@@ -142,21 +156,18 @@ body :is(
   border: 1px solid rgba(var(--theme-primary-rgb, 79, 70, 229), 0.55);
   border-top-color: rgba(255, 255, 255, 0.98);
   border-left-color: rgba(255, 255, 255, 0.9);
-  background:
-    linear-gradient(120deg, rgba(var(--theme-primary-rgb, 79, 70, 229), 0.3), rgba(var(--theme-primary-rgb, 79, 70, 229), 0) 55%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.62) 0%, rgba(210, 220, 255, 0.75) 100%);
+  background: linear-gradient(160deg, #ffffff 0%, #eef2ff 100%);
   box-shadow:
     0 16px 30px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
     inset 0 0 0 1px rgba(255, 255, 255, 0.55),
     inset 0 -14px 28px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.18);
   background-image:
-    linear-gradient(120deg, rgba(var(--theme-primary-rgb, 79, 70, 229), 0.32), rgba(var(--theme-primary-rgb, 79, 70, 229), 0) 55%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.62) 0%, rgba(210, 220, 255, 0.75) 100%),
+    linear-gradient(160deg, #ffffff 0%, #eef2ff 100%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 20 20'%3E%3Cpath d='M5 7l5 6 5-6' fill='none' stroke='%23312e81' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: left top, left top, right 12px center;
-  background-size: auto, auto, 18px;
+  background-position: left top, right 12px center;
+  background-size: auto, 18px;
   backdrop-filter: blur(20px) saturate(170%);
   -webkit-backdrop-filter: blur(20px) saturate(170%);
   cursor: pointer;
@@ -193,6 +204,9 @@ body :is(
   box-shadow:
     0 0 0 3px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.24),
     0 12px 26px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.26);
+  background-image:
+    linear-gradient(160deg, #ffffff 0%, #eef2ff 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 20 20'%3E%3Cpath d='M5 7l5 6 5-6' fill='none' stroke='%23312e81' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 body :is(
@@ -258,14 +272,11 @@ body :is(
   min-height: 40px;
   padding: 0 10px 0 12px;
   border-radius: 12px;
-  border: 1px solid rgba(var(--theme-primary-rgb, 79, 70, 229), 0.55);
-  border-top-color: rgba(255, 255, 255, 0.98);
-  border-left-color: rgba(255, 255, 255, 0.9);
+  border: none;
   background:
     linear-gradient(120deg, rgba(var(--theme-primary-rgb, 79, 70, 229), 0.3), rgba(var(--theme-primary-rgb, 79, 70, 229), 0) 55%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.62) 0%, rgba(210, 220, 255, 0.75) 100%);
   box-shadow:
-    0 16px 30px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
     inset 0 0 0 1px rgba(255, 255, 255, 0.55),
     inset 0 -14px 28px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.18);
@@ -275,14 +286,10 @@ body :is(
   justify-content: space-between;
   gap: 8px;
   cursor: pointer;
-  backdrop-filter: blur(20px) saturate(170%);
-  -webkit-backdrop-filter: blur(20px) saturate(170%);
 }
 
 .glass-select-trigger:hover {
-  border-color: rgba(var(--theme-primary-rgb, 79, 70, 229), 0.75);
   box-shadow:
-    0 18px 34px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.98),
     inset 0 0 0 1px rgba(255, 255, 255, 0.55),
     inset 0 -14px 28px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.18);
@@ -290,10 +297,8 @@ body :is(
 
 .glass-select-trigger:focus-visible {
   outline: none;
-  border-color: rgba(var(--theme-primary-rgb, 79, 70, 229), 0.9);
   box-shadow:
-    0 0 0 3px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.24),
-    0 12px 26px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.26);
+    0 0 0 3px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.24);
 }
 
 .glass-select-label {
@@ -402,6 +407,20 @@ body :is(
   font-size: 10px;
 }
 
+body .glass-select:has(
+    :is(
+      #postClinicSelect,
+      #calendarClinicSelect,
+      #calendarMemoClinicSelect,
+      #clinicSelect,
+      #myMemoClinicSelect,
+      #detailClinicSelect,
+      #hospitalSelect
+    )
+  ) .glass-select-trigger {
+  background: linear-gradient(160deg, #ffffff 0%, #eef2ff 100%);
+}
+
 body :is(
   #postClinicSelect,
   #calendarClinicSelect,
@@ -412,8 +431,7 @@ body :is(
   #hospitalSelect
 ):focus {
   background-image:
-    linear-gradient(120deg, rgba(var(--theme-primary-rgb, 79, 70, 229), 0.36), rgba(var(--theme-primary-rgb, 79, 70, 229), 0) 55%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(210, 220, 255, 0.82) 100%),
+    linear-gradient(160deg, #ffffff 0%, #eef2ff 100%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 20 20'%3E%3Cpath d='M5 7l5 6 5-6' fill='none' stroke='%23312e81' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
@@ -521,6 +539,21 @@ body.theme-vivid .nav-sub a.active {
   background: #0f172a;
   color: #ffffff;
   border-color: #0f172a;
+}
+
+.app-access-denied-card {
+  border: 1px solid #fecaca;
+  background: #fff5f5;
+  width: min(360px, 80vw);
+}
+
+.app-access-denied-message {
+  margin: 0;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 800;
+  color: #b91c1c;
+  letter-spacing: 0.02em;
 }
 
 .card-hd {

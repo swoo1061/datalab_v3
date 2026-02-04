@@ -13,7 +13,7 @@
   <!-- review 전용 -->
   <link rel="stylesheet" href="css/review.css" />
 </head>
-<body>
+<body class="review-basic-page">
 
 <div class="app-root">
   <div id="globalLoading" class="global-loading hidden" aria-live="polite">
@@ -31,92 +31,35 @@
 
       <!-- ================== 메인 레이아웃 ================== -->
       <section class="review-layout">
-
-        <!-- 좌측 설정 -->
         <div class="card review-left">
-          <div class="card-hd">리뷰 설정</div>
+          <div class="card-hd">키워드 입력</div>
           <div class="card-bd">
-
-            <div class="field-grid">
             <div class="field-group">
-              <div class="field-head">
-                <h3>기본 정보</h3>
-                <p>필수 항목을 먼저 선택하세요.</p>
-              </div>
-
               <div class="row">
-                <label>병원</label>
-                <select id="clinicSelect" class="select">
-                  <option value="">병원을 선택하세요</option>
-                </select>
-              </div>
-
-              <div class="row">
-                <label>리뷰 유형</label>
-                <div class="chip-group single" id="reviewType">
-                  <button data-value="고민/질문">고민/질문</button>
-                  <button data-value="발품/손품 후기">발품·손품</button>
-                  <button data-value="방문 상담 후기">상담 후기</button>
-                  <button data-value="시술 당일 후기">시술 당일</button>
-                  <button data-value="경과 후기">경과 후기</button>
-                </div>
-              </div>
-
-              <div class="row">
-                <label>후기 시점</label>
-                <div class="chip-group single" id="reviewTiming">
-                  <button data-value="시술 전">시술 전</button>
-                  <button data-value="시술 직후">직후</button>
-                  <button data-value="1주 후">1주 후</button>
-                  <button data-value="1개월 후">1개월</button>
-                  <button data-value="3개월 후">3개월</button>
-                </div>
+                <label>리뷰 정보 입력 (필수)</label>
+                <textarea
+                  id="keywordInput"
+                  class="input"
+                  rows="14"
+                  placeholder="예시:
+병원: OO성형외과
+시술: 눈매교정 + 앞트임
+컨텐츠: 시술 1주차 후기
+톤: 솔직하고 자연스럽게, 귀여운 말투
+mbti: ENFP
+길이: 15문장 내외, 500자 내외
+권장: 자연스러움, 회복 빠름
+금지: 가격/할인 직접 언급"
+                ></textarea>
+                <!-- <div class="hint">Basic처럼 자유 입력으로 생성합니다.</div> -->
               </div>
             </div>
 
             <div class="field-group">
-              <div class="field-head">
-                <h3>톤 & 키워드</h3>
-                <p>리뷰 분위기와 강조 포인트를 정하세요.</p>
-              </div>
-
               <div class="row">
-                <label>강조 키워드</label>
-                <div class="chip-group multi" id="keywordGroup">
-                  <button>자연스러움</button>
-                  <button>통증 적음</button>
-                  <button>회복 빠름</button>
-                  <button>친절한 상담</button>
-                  <button>가격 만족</button>
-                  <button>대기시간 짧음</button>
-                  <button>재방문 의사</button>
-                  <button>지인 추천</button>
-                </div>
-              </div>
-
-              <div class="row">
-                <div class="field-head">
-                  <h3>모델 선택</h3>
-                  <p>원하는 모델을 골라주세요.</p>
-                </div>
                 <label>AI 모델</label>
                 <div id="modelList" class="model-list"></div>
               </div>
-            </div>
-
-            <div class="field-group span-2">
-
-              <div class="row">
-                <label>페르소나 키워드 (직접 입력)</label>
-                <input
-                  id="personaInput"
-                  class="input"
-                  placeholder="예: 20대 여성, 첫 시술, 자연스러움 중시"
-                />
-                <div class="hint">쉼표(,)로 구분</div>
-              </div>
-
-            </div>
             </div>
 
             <div class="action-row">
@@ -124,11 +67,15 @@
                 리뷰 생성
               </button>
             </div>
-
           </div>
         </div>
 
-        
+        <div class="card review-right">
+          <div class="card-hd">프롬프트 미리보기</div>
+          <div class="card-bd">
+            <div id="previewMetaMain" class="preview-meta"></div>
+          </div>
+        </div>
 
       </section>
 
@@ -151,8 +98,8 @@
     </div>
 
     <!-- 🔥 반드시 modal-body -->
-        <div class="modal-body">
-      <details class="modal-preview" open>
+    <div class="modal-body">
+      <!-- <details class="modal-preview" open>
         <summary>미리보기</summary>
         <div class="preview-wrap">
           <ul class="summary" id="summary"></ul>
@@ -160,15 +107,14 @@
             <strong>프롬프트 미리보기</strong>
             <div id="previewMeta" class="preview-meta"></div>
           </div>
-          
+
           <div class="persona-preview">
             <strong>페르소나</strong>
             <div id="personaPreview" class="persona-tags"></div>
             <pre id="promptPreview" class="prompt-box"></pre>
           </div>
-
         </div>
-      </details>
+      </details> -->
 
       <div id="reviewLoading" class="review-loading hidden">
         AI가 리뷰를 작성 중입니다…

@@ -23,7 +23,7 @@ AVAILABLE_MODELS = {
     "openai": {
         "ft:gpt-4.1-2025-04-14:personal::D3gDuLBk": {
             "name": "구공이(V_3)",
-            "desc": "파인튜닝 모델. 리뷰 생성 전용.",
+            "desc": "튜닝 모델. 자아가 강함. (추천)",
             "max_tokens": 4096,
             "input_price": 0.30,
             "output_price": 1.20,
@@ -600,7 +600,8 @@ def generate_review_with_prompt_enforced(
     if model == "ft:gpt-4.1-2025-04-14:personal::D3gDuLBk":
         type_line = ""
         for line in prompt.splitlines():
-            if line.strip().startswith("리뷰 유형"):
+            line_s = line.strip()
+            if line_s.startswith("리뷰 유형") or line_s.startswith("글 목적"):
                 type_line = line.split(":", 1)[-1].strip()
                 break
 
@@ -641,7 +642,12 @@ def generate_review_with_prompt_enforced(
         if reaction_lines:
             base_prompt = "[리액션 규칙] " + " ".join(reaction_lines) + "\n\n" + base_prompt
 
-    for attempt in range(max_retries + 1):
+    effective_max_retries = max_retries
+    # 구공이는 재시도 규칙이 강해서 톤이 과도하게 바뀌는 경우가 있어 기본 재시도를 낮춤
+    if model == "ft:gpt-4.1-2025-04-14:personal::D3gDuLBk":
+        effective_max_retries = min(max_retries, 2)
+
+    for attempt in range(effective_max_retries + 1):
         result = generate_review_with_prompt(
             prompt=base_prompt,
             model=model,
@@ -678,7 +684,7 @@ def generate_review_with_prompt_enforced(
         if not missing and not too_short and not too_long and tone_ok and not echoed and not style_guard_failed:
             return result
 
-        if attempt < max_retries:
+        if attempt < effective_max_retries:
             rules = ["[중요] 조건 재강조:"]
             if keywords:
                 rules.append(f"- 필수 키워드: {', '.join(keywords)} (모두 포함, 동의어로만 대체 금지)")

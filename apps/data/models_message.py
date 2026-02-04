@@ -38,3 +38,21 @@ class InternalMessage(models.Model):
         self.read_at = timezone.now()
         self.save(update_fields=["is_read", "read_at", "updated_at"])
 
+
+class InternalMessageAttachment(models.Model):
+    message = models.ForeignKey(
+        InternalMessage,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+    file = models.FileField(upload_to="internal_messages/%Y/%m/%d")
+    original_name = models.CharField(max_length=255, blank=True, default="")
+    content_type = models.CharField(max_length=120, blank=True, default="")
+    file_size = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return self.original_name or self.file.name

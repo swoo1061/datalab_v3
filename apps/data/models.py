@@ -1206,4 +1206,4 @@ class ClinicAssignee(models.Model):
 
 from .models_worklog import DailyWorkLog
 from .models_attendance import AttendanceRecord, AttendanceCorrectionRequest
-from .models_message import InternalMessage
+from .models_message import InternalMessage, InternalMessageAttachment

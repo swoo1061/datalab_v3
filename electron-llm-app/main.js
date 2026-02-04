@@ -75,6 +75,7 @@ function createWindow() {
     width: 1200,
     height: 800,
     frame: false,   
+    icon: path.join(__dirname, "renderer", "assets", "app.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -216,11 +217,11 @@ ipcMain.handle("open-kakaowork", async () => {
       // Ignore focus errors; the app may still open successfully.
     }
 
-    return true;
+    return { ok: true, opened: "app" };
   }
 
   await shell.openExternal("kakaowork://");
-  return true;
+  return { ok: true, opened: "app" };
 });
 
 ipcMain.handle("open-notion", async () => {

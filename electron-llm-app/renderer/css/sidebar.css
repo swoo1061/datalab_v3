@@ -101,6 +101,18 @@
   box-shadow: 0 10px 18px rgba(67, 56, 202, 0.12);
 }
 
+.nav-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  display: block;
+}
+
+.nav-icon-ai svg {
+  width: 28px;
+  height: 28px;
+}
+
 .nav-icon-bell {
   position: relative;
 }

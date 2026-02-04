@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | 메일센터</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/business_mode.css" />
+  <link rel="stylesheet" href="css/notifications_center.css?v=20260204-5" />
+</head>
+<body class="theme-vivid tone-sidebar" data-nav="mail_center" data-notify-mode="mail">
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope notify-page">
+      <section class="page-canvas">
+        <header class="page-head">
+          <h1 class="h1">Mail</h1>
+        </header>
+
+        <section class="notify-shell card">
+          <aside class="notify-folder-col" id="notifyFolders"></aside>
+
+          <section class="notify-list-col">
+            <div class="notify-toolbar">
+              <input id="notifySearchInput" class="input" type="text" placeholder="검색" />
+              <button class="btn primary" id="notifyComposeBtn" type="button">메일 쓰기</button>
+            </div>
+            <div class="mail-command-bar">
+              <button class="mail-cmd danger" id="mailDeleteBtn" type="button">삭제</button>
+              <label class="mail-sort-wrap" for="mailSortSelect">필터</label>
+              <select id="mailSortSelect" class="mail-sort-select">
+                <option value="latest">최신순</option>
+                <option value="oldest">오래된 순</option>
+              </select>
+            </div>
+            <div class="mail-list-head">
+              <span>보낸사람</span>
+              <span>제목</span>
+              <span>시간</span>
+            </div>
+            <div class="notify-mail-list" id="notifyMailList"></div>
+          </section>
+
+          <section class="notify-detail-col">
+            <div class="notify-detail-empty" id="notifyDetailEmpty">메일을 선택하면 상세가 열립니다.</div>
+            <div class="notify-detail hidden" id="notifyDetailPane">
+              <div class="notify-detail-head">
+                <h3 id="notifyDetailTitle">메일</h3>
+                <div class="notify-detail-actions">
+                </div>
+              </div>
+              <div class="notify-detail-meta" id="notifyDetailMeta"></div>
+              <div class="notify-detail-body" id="notifyDetailBody"></div>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="mailComposeModal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">새 메일</div>
+        <div class="modal-sub">보낼 사람을 이름으로 선택해 전송합니다.</div>
+      </div>
+      <button class="modal-close" data-close="true">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid">
+        <div class="ai-field">
+          <label>받는 사람</label>
+          <select id="mailRecipientSelect" class="select"></select>
+        </div>
+        <div class="ai-field span-2">
+          <label>제목</label>
+          <input id="mailSubjectInput" class="input" type="text" />
+        </div>
+        <div class="ai-field span-2">
+          <label>본문</label>
+          <textarea id="mailContentInput" class="input" rows="7"></textarea>
+        </div>
+        <div class="ai-field span-2">
+          <label>첨부파일</label>
+          <input id="mailAttachmentInput" class="input" type="file" multiple />
+          <div id="mailAttachmentList" class="mail-attachment-list"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-close="true">취소</button>
+      <button class="btn primary" id="mailSendBtn">보내기</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/header.js"></script>
+<script src="js/notifications_center.js?v=20260204-3"></script>
+<script>
+  (async () => {
+    await loadLayout();
+    await loadHeader("메일센터");
+  })();
+</script>
+</body>
+</html>

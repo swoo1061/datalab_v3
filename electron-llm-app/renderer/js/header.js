@@ -36,13 +36,6 @@ async function loadHeader(pageTitle = "") {
     headerRoot.innerHTML = await res.text();
   }
 
-  const themeCloseBtn = document.querySelector("#themeSettingsModal .popup-btn");
-  if (themeCloseBtn) {
-    themeCloseBtn.textContent = "←";
-    themeCloseBtn.setAttribute("aria-label", "뒤로가기");
-    themeCloseBtn.classList.add("theme-back-btn");
-  }
-
   const infoCloseBtn = document.querySelector("#profileInfoModal .popup-btn");
   if (infoCloseBtn) {
     infoCloseBtn.textContent = "←";
@@ -69,11 +62,6 @@ async function loadHeader(pageTitle = "") {
 
   const userKey = me?.id ? `user:${me.id}` : `user:${me?.username || me?.email || "unknown"}`;
   localStorage.setItem("currentUserKey", userKey);
-  window.migrateUserStorage?.("themePrimary");
-  window.migrateUserStorage?.("themeAccent");
-  window.migrateUserStorage?.("appTheme");
-  window.migrateUserStorage?.("themePresets");
-  window.applyCustomThemeVars?.();
 
   const name = me?.name || me?.username || "사용자";
   const rawPosition = me?.position || "";
@@ -105,7 +93,6 @@ async function loadHeader(pageTitle = "") {
   bindGlobalSearch();
   startLiveClock();
   bindNotifications();
-  bindThemeSettingsModal();
 }
 
 // ================================
@@ -132,218 +119,6 @@ function bindProfileMenu() {
       if (action === "attendance") window.showAlert?.("출퇴근 기록 준비중");
       if (action === "my_dashboard") window.nav.go("my_dashboard");
     };
-  });
-}
-
-function applyTheme(theme) {
-  const nextTheme = theme || "classic";
-  document.body.dataset.theme = nextTheme;
-  if (window.writeUserStorage) window.writeUserStorage("appTheme", nextTheme);
-  else localStorage.setItem("appTheme", nextTheme);
-  document.querySelectorAll(".theme-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.theme === nextTheme);
-  });
-}
-
-function bindThemeSelector() {
-  const saved = window.readUserStorage
-    ? window.readUserStorage("appTheme")
-    : localStorage.getItem("appTheme");
-  const resolved = saved || "classic";
-  applyTheme(resolved);
-  document.querySelectorAll(".theme-btn").forEach((btn) => {
-    btn.addEventListener("click", () => applyTheme(btn.dataset.theme));
-  });
-}
-
-let activePresetId = null;
-
-function loadThemePresets() {
-  try {
-    const stored = window.readUserStorage
-      ? window.readUserStorage("themePresets")
-      : localStorage.getItem("themePresets");
-    return JSON.parse(stored || "[]");
-  } catch (e) {
-    return [];
-  }
-}
-
-function saveThemePresets(list) {
-  if (window.writeUserStorage) window.writeUserStorage("themePresets", JSON.stringify(list));
-  else localStorage.setItem("themePresets", JSON.stringify(list));
-}
-
-function openThemeSettings() {
-  const modal = document.getElementById("themeSettingsModal");
-  if (!modal) return;
-  modal.classList.remove("hidden");
-  const primary = window.readUserStorage
-    ? window.readUserStorage("themePrimary") || "#ffffff"
-    : localStorage.getItem("themePrimary") || "#ffffff";
-  const accent = window.readUserStorage
-    ? window.readUserStorage("themeAccent") || "#ffffff"
-    : localStorage.getItem("themeAccent") || "#ffffff";
-  const primaryInput = document.getElementById("themePrimaryInput");
-  const accentInput = document.getElementById("themeAccentInput");
-  const nameInput = document.getElementById("themeCustomName");
-  if (primaryInput) primaryInput.value = primary;
-  if (accentInput) accentInput.value = accent;
-  if (nameInput) nameInput.value = "";
-}
-
-function closeThemeSettings() {
-  document.getElementById("themeSettingsModal")?.classList.add("hidden");
-}
-
-function openThemePresets() {
-  const modal = document.getElementById("themePresetModal");
-  if (!modal) return;
-  activePresetId = null;
-  modal.classList.remove("hidden");
-  const nameInput = document.getElementById("themePresetName");
-  const updateBtn = document.getElementById("themePresetUpdateBtn");
-  if (nameInput) nameInput.value = "";
-  if (updateBtn) updateBtn.classList.add("hidden");
-  renderThemePresets();
-}
-
-function closeThemePresets() {
-  document.getElementById("themePresetModal")?.classList.add("hidden");
-}
-
-function renderThemePresets() {
-  const listEl = document.getElementById("themePresetList");
-  if (!listEl) return;
-  const presets = loadThemePresets();
-  listEl.innerHTML = presets.map((preset) => `
-    <div class="preset-item" data-id="${preset.id}">
-      <div class="preset-info">
-        <div class="preset-swatches">
-          <span class="preset-swatch" style="background:${preset.primary}"></span>
-          <span class="preset-swatch" style="background:${preset.accent}"></span>
-        </div>
-        <div class="preset-name">${preset.name}</div>
-      </div>
-      <div class="preset-actions">
-        <button class="apply" data-action="apply">적용</button>
-        <button data-action="edit">수정</button>
-        <button data-action="delete">삭제</button>
-      </div>
-    </div>
-  `).join("");
-
-  listEl.querySelectorAll(".preset-item").forEach((item) => {
-    const presetId = item.dataset.id;
-    const preset = presets.find((p) => String(p.id) === String(presetId));
-    if (!preset) return;
-    item.querySelectorAll("button").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const action = btn.dataset.action;
-        if (action === "apply") {
-          window.setCustomThemeColors?.(preset.primary, preset.accent);
-          const primaryInput = document.getElementById("themePrimaryInput");
-          const accentInput = document.getElementById("themeAccentInput");
-          if (primaryInput) primaryInput.value = preset.primary;
-          if (accentInput) accentInput.value = preset.accent;
-          return;
-        }
-        if (action === "edit") {
-          activePresetId = preset.id;
-          const primaryInput = document.getElementById("themePrimaryInput");
-          const accentInput = document.getElementById("themeAccentInput");
-          const nameInput = document.getElementById("themePresetName");
-          const updateBtn = document.getElementById("themePresetUpdateBtn");
-          if (primaryInput) primaryInput.value = preset.primary;
-          if (accentInput) accentInput.value = preset.accent;
-          if (nameInput) nameInput.value = preset.name;
-          if (updateBtn) updateBtn.classList.remove("hidden");
-          return;
-        }
-        if (action === "delete") {
-          const next = presets.filter((p) => String(p.id) !== String(presetId));
-          saveThemePresets(next);
-          renderThemePresets();
-        }
-      });
-    });
-  });
-}
-
-function bindThemeSettingsModal() {
-  const openBtn = document.getElementById("themeSettingsBtn");
-  const manageBtn = document.getElementById("themePresetManageBtn");
-  const resetBtn = document.getElementById("themeColorsResetBtn");
-  const createBtn = document.getElementById("themePresetCreateBtn");
-  const updateBtn = document.getElementById("themePresetUpdateBtn");
-  const primaryInput = document.getElementById("themePrimaryInput");
-  const accentInput = document.getElementById("themeAccentInput");
-  const nameInput = document.getElementById("themeCustomName");
-
-  openBtn?.addEventListener("click", () => {
-    closeProfilePopup();
-    openThemeSettings();
-  });
-
-  resetBtn?.addEventListener("click", () => {
-    window.resetCustomThemeColors?.();
-    if (primaryInput) primaryInput.value = "#ffffff";
-    if (accentInput) accentInput.value = "#ffffff";
-    applyTheme("classic");
-  });
-
-  manageBtn?.addEventListener("click", () => {
-    openThemePresets();
-  });
-
-  const applyCustom = () => {
-    const primary = primaryInput?.value;
-    const accent = accentInput?.value;
-    window.setCustomThemeColors?.(primary, accent);
-  };
-
-  primaryInput?.addEventListener("input", applyCustom);
-  accentInput?.addEventListener("input", applyCustom);
-
-  createBtn?.addEventListener("click", () => {
-    const name = nameInput?.value?.trim();
-    if (!name) {
-      window.showAlert?.("프리셋 이름을 입력해 주세요.");
-      return;
-    }
-    const presets = loadThemePresets();
-    presets.push({
-      id: Date.now(),
-      name,
-      primary: primaryInput?.value || "#ffffff",
-      accent: accentInput?.value || "#ffffff",
-    });
-    saveThemePresets(presets);
-    if (nameInput) nameInput.value = "";
-  });
-
-  updateBtn?.addEventListener("click", () => {
-    if (!activePresetId) return;
-    const name = document.getElementById("themePresetName")?.value?.trim();
-    if (!name) {
-      window.showAlert?.("프리셋 이름을 입력해 주세요.");
-      return;
-    }
-    const presets = loadThemePresets();
-    const target = presets.find((preset) => String(preset.id) === String(activePresetId));
-    if (!target) return;
-    target.name = name;
-    target.primary = primaryInput?.value || target.primary;
-    target.accent = accentInput?.value || target.accent;
-    saveThemePresets(presets);
-    activePresetId = null;
-    renderThemePresets();
-    const save = document.getElementById("themePresetSaveBtn");
-    const update = document.getElementById("themePresetUpdateBtn");
-    if (save) save.classList.remove("hidden");
-    if (update) update.classList.add("hidden");
-    const nameInput = document.getElementById("themePresetName");
-    if (nameInput) nameInput.value = "";
   });
 }
 
@@ -425,6 +200,12 @@ async function buildAuthHeaders() {
 let notifyPollTimer = null;
 let notifyItemsById = new Map();
 
+function getNotifyItemTime(item) {
+  const raw = item?.remind_at || item?.created_at || item?.updated_at;
+  const d = raw ? new Date(raw) : null;
+  return d && !Number.isNaN(d.valueOf()) ? d.getTime() : 0;
+}
+
 function bindNotifications() {
   const button = document.getElementById("notifyButton");
   const dropdown = document.getElementById("notifyDropdown");
@@ -483,26 +264,42 @@ async function refreshNotifications() {
 
   try {
     const headers = await buildAuthHeaders();
-    const res = await fetch(`${window.API_BASE}/api/data/notifications/`, {
+    const res = await fetch(`${window.API_BASE}/api/data/notifications/?limit=20`, {
       credentials: "include",
       headers,
     });
     if (!res.ok) throw new Error("notification fetch failed");
     const data = await res.json();
+    let mailItems = [];
     let unreadMail = 0;
     try {
-      const mres = await fetch(`${window.API_BASE}/api/data/messages/?box=inbox&limit=1`, {
+      const mres = await fetch(`${window.API_BASE}/api/data/messages/?box=inbox&limit=20`, {
         credentials: "include",
         headers,
       });
       if (mres.ok) {
         const mdata = await mres.json();
         unreadMail = Number(mdata?.unread_count || 0);
+        mailItems = mdata?.results || [];
       }
     } catch (e) {
       // ignore mail unread fetch errors
     }
-    const items = data.results || [];
+
+    const memoItems = (data.results || []).map((item) => ({
+      ...item,
+      _kind: "memo",
+      _key: `memo:${item.id}`,
+    }));
+    const inboxItems = mailItems.map((item) => ({
+      ...item,
+      _kind: "mail",
+      _key: `mail:${item.id}`,
+    }));
+    const items = [...memoItems, ...inboxItems]
+      .sort((a, b) => getNotifyItemTime(b) - getNotifyItemTime(a))
+      .slice(0, 30);
+
     const unreadNotify = Number.isFinite(data.unread_count) ? data.unread_count : items.filter((i) => !i.is_read).length;
     const unreadCount = unreadNotify + unreadMail;
     renderNotifications(items);
@@ -533,19 +330,22 @@ function renderNotifications(items) {
     return;
   }
 
-  notifyItemsById = new Map(items.map((item) => [String(item.id), item]));
+  notifyItemsById = new Map(items.map((item) => [String(item._key || item.id), item]));
   if (detail) detail.classList.add("hidden");
   if (empty) empty.classList.add("hidden");
   list.classList.remove("hidden");
 
   list.innerHTML = items
     .map((item) => {
-      const title = (item.content || "").trim() || "메모";
-      const dateLabel = item.date || "-";
+      const kindLabel = item._kind === "mail" ? "메일" : "알림";
+      const title = item._kind === "mail"
+        ? (item.subject || "").trim() || "제목 없음"
+        : (item.content || "").trim() || "메모";
+      const dateLabel = item._kind === "mail" ? (item.sender_name || "-") : (item.date || "-");
 
       return `
-        <div class="notify-item ${item.is_read ? "is-read" : ""}" data-id="${item.id}" data-date="${dateLabel}">
-          <div class="notify-summary">${dateLabel} · ${title}</div>
+        <div class="notify-item ${item.is_read ? "is-read" : ""}" data-id="${item._key || item.id}" data-date="${dateLabel}">
+          <div class="notify-summary">[${kindLabel}] ${dateLabel} · ${title}</div>
         </div>
       `;
     })
@@ -553,9 +353,9 @@ function renderNotifications(items) {
 
   list.querySelectorAll(".notify-item").forEach((itemEl) => {
     itemEl.addEventListener("click", () => {
-      const memoId = itemEl.dataset.id;
-      if (!memoId) return;
-      openNotificationDetail(memoId);
+      const key = itemEl.dataset.id;
+      if (!key) return;
+      openNotificationDetail(key);
     });
   });
 }
@@ -571,6 +371,20 @@ async function markNotificationRead(memoId) {
     });
   } catch (e) {
     console.warn("mark notification read failed", e);
+  }
+}
+
+async function markMailRead(messageId) {
+  try {
+    const headers = await buildAuthHeaders();
+    await fetch(`${window.API_BASE}/api/data/messages/${messageId}/`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ is_read: true }),
+    });
+  } catch (e) {
+    console.warn("mark mail read failed", e);
   }
 }
 
@@ -605,7 +419,7 @@ function openMemoFromNotification({ id, date }) {
   }
 }
 
-function openNotificationDetail(memoId) {
+function openNotificationDetail(itemKey) {
   const detail = document.getElementById("notifyDetail");
   const list = document.getElementById("notifyList");
   const empty = document.getElementById("notifyEmpty");
@@ -617,45 +431,72 @@ function openNotificationDetail(memoId) {
 
   if (!detail || !list || !metaEl || !contentEl || !deleteBtn || !openBtn) return;
 
-  const item = notifyItemsById.get(String(memoId));
+  const item = notifyItemsById.get(String(itemKey));
   if (!item) return;
 
-  const clinic = item.clinic_name || "전체";
-  const dateLabel = item.date || "-";
-  const remindAt = item.remind_at ? new Date(item.remind_at) : null;
-  const timeLabel = remindAt && !Number.isNaN(remindAt.valueOf())
-    ? remindAt.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
-    : "-";
-  const platform = item.platform_label || item.platform || "";
-  const account = item.account || "";
-  const password = item.account_password || "";
-  const author = item.user_name || "-";
+  if (item._kind === "mail") {
+    if (titleEl) titleEl.innerText = item.subject || "메일";
+    metaEl.innerHTML = `
+      <div class="meta-row"><span>보낸사람</span><span>${item.sender_name || "-"}</span></div>
+      <div class="meta-row"><span>받는사람</span><span>${item.recipient_name || "-"}</span></div>
+      <div class="meta-row"><span>시간</span><span>${new Date(item.created_at).toLocaleString("ko-KR")}</span></div>
+    `;
+    contentEl.innerText = item.content || "";
+    if (!item.is_read) {
+      markMailRead(item.id);
+    }
+    deleteBtn.textContent = "메일함으로";
+    deleteBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (window.nav?.go) window.nav.go("mail_center");
+      else window.location.href = "mail_center.html";
+    };
+    openBtn.textContent = "메일센터 열기";
+    openBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (window.nav?.go) window.nav.go("mail_center");
+      else window.location.href = "mail_center.html";
+    };
+  } else {
+    const clinic = item.clinic_name || "전체";
+    const dateLabel = item.date || "-";
+    const remindAt = item.remind_at ? new Date(item.remind_at) : null;
+    const timeLabel = remindAt && !Number.isNaN(remindAt.valueOf())
+      ? remindAt.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+      : "-";
+    const platform = item.platform_label || item.platform || "";
+    const account = item.account || "";
+    const password = item.account_password || "";
+    const author = item.user_name || "-";
 
-  if (titleEl) titleEl.innerText = `${dateLabel} 메모`;
-  metaEl.innerHTML = `
-    <div class="meta-row"><span>병원</span><span>${clinic}</span></div>
-    <div class="meta-row"><span>알림</span><span>${dateLabel} ${timeLabel}</span></div>
-    ${platform ? `<div class="meta-row"><span>플랫폼</span><span>${platform}</span></div>` : ""}
-    ${account ? `<div class="meta-row"><span>ID</span><span>${account}</span></div>` : ""}
-    ${password ? `<div class="meta-row"><span>PW</span><span>${password}</span></div>` : ""}
-    <div class="meta-row"><span>담당자</span><span>${author}</span></div>
-  `;
-  contentEl.innerText = item.content || "";
+    if (titleEl) titleEl.innerText = `${dateLabel} 메모`;
+    metaEl.innerHTML = `
+      <div class="meta-row"><span>병원</span><span>${clinic}</span></div>
+      <div class="meta-row"><span>알림</span><span>${dateLabel} ${timeLabel}</span></div>
+      ${platform ? `<div class="meta-row"><span>플랫폼</span><span>${platform}</span></div>` : ""}
+      ${account ? `<div class="meta-row"><span>ID</span><span>${account}</span></div>` : ""}
+      ${password ? `<div class="meta-row"><span>PW</span><span>${password}</span></div>` : ""}
+      <div class="meta-row"><span>담당자</span><span>${author}</span></div>
+    `;
+    contentEl.innerText = item.content || "";
 
-  if (!item.is_read) {
-    markNotificationRead(memoId);
+    if (!item.is_read) {
+      markNotificationRead(item.id);
+    }
+
+    deleteBtn.textContent = "삭제";
+    deleteBtn.onclick = async (e) => {
+      e.stopPropagation();
+      await deleteNotificationMemo(item.id);
+      refreshNotifications();
+    };
+
+    openBtn.textContent = "메모 상세로";
+    openBtn.onclick = (e) => {
+      e.stopPropagation();
+      openMemoFromNotification({ id: item.id, date: item.date });
+    };
   }
-
-  deleteBtn.onclick = async (e) => {
-    e.stopPropagation();
-    await deleteNotificationMemo(memoId);
-    refreshNotifications();
-  };
-
-  openBtn.onclick = (e) => {
-    e.stopPropagation();
-    openMemoFromNotification({ id: memoId, date: item.date });
-  };
 
   list.classList.add("hidden");
   if (empty) empty.classList.add("hidden");
@@ -697,8 +538,6 @@ function startLiveClock() {
 window.loadHeader = loadHeader;
 window.toggleProfile = toggleProfile;
 window.closeProfilePopup = closeProfilePopup;
-window.closeThemeSettings = closeThemeSettings;
-window.closeThemePresets = closeThemePresets;
 window.logout = logout;
 window.openProfileInfo = openProfileInfo;
 window.closeProfileInfo = closeProfileInfo;

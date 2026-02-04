@@ -1,6 +1,6 @@
 {
   "name": "llm-staff-app",
-  "version": "0.1.6",
+  "version": "0.10.1",
   "main": "main.js",
   "scripts": {
     "dev": "electron .",
@@ -26,6 +26,7 @@
       "output": "dist"
     },
     "win": {
+      "icon": "renderer/assets/app.ico",
       "target": [
         "nsis"
       ]

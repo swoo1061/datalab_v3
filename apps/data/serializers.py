@@ -1,5 +1,13 @@
 from rest_framework import serializers
-from apps.data.models import ClinicGuide, FavoriteClinic, ClinicPost, CalendarMemo, InternalMessage
+from django.db.utils import OperationalError, ProgrammingError
+from apps.data.models import (
+    ClinicGuide,
+    FavoriteClinic,
+    ClinicPost,
+    CalendarMemo,
+    InternalMessage,
+    InternalMessageAttachment,
+)
 
 
 class FavoriteClinicSerializer(serializers.ModelSerializer):
@@ -145,6 +153,7 @@ class CalendarMemoSerializer(serializers.ModelSerializer):
 class InternalMessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
     recipient_name = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = InternalMessage
@@ -156,6 +165,7 @@ class InternalMessageSerializer(serializers.ModelSerializer):
             "recipient_name",
             "subject",
             "content",
+            "attachments",
             "is_read",
             "read_at",
             "created_at",
@@ -176,3 +186,26 @@ class InternalMessageSerializer(serializers.ModelSerializer):
 
     def get_recipient_name(self, obj):
         return self._display_name(obj.recipient)
+
+    def get_attachments(self, obj):
+        request = self.context.get("request")
+        rows = []
+        try:
+            attachments = obj.attachments.all()
+            for att in attachments:
+                url = att.file.url
+                if request:
+                    url = request.build_absolute_uri(url)
+                rows.append(
+                    {
+                        "id": att.id,
+                        "name": att.original_name or att.file.name.split("/")[-1],
+                        "url": url,
+                        "content_type": att.content_type,
+                        "size": att.file_size,
+                    }
+                )
+        except (OperationalError, ProgrammingError):
+            # Migration not applied yet: return empty attachments to keep mail UI working.
+            return []
+        return rows

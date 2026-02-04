@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.db import transaction
+from django.db.utils import OperationalError, ProgrammingError
 from django.shortcuts import get_object_or_404
 
 from rest_framework import status
@@ -7,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.data.models import InternalMessage
+from apps.data.models import InternalMessage, InternalMessageAttachment
 from apps.data.serializers import InternalMessageSerializer
 from apps.data.views_api import CsrfExemptSessionAuthentication, HeaderSessionAuthentication
 
@@ -45,7 +47,7 @@ class InternalMessageListCreateView(APIView):
                 "unread_count": unread,
                 "inbox_count": inbox_count,
                 "sent_count": sent_count,
-                "results": InternalMessageSerializer(rows, many=True).data,
+                "results": InternalMessageSerializer(rows, many=True, context={"request": request}).data,
             },
             status=status.HTTP_200_OK,
         )
@@ -65,15 +67,38 @@ class InternalMessageListCreateView(APIView):
 
         User = get_user_model()
         recipient = get_object_or_404(User, id=recipient_id, is_active=True)
+        attachments = request.FILES.getlist("attachments")
+        if len(attachments) > 5:
+            return Response({"message": "attachments_limit_exceeded"}, status=status.HTTP_400_BAD_REQUEST)
+        max_size = 20 * 1024 * 1024
+        for f in attachments:
+            if (getattr(f, "size", 0) or 0) > max_size:
+                return Response({"message": "attachment_too_large"}, status=status.HTTP_400_BAD_REQUEST)
 
-        msg = InternalMessage.objects.create(
-            sender=request.user,
-            recipient=recipient,
-            subject=subject,
-            content=content,
-            is_read=False,
+        with transaction.atomic():
+            msg = InternalMessage.objects.create(
+                sender=request.user,
+                recipient=recipient,
+                subject=subject,
+                content=content,
+                is_read=False,
+            )
+            try:
+                for f in attachments:
+                    InternalMessageAttachment.objects.create(
+                        message=msg,
+                        file=f,
+                        original_name=(getattr(f, "name", "") or "")[:255],
+                        content_type=(getattr(f, "content_type", "") or "")[:120],
+                        file_size=getattr(f, "size", 0) or 0,
+                    )
+            except (OperationalError, ProgrammingError):
+                return Response({"message": "attachment_feature_not_ready"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        return Response(
+            {"ok": True, "message": InternalMessageSerializer(msg, context={"request": request}).data},
+            status=status.HTTP_201_CREATED,
         )
-        return Response({"ok": True, "message": InternalMessageSerializer(msg).data}, status=status.HTTP_201_CREATED)
 
 
 class InternalMessageDetailView(APIView):
@@ -92,4 +117,4 @@ class InternalMessageDetailView(APIView):
         if "is_read" in payload and msg.recipient_id == request.user.id and payload.get("is_read"):
             msg.mark_read()
 
-        return Response(InternalMessageSerializer(msg).data, status=status.HTTP_200_OK)
+        return Response(InternalMessageSerializer(msg, context={"request": request}).data, status=status.HTTP_200_OK)

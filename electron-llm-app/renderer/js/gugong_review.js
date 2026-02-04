@@ -175,7 +175,10 @@ function buildPrompt() {
   const lines = [];
 
   lines.push(`병원: ${state.clinicName || "미선택"}`);
-  lines.push(`글 목적: ${state.reviewIntent || "자연스러운 후기"}`);
+  const reviewType = state.reviewIntent || "자연스러운 후기";
+  lines.push(`글 목적: ${reviewType}`);
+  // 백엔드 구공이 룰 파서와 키를 맞춰서 유형 규칙이 확실히 반영되도록 중복 표기
+  lines.push(`리뷰 유형: ${reviewType}`);
   lines.push(`연령대: ${state.ageGroup || "20대 후반"}`);
   lines.push(`MBTI: ${state.mbti || "INFP"}`);
   lines.push(`톤: ${state.tonePreset || "자연스럽고 담백한 톤"}`);
@@ -231,6 +234,8 @@ async function generateReview() {
       keywords: state.keywords,
       age_group: state.ageGroup,
       mbti: state.mbti,
+      review_intent: state.reviewIntent,
+      review_type: state.reviewIntent,
     },
   };
 
@@ -394,6 +399,8 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   await loadClinics();
   await loadModels();
+  window.initGlassSelects?.();
+  setTimeout(() => window.initGlassSelects?.(), 0);
 });
 
 /* ---------- global ---------- */

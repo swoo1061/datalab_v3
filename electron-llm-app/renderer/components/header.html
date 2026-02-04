@@ -74,9 +74,6 @@
 
         <div class="profile-menu">
             <div class="menu-item" data-action="profile">기본 정보</div>
-            <div class="menu-item" id="themeSettingsBtn">테마 설정</div>
-            <div class="menu-item" data-action="my_dashboard">나의 대시보드</div>
-            <div class="menu-item" data-action="attendance">출퇴근 기록</div>
           </div>
 
           <hr />
@@ -117,52 +114,3 @@
   </div>
 </div>
 
-  <div id="themeSettingsModal" class="profile-info-modal hidden theme-modal">
-    <h3>테마 설정</h3>
-    <button class="popup-btn theme-back-btn" onclick="closeThemeSettings()" aria-label="뒤로가기">←</button>
-
-    <div class="theme-editor">
-      <div class="editor-row">
-        <label>커스텀 색</label>
-        <div class="color-row">
-          <div class="color-field">
-            <span>Primary</span>
-            <input type="color" id="themePrimaryInput" value="#4f46e5" />
-          </div>
-          <div class="color-field">
-            <span>Accent</span>
-            <input type="color" id="themeAccentInput" value="#0e7490" />
-          </div>
-        </div>
-      </div>
-      <div class="editor-row">
-        <label for="themeCustomName">커스텀 이름</label>
-        <input type="text" id="themeCustomName" placeholder="예: 라일락" />
-      </div>
-      <div class="editor-actions">
-        <button class="theme-reset" id="themeColorsResetBtn" type="button">기본으로</button>
-        <button class="theme-save" id="themePresetCreateBtn" type="button">프리셋 저장</button>
-        <button class="theme-save" id="themePresetManageBtn" type="button">프리셋 관리</button>
-      </div>
-    </div>
-  </div>
-
-<div id="themePresetModal" class="profile-info-modal hidden theme-modal preset-modal">
-  <h3>프리셋 관리</h3>
-  <button class="popup-btn theme-back-btn" onclick="closeThemePresets()" aria-label="뒤로가기">←</button>
-
-    <div class="theme-editor">
-      <div class="editor-row">
-        <label for="themePresetName">프리셋 이름</label>
-        <input type="text" id="themePresetName" placeholder="예: 라일락" />
-      </div>
-      <div class="editor-actions">
-        <button class="theme-update hidden" id="themePresetUpdateBtn" type="button">수정 저장</button>
-      </div>
-    </div>
-
-  <div class="theme-presets">
-    <div class="section-title">프리셋</div>
-    <div id="themePresetList" class="preset-list"></div>
-  </div>
-</div>

@@ -23,6 +23,8 @@ MODEL_ALIAS_MAP = {
     "gpt-4.1": "gpt-4.1",
     "claude-4.5": "claude-sonnet-4-5-20250929",
     "claude-opus": "claude-opus-4-5-20251101",
+    "claude-sonnet-4-5-20250929": "claude-sonnet-4-5-20250929",
+    "claude-opus-4-5-20251101": "claude-opus-4-5-20251101",
     # "ft:gpt-3.5-turbo-0125:personal::D2AzRPLe": "ft:gpt-3.5-turbo-0125:personal::D2AzRPLe", --- IGNORE ---
     # "ft:gpt-4.1-2025-04-14:personal::D3C9lMYD": "ft:gpt-4.1-2025-04-14:personal::D3C9lMYD", --- IGNORE ---
     # Legacy aliases -> current Gugong model
@@ -107,6 +109,10 @@ def review_generate_api(request):
 
     print("[DEBUG] ml/views_api build_ft_prompt_from_models prompt preview:")
     print(prompt)
+    print(
+        f"[DEBUG] review_generate_api model={model} "
+        f"review_intent={context.get('review_intent') or context.get('review_type') or context.get('content_type')}"
+    )
 
     keywords_used = context.get("keywords") or []
     if isinstance(keywords_used, str):

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | 근태 정정요청</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/business_mode.css" />
+  <link rel="stylesheet" href="css/notifications_center.css?v=20260204-5" />
+</head>
+<body class="theme-vivid tone-sidebar" data-nav="attendance_requests" data-notify-mode="attendance">
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope notify-page">
+      <section class="page-canvas">
+        <header class="page-head">
+          <h1 class="h1">근태 정정요청</h1>
+          <p class="sub">관리자/대표 전용 근태 정정요청 관리 페이지입니다.</p>
+        </header>
+
+        <section class="notify-shell card" id="attendanceRequestsShell">
+          <aside class="notify-folder-col" id="notifyFolders"></aside>
+
+          <section class="notify-list-col">
+            <div class="notify-toolbar">
+              <input id="notifySearchInput" class="input" type="text" placeholder="검색" />
+              <button class="btn" id="notifyRefreshBtn" type="button">새로고침</button>
+              <button class="btn primary hidden" id="notifyComposeBtn" type="button">새 메일</button>
+              <button class="btn" id="notifyBulkReadBtn" type="button">선택 읽음</button>
+            </div>
+            <div class="notify-mail-list" id="notifyMailList"></div>
+          </section>
+
+          <section class="notify-detail-col">
+            <div class="notify-detail-empty" id="notifyDetailEmpty">정정요청을 선택하면 상세가 열립니다.</div>
+            <div class="notify-detail hidden" id="notifyDetailPane">
+              <div class="notify-detail-head">
+                <h3 id="notifyDetailTitle">근태 정정요청</h3>
+                <div class="notify-detail-actions">
+                  <button class="btn" id="notifyDetailMarkReadBtn" type="button">읽음 처리</button>
+                  <button class="btn" id="notifyDetailOpenCalendarBtn" type="button">캘린더 열기</button>
+                </div>
+              </div>
+              <div class="notify-detail-meta" id="notifyDetailMeta"></div>
+              <div class="notify-detail-body" id="notifyDetailBody"></div>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="mailComposeModal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+  <div class="modal-card"></div>
+</div>
+
+<div id="attendanceDeniedModal" class="modal hidden access-denied-modal">
+  <div class="modal-backdrop"></div>
+  <div class="modal-card">
+    <div class="modal-body access-denied-body">
+      <div class="access-denied-text">접근 불가</div>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/header.js"></script>
+<script src="js/notifications_center.js?v=20260204-3"></script>
+<script>
+  (async () => {
+    await loadLayout();
+    await loadHeader("근태 정정요청");
+  })();
+</script>
+</body>
+</html>

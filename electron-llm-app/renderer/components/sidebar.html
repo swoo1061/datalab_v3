@@ -12,7 +12,11 @@
 
     <div class="nav-group">
       <div class="nav-group-title" onclick="toggleNav(this)">
-        <span class="nav-icon">D</span>
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M3 13h8V3H3v10zm10 8h8V11h-8v10zM3 21h8v-6H3v6zm10-20v8h8V1h-8z"></path>
+          </svg>
+        </span>
         <span class="nav-label">대시보드</span>
       </div>
       <div class="nav-sub">
@@ -40,25 +44,20 @@
       </div>
     </div>
 
+    
     <div class="nav-group">
       <div class="nav-group-title" onclick="toggleNav(this)">
-        <span class="nav-icon nav-icon-bell">
-          <span>🔔</span>
-          <span class="nav-badge hidden" id="sidebarNotifyBadge">0</span>
+        <span class="nav-icon nav-icon-ai" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path style="fill:none;stroke:#4f46e5;stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round" d="M6.9 6.2 8.3 3.4 10.3 6.2"></path>
+            <path style="fill:none;stroke:#4f46e5;stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round" d="M13.7 6.2 15.9 3.2 17.2 6.2"></path>
+            <rect x="4.2" y="6.2" width="15.6" height="13" rx="5.8" style="fill:none;stroke:#4f46e5;stroke-width:1.6"></rect>
+            <rect x="6.1" y="8.5" width="11.8" height="8" rx="4" style="fill:#0f172a"></rect>
+            <circle cx="10.2" cy="12.5" r="1.05" style="fill:#3b82f6"></circle>
+            <circle cx="13.8" cy="12.5" r="1.05" style="fill:#3b82f6"></circle>
+            <path style="fill:none;stroke:#93c5fd;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round" d="M10.9 14.4l1.1.8 1.1-.8"></path>
+          </svg>
         </span>
-        <span class="nav-label">알림</span>
-      </div>
-      <div class="nav-sub">
-        <div class="nav-flyout-title">알림</div>
-        <a href="notifications_center.html" data-nav="notifications_center">
-          <span class="nav-sub-label">알림센터</span>
-        </a>
-      </div>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-group-title" onclick="toggleNav(this)">
-        <span class="nav-icon">A</span>
         <span class="nav-label">AI 생성</span>
       </div>
       <div class="nav-sub">
@@ -95,7 +94,11 @@
     
     <div class="nav-group">
       <div class="nav-group-title" onclick="toggleNav(this)">
-        <span class="nav-icon">H</span>
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M12 3 2 9v12h6v-7h8v7h6V9L12 3zm8 16h-2v-7H6v7H4V10l8-4.8 8 4.8v9z"></path>
+          </svg>
+        </span>
         <span class="nav-label">병원 관리</span>
       </div>
       <div class="nav-sub">
@@ -110,10 +113,14 @@
         </a>
       </div>
     </div>
-
+    
     <div class="nav-group">
       <div class="nav-group-title" onclick="toggleNav(this)">
-        <span class="nav-icon">W</span>
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v1H3V6zm0 4h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8z"></path>
+          </svg>
+        </span>
         <span class="nav-label">업무 자료</span>
       </div>
       <div class="nav-sub">
@@ -128,11 +135,39 @@
         </a>
       </div>
     </div>
-
-
+    
+    
+    
     <div class="nav-group">
       <div class="nav-group-title" onclick="toggleNav(this)">
-        <span class="nav-icon">P</span>
+        <span class="nav-icon nav-icon-bell" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 1 0-14 0v5L3 18v1h18v-1l-2-2z"></path>
+          </svg>
+          <span class="nav-badge hidden" id="sidebarNotifyBadge">0</span>
+        </span>
+        <span class="nav-label">알림</span>
+      </div>
+      <div class="nav-sub">
+        <div class="nav-flyout-title">알림</div>
+        <a href="mail_center.html" data-nav="mail_center">
+          <span class="nav-sub-label">메일</span>
+        </a>
+        <a href="notifications_center.html" data-nav="notifications_center">
+          <span class="nav-sub-label">메모함</span>
+        </a>
+        <a href="attendance_requests.html" data-nav="attendance_requests" data-role-only="admin,ceo">
+          <span class="nav-sub-label">근태 정정요청</span>
+        </a>
+      </div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title" onclick="toggleNav(this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0-8a3 3 0 1 1-3 3 3 3 0 0 1 3-3zm0 9c-4.4 0-8 2.2-8 5v2h16v-2c0-2.8-3.6-5-8-5zm6 5H6c.3-1.5 2.8-3 6-3s5.7 1.5 6 3z"></path>
+          </svg>
+        </span>
         <span class="nav-label">인사관리</span>
       </div>
       <div class="nav-sub">
@@ -151,21 +186,22 @@
         </a>
       </div>
     </div>
-
+    
   </nav>
-
+  
   <div class="sidebar-quick">
     <button
-      id="notionShortcut"
-      type="button"
-      class="quick-link-btn icon-only"
-      title="노션 열기"
-      aria-label="노션 열기"
+    id="notionShortcut"
+    type="button"
+    class="quick-link-btn icon-only"
+    title="노션 열기"
+    aria-label="노션 열기"
     >
       <img
-        src="../../static/img/notion image.png"
+        src="assets/shortcuts/notion.png"
         alt="notion"
         class="quick-link-icon"
+        onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=&quot;quick-link-glyph&quot;>N</span>';"
       />
     </button>
     <button
@@ -176,14 +212,15 @@
       aria-label="카카오워크 열기"
     >
       <img
-        src="../../static/img/카카오워크 image.png"
+        src="assets/shortcuts/kakaowork.png"
         alt="카카오워크"
         class="quick-link-icon"
+        onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=&quot;quick-link-glyph&quot;>K</span>';"
       />
     </button>
   </div>
 
-  <div class="footer">V_0.1.6</div>
+  <div class="footer">V_0.10.1</div>
 </aside>
 
 <!-- 🔥 이 한 줄이 핵심 -->

@@ -7,9 +7,36 @@ async function loadComponent(targetId, url) {
     return;
   }
 
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`${url} fetch failed`);
   root.innerHTML = await res.text();
+}
+
+const PAGE_TRANSITION_MS = 180;
+let isPageTransitioning = false;
+const PAGE_ROLE_ACCESS = {
+  attendance_requests: ["admin", "ceo"],
+};
+let cachedUserRole = null;
+
+function prefersReducedMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+}
+
+function runPageTransition(action) {
+  if (typeof action !== "function") return;
+  if (prefersReducedMotion()) {
+    action();
+    return;
+  }
+  if (isPageTransitioning) return;
+
+  isPageTransitioning = true;
+  document.body.classList.add("page-transitioning");
+
+  window.setTimeout(() => {
+    action();
+  }, PAGE_TRANSITION_MS);
 }
 
 function setActiveNav(key) {
@@ -18,12 +45,61 @@ function setActiveNav(key) {
   });
 }
 
-function navigate(page) {
-  if (window.nav?.go) {
-    window.nav.go(page); // Electron
-  } else {
-    window.location.href = `${page}.html`; // Web
+async function getCurrentUserRole() {
+  if (cachedUserRole) return cachedUserRole;
+  try {
+    const me = await window.api?.getMe?.();
+    const raw = String(
+      me?.position ?? me?.role ?? me?.position_code ?? me?.position_key ?? ""
+    )
+      .trim()
+      .toLowerCase();
+    const map = {
+      admin: "admin",
+      ceo: "ceo",
+      manager: "manager",
+      leader: "leader",
+      "계정": "admin",
+      "관리자": "admin",
+      "대표": "ceo",
+      "대표이사": "ceo",
+      "매니저": "manager",
+      "팀장": "leader",
+    };
+    cachedUserRole = map[raw] || raw;
+    return cachedUserRole;
+  } catch (e) {
+    return "";
   }
+}
+
+function getPageKeyFromPath(pathname) {
+  const file = String(pathname || "").split("/").pop() || "";
+  return file.endsWith(".html") ? file.slice(0, -5) : file;
+}
+
+async function canAccessPage(pageKey) {
+  const allowRoles = PAGE_ROLE_ACCESS[String(pageKey || "").toLowerCase()];
+  if (!allowRoles || !allowRoles.length) return true;
+  const role = await getCurrentUserRole();
+  const ok = allowRoles.includes(role);
+  if (!ok) {
+    if (typeof window.showAccessDenied === "function") window.showAccessDenied();
+    else window.showAlert?.("접근 불가");
+  }
+  return ok;
+}
+
+async function navigate(page) {
+  const ok = await canAccessPage(page);
+  if (!ok) return;
+  runPageTransition(() => {
+    if (window.nav?.go) {
+      window.nav.go(page); // Electron
+    } else {
+      window.location.href = `${page}.html`; // Web
+    }
+  });
 }
 
 async function loadLayout() {
@@ -37,6 +113,58 @@ function goMyDashboard() {
 
 window.navigate = navigate;
 window.loadLayout = loadLayout;
+
+function initPageTransitionState() {
+  if (prefersReducedMotion()) {
+    document.body.classList.add("page-ready");
+    return;
+  }
+  requestAnimationFrame(() => {
+    document.body.classList.add("page-ready");
+  });
+}
+
+function initHtmlLinkTransition() {
+  document.addEventListener("click", async (e) => {
+    const anchor = e.target?.closest?.("a[href]");
+    if (!anchor) return;
+    if (anchor.target && anchor.target !== "_self") return;
+    if (anchor.hasAttribute("download")) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+    const href = anchor.getAttribute("href");
+    if (!href || href.startsWith("#")) return;
+    if (/^(https?:|mailto:|tel:)/i.test(href)) return;
+
+    let nextUrl;
+    try {
+      nextUrl = new URL(href, window.location.href);
+    } catch (_err) {
+      return;
+    }
+
+    if (nextUrl.origin !== window.location.origin) return;
+    if (!nextUrl.pathname.endsWith(".html")) return;
+    if (
+      nextUrl.pathname === window.location.pathname &&
+      nextUrl.search === window.location.search &&
+      nextUrl.hash === window.location.hash
+    ) {
+      return;
+    }
+
+    e.preventDefault();
+    const nextPage = getPageKeyFromPath(nextUrl.pathname);
+    const ok = await canAccessPage(nextPage);
+    if (!ok) return;
+    runPageTransition(() => {
+      window.location.href = nextUrl.href;
+    });
+  }, true);
+}
+
+initPageTransitionState();
+initHtmlLinkTransition();
 
 // Fallback: close known overlays if they get stuck open.
 function releaseBlockingLayers() {
@@ -337,7 +465,39 @@ function initGlassSelects(root = document) {
 
 window.initGlassSelects = initGlassSelects;
 
+function clearLegacyThemeState() {
+  const keysToRemove = ["themePrimary", "themeAccent", "appTheme", "themePresets"];
+  try {
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+    const allKeys = Object.keys(localStorage);
+    allKeys.forEach((key) => {
+      if (keysToRemove.some((suffix) => key.endsWith(`:${suffix}`))) {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch (e) {
+    // ignore storage errors
+  }
+
+  [document.documentElement, document.body, document.querySelector(".app-main")]
+    .filter(Boolean)
+    .forEach((el) => {
+      el.style.removeProperty("--theme-primary");
+      el.style.removeProperty("--theme-accent");
+      el.style.removeProperty("--theme-primary-rgb");
+      el.style.removeProperty("--theme-accent-rgb");
+      el.style.removeProperty("background-color");
+    });
+
+  const body = document.body;
+  if (body) {
+    body.classList.remove("theme-vivid", "tone-sidebar", "theme-flat");
+    body.removeAttribute("data-theme");
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  clearLegacyThemeState();
   initGlassSelects();
 });
 
@@ -471,126 +631,47 @@ window.showAlert = window.showAlert || ((message) => {
   return Promise.resolve(true);
 });
 
-function hexToRgbString(hex) {
-  const cleaned = String(hex || "").trim().replace("#", "");
-  if (cleaned.length !== 6) return null;
-  const r = Number.parseInt(cleaned.slice(0, 2), 16);
-  const g = Number.parseInt(cleaned.slice(2, 4), 16);
-  const b = Number.parseInt(cleaned.slice(4, 6), 16);
-  if ([r, g, b].some((v) => Number.isNaN(v))) return null;
-  return `${r}, ${g}, ${b}`;
+function ensureAccessDeniedModal() {
+  let modal = document.getElementById("appAccessDeniedModal");
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = "appAccessDeniedModal";
+  modal.className = "app-confirm hidden";
+  modal.innerHTML = `
+    <div class="app-confirm-backdrop" data-close="true"></div>
+    <div class="app-confirm-card app-access-denied-card" role="alertdialog" aria-modal="true">
+      <div class="app-confirm-message app-access-denied-message">접근 불가</div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  return modal;
 }
 
-function mixWithWhite(rgbString, ratio = 0.9) {
-  const parts = String(rgbString || "")
-    .split(",")
-    .map((v) => Number.parseInt(v.trim(), 10));
-  if (parts.length !== 3 || parts.some((v) => Number.isNaN(v))) return "#ffffff";
-  const mix = (v) => Math.round(v * (1 - ratio) + 255 * ratio);
-  return `rgb(${mix(parts[0])}, ${mix(parts[1])}, ${mix(parts[2])})`;
-}
+window.showAccessDenied = () =>
+  new Promise((resolve) => {
+    const modal = ensureAccessDeniedModal();
+    const backdrop = modal.querySelector("[data-close]");
 
-function getUserStorageKey(suffix) {
-  const userKey = localStorage.getItem("currentUserKey");
-  if (!userKey) return suffix;
-  return `${userKey}:${suffix}`;
-}
+    const cleanup = () => {
+      modal.classList.add("hidden");
+      backdrop?.removeEventListener("click", onClose);
+      document.removeEventListener("keydown", onKeydown, true);
+      resolve(true);
+    };
 
-function readUserStorage(suffix) {
-  const userKey = localStorage.getItem("currentUserKey");
-  const scopedKey = getUserStorageKey(suffix);
-  const scopedValue = localStorage.getItem(scopedKey);
-  if (scopedValue !== null) return scopedValue;
-  if (userKey) return null;
-  return localStorage.getItem(suffix);
-}
+    const onClose = () => cleanup();
+    const onKeydown = (e) => {
+      if (e.key === "Escape" || e.key === "Enter") {
+        e.stopPropagation();
+        cleanup();
+      }
+    };
 
-function writeUserStorage(suffix, value) {
-  const scopedKey = getUserStorageKey(suffix);
-  localStorage.setItem(scopedKey, value);
-}
-
-function removeUserStorage(suffix) {
-  const scopedKey = getUserStorageKey(suffix);
-  localStorage.removeItem(scopedKey);
-}
-
-function migrateUserStorage(suffix) {
-  const userKey = localStorage.getItem("currentUserKey");
-  if (!userKey) return;
-  const scopedKey = getUserStorageKey(suffix);
-  if (localStorage.getItem(scopedKey) !== null) return;
-  const legacyValue = localStorage.getItem(suffix);
-  if (legacyValue === null) return;
-  localStorage.setItem(scopedKey, legacyValue);
-  localStorage.removeItem(suffix);
-}
-
-function applyCustomThemeVars() {
-  const root = document.documentElement;
-  const body = document.body;
-  if (!root || !body) return;
-  const storedPrimary = readUserStorage("themePrimary");
-  const storedAccent = readUserStorage("themeAccent");
-  const primary = storedPrimary || "#ffffff";
-  const accent = storedAccent || "#ffffff";
-  const primaryRgb = hexToRgbString(primary) || "255, 255, 255";
-  const accentRgb = hexToRgbString(accent) || "255, 255, 255";
-
-  root.style.setProperty("--theme-primary", primary);
-  root.style.setProperty("--theme-accent", accent);
-  root.style.setProperty("--theme-primary-rgb", primaryRgb);
-  root.style.setProperty("--theme-accent-rgb", accentRgb);
-  body.style.setProperty("--theme-primary", primary);
-  body.style.setProperty("--theme-accent", accent);
-  body.style.setProperty("--theme-primary-rgb", primaryRgb);
-  body.style.setProperty("--theme-accent-rgb", accentRgb);
-
-  const hasCustom = Boolean(storedPrimary || storedAccent);
-  const nextBg = hasCustom ? mixWithWhite(accentRgb, 0.94) : "#ffffff";
-  const nextSurface2 = hasCustom ? mixWithWhite(primaryRgb, 0.97) : "#ffffff";
-
-  root.style.setProperty("--bg", "#ffffff");
-  root.style.setProperty("--surface", "#ffffff");
-  root.style.setProperty("--surface-2", nextSurface2);
-  body.style.backgroundColor = nextBg;
-
-  const isNearWhite = (hex) => {
-    const cleaned = String(hex || "").trim().replace("#", "");
-    if (cleaned.length !== 6) return false;
-    const r = Number.parseInt(cleaned.slice(0, 2), 16);
-    const g = Number.parseInt(cleaned.slice(2, 4), 16);
-    const b = Number.parseInt(cleaned.slice(4, 6), 16);
-    if ([r, g, b].some((v) => Number.isNaN(v))) return false;
-    return r > 235 && g > 235 && b > 235;
-  };
-
-  root.classList.toggle(
-    "theme-flat",
-    isNearWhite(primary) && isNearWhite(accent)
-  );
-}
-
-window.setCustomThemeColors = (primary, accent) => {
-  if (primary) writeUserStorage("themePrimary", primary);
-  if (accent) writeUserStorage("themeAccent", accent);
-  applyCustomThemeVars();
-};
-
-window.resetCustomThemeColors = () => {
-  removeUserStorage("themePrimary");
-  removeUserStorage("themeAccent");
-  applyCustomThemeVars();
-};
-
-applyCustomThemeVars();
-
-window.getUserStorageKey = getUserStorageKey;
-window.readUserStorage = readUserStorage;
-window.writeUserStorage = writeUserStorage;
-window.removeUserStorage = removeUserStorage;
-window.migrateUserStorage = migrateUserStorage;
-window.applyCustomThemeVars = applyCustomThemeVars;
+    modal.classList.remove("hidden");
+    backdrop?.addEventListener("click", onClose);
+    document.addEventListener("keydown", onKeydown, true);
+  });
 
 // If a global key handler is blocking typing, cut it off for text inputs.
 document.addEventListener(

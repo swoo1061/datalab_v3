@@ -4,6 +4,13 @@
   --gugong-bg: #eef2ff;
 }
 
+/* glass 변환 실패 시에도 보라 테두리 강제 스타일은 막음 */
+.review-page #clinicSelect.select:not(.glass-native) {
+  border: 1px solid #bae6fd !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
 .review-page .card {
   border-color: #c7d2fe;
   box-shadow: 0 16px 32px rgba(59, 130, 246, 0.14);
@@ -11,6 +18,8 @@
 
 .review-page .card-hd {
   background: linear-gradient(90deg, rgba(219, 234, 254, 0.9), rgba(224, 231, 255, 0.7));
+  border-top-right-radius: 16px;
+  border-top-left-radius: 16px;
 }
 
 .review-page .btn.btn-primary.full {
@@ -33,4 +42,17 @@
 .review-page .title-suggestions {
   border-color: #cbd5f5;
   background: var(--gugong-bg);
+}
+
+.model-list .model-card.selected {
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  width: fit-content;
+  padding: 14px 16px;
+
+  background: linear-gradient(180deg, #4338ca 0%, #1e3a8a 100%);
+  box-shadow: 0 4px 10px rgba(67, 56, 202, 0.08);
+
+  font-size: 15px;
+  color: #ffffff;
 }
