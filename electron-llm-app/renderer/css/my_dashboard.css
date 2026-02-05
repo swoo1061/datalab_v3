@@ -778,6 +778,18 @@
   box-shadow: 0 0 0 3px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.18);
 }
 
+#attCorrectionModal .modal-grid {
+  grid-template-columns: 1fr;
+}
+
+#attCorrectionModal .ai-field.span-2 {
+  grid-column: span 1;
+}
+
+#attCorrectionModal .modal-card {
+  width: min(480px, 92vw);
+}
+
 @media (max-width: 1200px) {
   .week-calendar {
     grid-template-columns: repeat(5, minmax(0, 1fr));

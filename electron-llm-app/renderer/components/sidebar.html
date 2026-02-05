@@ -156,9 +156,6 @@
         <a href="notifications_center.html" data-nav="notifications_center">
           <span class="nav-sub-label">메모함</span>
         </a>
-        <a href="attendance_requests.html" data-nav="attendance_requests" data-role-only="admin,ceo">
-          <span class="nav-sub-label">근태 정정요청</span>
-        </a>
       </div>
     </div>
     <div class="nav-group">
@@ -172,9 +169,8 @@
       </div>
       <div class="nav-sub">
         <div class="nav-flyout-title">인사관리</div>
-        <a href="attendance.html" data-nav="attendance">
-          <!-- <span class="nav-sub-icon">A</span> -->
-          <span class="nav-sub-label">출퇴근 기록</span>
+        <a href="attendance_admin.html" data-nav="attendance_admin" data-role-only="admin,ceo,leader">
+          <span class="nav-sub-label">출퇴근 관리</span>
         </a>
         <a href="attendance.html" data-nav="attendance">
           <!-- <span class="nav-sub-icon">V</span> -->
@@ -183,6 +179,29 @@
         <a href="attendance.html" data-nav="attendance">
           <!-- <span class="nav-sub-icon">S</span> -->
           <span class="nav-sub-label">직원 정보</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-title" onclick="toggleNav(this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.4 7.4 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.89 2h-3.78a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.13.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.72 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.4 1.05.71 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.78a.5.5 0 0 0 .49-.42l.36-2.54c.58-.23 1.13-.54 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"></path>
+          </svg>
+        </span>
+        <span class="nav-label">시스템</span>
+      </div>
+      <div class="nav-sub">
+        <div class="nav-flyout-title">시스템</div>
+        <a href="system_monitor.html" data-nav="system_monitor" data-role-only="admin,ceo">
+          <span class="nav-sub-label">서버 관리</span>
+        </a>
+        <a href="system_logs.html" data-nav="system_logs" data-role-only="admin,ceo">
+          <span class="nav-sub-label">시스템 로그</span>
+        </a>
+        <a href="system_permissions.html" data-nav="system_permissions" data-role-only="admin,ceo">
+          <span class="nav-sub-label">시스템 권한</span>
         </a>
       </div>
     </div>
@@ -220,7 +239,7 @@
     </button>
   </div>
 
-  <div class="footer">V_0.10.1</div>
+  <div class="footer">V_0.10.2</div>
 </aside>
 
 <!-- 🔥 이 한 줄이 핵심 -->

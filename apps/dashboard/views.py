@@ -44,6 +44,7 @@ from apps.ml.services.llm_service import (
 )
 from apps.ml.services.prompt_generator import build_review_prompt, build_prompt_from_models, build_ft_prompt_from_models
 from apps.ml.services.clinic_parser import parse_clinic_content
+from apps.data.permissions import can_access_web_dashboard
 from .services.monthly_report_layouts import get_monthly_report_layout
 
 # =====================================================
@@ -71,12 +72,7 @@ def _get_model_display(model_id: str) -> str:
 
 
 def _is_internal_user(user):
-    if not user.is_authenticated:
-        return False
-    if user.is_superuser or user.groups.filter(name="staff").exists():
-        return True
-    profile = getattr(user, "profile", None)
-    return bool(profile and profile.position in {"manager", "leader", "ceo"})
+    return can_access_web_dashboard(user)
 
 @dashboard_required
 def is_staff(user):

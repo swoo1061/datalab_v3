@@ -104,6 +104,12 @@ def get_provider_from_model(model: str) -> str:
     return "openai"
 
 
+def _is_openai_gpt5_family(model: str) -> bool:
+    """OpenAI GPT-5 계열 모델 여부."""
+    m = (model or "").lower()
+    return m.startswith("gpt-5") or m.startswith("ft:gpt-5")
+
+
 def apply_review_type_guard(prompt: str) -> str:
     """리뷰 유형 강제 규칙을 프롬프트에 선삽입."""
     if not prompt or not isinstance(prompt, str):
@@ -943,9 +949,9 @@ def generate_review_with_prompt(
             cached_input_tokens = 0
         else:
             # 일반 chat 모델
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
+            chat_kwargs = {
+                "model": model,
+                "messages": [
                     {
                         "role": "system",
                         "content": system_prompt
@@ -955,11 +961,18 @@ def generate_review_with_prompt(
                         "content": prompt
                     }
                 ],
-                temperature=temperature,
-                top_p=top_p,
-                frequency_penalty=frequency_penalty,
-                presence_penalty=presence_penalty,
-            )
+            }
+
+            # GPT-5 계열은 sampling 파라미터를 모델이 제한할 수 있어 기본값 호출로 안전하게 보냄.
+            if not _is_openai_gpt5_family(model):
+                chat_kwargs.update({
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "frequency_penalty": frequency_penalty,
+                    "presence_penalty": presence_penalty,
+                })
+
+            response = client.chat.completions.create(**chat_kwargs)
             text = response.choices[0].message.content
             input_tokens = response.usage.prompt_tokens if response.usage else 0
             output_tokens = response.usage.completion_tokens if response.usage else 0

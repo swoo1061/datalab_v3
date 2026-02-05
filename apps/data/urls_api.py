@@ -15,10 +15,21 @@ from apps.data.views_attendance_api import (
     MyAttendanceCheckInView,
     MyAttendanceCheckOutView,
     MyAttendanceCorrectionListCreateView,
+    AttendanceAdminListView,
+    AttendanceCorrectionAdminListView,
+    AttendanceCorrectionAdminDetailView,
 )
 from apps.data.views_message_api import (
     InternalMessageListCreateView,
     InternalMessageDetailView,
+)
+from apps.data.views_permissions_api import (
+    SystemPermissionMeView,
+    SystemPermissionUserListView,
+    SystemPermissionUserDetailView,
+)
+from apps.data.views_monitor_api import (
+    SystemMonitorLLMStatusView,
 )
 
 worklog_list = ClinicDailyWorkLogViewSet.as_view({
@@ -52,9 +63,16 @@ urlpatterns = [
     path("calendar-memos/<int:memo_id>/", CalendarMemoDetailView.as_view()),
     path("notifications/", NotificationListView.as_view()),
     path("attendance/me/", MyAttendanceMonthView.as_view()),
+    path("attendance/admin/records/", AttendanceAdminListView.as_view()),
+    path("attendance/admin/corrections/", AttendanceCorrectionAdminListView.as_view()),
+    path("attendance/admin/corrections/<int:correction_id>/", AttendanceCorrectionAdminDetailView.as_view()),
     path("attendance/me/check-in/", MyAttendanceCheckInView.as_view()),
     path("attendance/me/check-out/", MyAttendanceCheckOutView.as_view()),
     path("attendance/me/corrections/", MyAttendanceCorrectionListCreateView.as_view()),
+    path("system-permissions/me/", SystemPermissionMeView.as_view()),
+    path("system-permissions/users/", SystemPermissionUserListView.as_view()),
+    path("system-permissions/users/<int:user_id>/", SystemPermissionUserDetailView.as_view()),
+    path("system-monitor/llm-status/", SystemMonitorLLMStatusView.as_view()),
     path("messages/", InternalMessageListCreateView.as_view()),
     path("messages/<int:message_id>/", InternalMessageDetailView.as_view()),
 ]

@@ -122,7 +122,7 @@ function renderAttendanceCorrections(rows) {
   const root = document.getElementById("attCorrections");
   if (!root) return;
   if (!Array.isArray(rows) || !rows.length) {
-    root.innerHTML = `<div class="muted">정정 요청 내역이 없습니다.</div>`;
+    root.innerHTML = `<div class="muted"></div>`;
     return;
   }
   const statusLabel = (s) => (s === "approved" ? "승인" : s === "rejected" ? "반려" : "대기");

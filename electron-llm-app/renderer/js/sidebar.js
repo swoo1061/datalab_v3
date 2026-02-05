@@ -31,6 +31,7 @@ function applySidebarActiveState() {
 }
 
 let sidebarCurrentRole = "";
+const sidebarPermissionCache = new Map();
 
 function normalizeRole(me) {
   const raw = String(
@@ -55,7 +56,8 @@ function normalizeRole(me) {
 
 async function applySidebarRoleAccess() {
   const roleOnlyLinks = document.querySelectorAll(".nav-sub a[data-role-only]");
-  if (!roleOnlyLinks.length) return;
+  const permissionLinks = document.querySelectorAll(".nav-sub a[data-permission]");
+  if (!roleOnlyLinks.length && !permissionLinks.length) return;
 
   let myRole = "";
   try {
@@ -75,6 +77,32 @@ async function applySidebarRoleAccess() {
     const visible = allow.includes(myRole);
     link.classList.toggle("hidden", !visible);
   });
+
+  for (const link of permissionLinks) {
+    const key = String(link.dataset.permission || "").trim();
+    if (!key) continue;
+    const visible = await fetchSidebarPermission(key);
+    link.classList.toggle("hidden", !visible);
+  }
+}
+
+async function fetchSidebarPermission(key) {
+  if (sidebarPermissionCache.has(key)) return sidebarPermissionCache.get(key);
+  try {
+    const headers = await buildSidebarAuthHeaders();
+    const base = window.API_BASE || window?.config?.apiBase || "http://127.0.0.1:8000";
+    const res = await fetch(`${base}/api/data/system-permissions/me/?key=${encodeURIComponent(key)}`, {
+      credentials: "include",
+      headers,
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const enabled = Boolean(data?.enabled);
+    sidebarPermissionCache.set(key, enabled);
+    return enabled;
+  } catch (_e) {
+    return false;
+  }
 }
 
 async function openKakaoWorkShortcut() {
@@ -145,6 +173,19 @@ document.addEventListener("click", async (e) => {
 
     // 역할을 아직 판별 못한 경우엔 여기서 차단하지 않고 app.js 접근제어로 위임
     if (role && !allow.includes(role)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof window.showAccessDenied === "function") window.showAccessDenied();
+      else window.showAlert?.("접근 불가");
+    }
+  }
+
+  const permissionLink = e.target?.closest?.(".nav-sub a[data-permission]");
+  if (permissionLink) {
+    const key = String(permissionLink.dataset.permission || "").trim();
+    if (!key) return;
+    const enabled = await fetchSidebarPermission(key);
+    if (!enabled) {
       e.preventDefault();
       e.stopPropagation();
       if (typeof window.showAccessDenied === "function") window.showAccessDenied();

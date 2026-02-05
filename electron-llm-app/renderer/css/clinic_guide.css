@@ -142,9 +142,13 @@
   word-break: keep-all;
 }
 
+#clinicHours {
+  white-space: pre-line;
+}
+
 .guide-main {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 140px minmax(0, 1fr);
   gap: 10px;
 }
 
@@ -223,10 +227,167 @@
   font-weight: 700;
 }
 
+#priceTable td.procedure {
+  font-weight: 700;
+}
+
 .guide-support {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.sachi-special {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.sachi-special .support-card:last-child {
+  grid-column: span 2;
+}
+
+.sachi-subclinic-card {
+  grid-column: span 2;
+}
+
+.preline {
+  white-space: pre-line;
+  line-height: 1.55;
+}
+
+.accordion-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.accordion-btn {
+  border: 1px solid #d4dceb;
+  background: #f8fbff;
+  color: #1e3a8a;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.accordion-btn:hover {
+  border-color: #b7c6ef;
+}
+
+.sachi-special .panel-bd.collapsed {
+  display: none;
+}
+
+.sachi-rich {
+  color: #1f2937;
+}
+
+.sachi-rich p {
+  margin: 0 0 8px;
+  line-height: 1.58;
+}
+
+.sachi-rich p:last-child {
+  margin-bottom: 0;
+}
+
+.sachi-rich ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.sachi-rich li {
+  margin: 0 0 6px;
+  line-height: 1.55;
+}
+
+.labeled-list {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.labeled-list li {
+  margin-bottom: 8px;
+}
+
+.keyword-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.keyword-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid #d6def0;
+  border-radius: 999px;
+  background: #f8fbff;
+  color: #1e3a8a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.price-guide-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.price-guide-block {
+  border: 1px solid #e3e9f4;
+  border-radius: 8px;
+  background: #fbfdff;
+  padding: 10px;
+}
+
+.price-guide-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.price-guide-block ul {
+  margin: 0;
+  padding-left: 14px;
+}
+
+.price-guide-block li {
+  margin-bottom: 5px;
+  line-height: 1.5;
+}
+
+.sachi-clinic-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sachi-clinic-btn {
+  border: 1px solid #d7deea;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sachi-clinic-btn.active {
+  border-color: #b7c6ef;
+  background: #e9efff;
+  color: #1e40af;
+}
+
+.sachi-clinic-btn.muted {
+  opacity: 0.55;
 }
 
 .support-card .panel-bd {
@@ -307,5 +468,18 @@
 
   .guide-support {
     grid-template-columns: 1fr;
+  }
+
+  .sachi-special {
+    grid-template-columns: 1fr;
+  }
+
+  .sachi-special .support-card:last-child {
+    grid-column: span 1;
+  }
+
+  .sachi-subclinic-card,
+  .sachi-special .support-card:last-child {
+    grid-column: span 1;
   }
 }

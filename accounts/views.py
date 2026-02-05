@@ -3,9 +3,10 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 from .forms import SignupForm
 from .models import UserProfile
-from django.urls import reverse
+from apps.data.permissions import can_access_web_dashboard
 
 # Create your views here.
 
@@ -37,14 +38,9 @@ def login_view(request):
         login(request, user)
 
         profile = getattr(user, "profile", None)
-        is_internal = (
-            user.is_superuser
-            or user.groups.filter(name="staff").exists()
-            or (profile and profile.position in {"manager", "leader", "ceo"})
-        )
-        if is_internal:
+        if can_access_web_dashboard(user):
             return redirect(reverse("dashboard:index"))
-        return redirect(reverse("dashboard:monthly_report"))
+        return render(request, "core/forbidden.html", status=403)
 
     return render(request, "accounts/login.html")
 
@@ -85,13 +81,7 @@ def signup_view(request):
 @login_required
 def doctor_report_view(request):
     user = request.user
-    profile = getattr(user, "profile", None)
-    is_internal = (
-        user.is_superuser
-        or user.groups.filter(name="staff").exists()
-        or (profile and profile.position in {"manager", "leader", "ceo"})
-    )
-    if is_internal:
+    if can_access_web_dashboard(user):
         return redirect("dashboard:index")
-    return redirect("dashboard:monthly_report")
+    return render(request, "core/forbidden.html", status=403)
 

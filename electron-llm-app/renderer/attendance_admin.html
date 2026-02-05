@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | 직원 출퇴근 관리</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/business_mode.css" />
+  <link rel="stylesheet" href="css/attendance_admin.css" />
+</head>
+<body class="theme-vivid tone-sidebar" data-nav="attendance_admin">
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope attendance-admin-page">
+      <section class="page-canvas">
+        <header class="page-head">
+          <div>
+            <h1 class="h1">직원 출퇴근 관리</h1>
+            <p class="sub">월별 관리와 정정요청 처리를 한 화면에서 관리합니다.</p>
+          </div>
+        </header>
+
+        <section class="card attendance-shell">
+          <div class="attendance-tabs">
+            <div class="attendance-tab-buttons">
+              <button type="button" class="attendance-tab active" data-tab="monthly">월별 출퇴근 관리</button>
+              <button type="button" class="attendance-tab" data-tab="corrections">정정요청 처리</button>
+            </div>
+            <div class="attendance-top-actions">
+              <button id="attendanceCsvBtn" class="chip-btn csv" type="button">CSV</button>
+              <button id="attendanceExcelBtn" class="chip-btn excel" type="button">XLSX</button>
+              <button id="attendanceRefreshBtn" class="btn" type="button">새로고침</button>
+            </div>
+          </div>
+
+          <div class="attendance-toolbar">
+            <input id="attendanceMonthInput" class="input" type="month" />
+            <input id="attendanceSearchInput" class="input" type="text" placeholder="이름/직급 검색" />
+            <select id="attendanceStatusFilter" class="select">
+              <option value="all">전체 상태</option>
+              <option value="working">근무중</option>
+              <option value="completed">퇴근</option>
+            </select>
+          </div>
+
+          <div class="attendance-summary" id="attendanceSummary"></div>
+
+          <div id="monthlyPanel" class="attendance-panel">
+            <div class="attendance-table-wrap matrix-wrap">
+              <table class="table attendance-matrix">
+                <thead id="attendanceMatrixHead"></thead>
+                <tbody id="attendanceMatrixBody">
+                  <tr><td class="muted">불러오는 중...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="correctionsPanel" class="attendance-panel hidden">
+            <div class="attendance-table-wrap">
+              <table class="table attendance-table">
+                <thead>
+                  <tr>
+                    <th style="width: 9%;">상태</th>
+                    <th style="width: 10%;">대상일</th>
+                    <th style="width: 12%;">직원</th>
+                    <th style="width: 12%;">현재 출/퇴근</th>
+                    <th style="width: 12%;">요청 출/퇴근</th>
+                    <th>사유</th>
+                    <th style="width: 14%;">처리</th>
+                  </tr>
+                </thead>
+                <tbody id="attendanceCorrectionsBody">
+                  <tr><td colspan="7" class="muted">불러오는 중...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/header.js"></script>
+<script src="../node_modules/xlsx/dist/xlsx.full.min.js"></script>
+<script src="js/attendance_admin.js"></script>
+<script>
+  (async () => {
+    await loadLayout();
+    await loadHeader("직원 출퇴근 관리");
+  })();
+</script>
+</body>
+</html>

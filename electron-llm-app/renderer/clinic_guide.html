@@ -59,7 +59,7 @@
               </div>
             </section>
 
-            <section class="guide-main">
+            <section class="guide-main" id="guideMainDefault">
               <div class="doctor-panel card">
                 <div class="panel-hd">의료진</div>
                 <div class="nav-list" id="doctorTabs"></div>
@@ -77,8 +77,10 @@
                   <table class="table" id="priceTable">
                     <thead>
                       <tr>
-                        <th style="width: 70%;">시술/항목</th>
-                        <th style="width: 30%; text-align:right;">금액</th>
+                        <th style="width: 30%;">시술/항목</th>
+                        <th style="width: 20%; text-align:right;">금액</th>
+                        <th style="width: 30%;">시술/항목</th>
+                        <th style="width: 20%; text-align:right;">금액</th>
                       </tr>
                     </thead>
                     <tbody id="priceTbody"></tbody>
@@ -87,7 +89,7 @@
               </div>
             </section>
 
-            <section class="guide-support">
+            <section class="guide-support" id="guideSupportDefault">
               <div class="support-card card">
                 <div class="panel-hd">상담실장</div>
                 <div class="panel-bd" id="consultants">-</div>
@@ -95,6 +97,35 @@
               <div class="support-card card">
                 <div class="panel-hd">사후관리</div>
                 <div class="panel-bd" id="aftercare">-</div>
+              </div>
+            </section>
+
+            <section class="sachi-special hidden" id="sachibioSpecial">
+              <div class="support-card card sachi-subclinic-card">
+                <div class="panel-hd">병원별 보기</div>
+                <div class="panel-bd">
+                  <div class="sachi-clinic-nav" id="sachiClinicNav"></div>
+                </div>
+              </div>
+              <div class="support-card card">
+                <div class="panel-hd accordion-hd">제품 소개 <button type="button" class="accordion-btn" data-target="sachiProductIntro">열기</button></div>
+                <div class="panel-bd preline" id="sachiProductIntro">-</div>
+              </div>
+              <div class="support-card card">
+                <div class="panel-hd accordion-hd">기전/타임라인 소구 포인트 <button type="button" class="accordion-btn" data-target="sachiTimeline">열기</button></div>
+                <div class="panel-bd preline" id="sachiTimeline">-</div>
+              </div>
+              <div class="support-card card">
+                <div class="panel-hd accordion-hd">제품 키워드 <button type="button" class="accordion-btn" data-target="sachiKeywords">열기</button></div>
+                <div class="panel-bd preline" id="sachiKeywords">-</div>
+              </div>
+              <div class="support-card card">
+                <div class="panel-hd accordion-hd">커뮤니티 참고사항 <button type="button" class="accordion-btn" data-target="sachiCommunity">열기</button></div>
+                <div class="panel-bd preline" id="sachiCommunity">-</div>
+              </div>
+              <div class="support-card card">
+                <div class="panel-hd accordion-hd">수가표 <button type="button" class="accordion-btn" data-target="sachiPriceGuide">열기</button></div>
+                <div class="panel-bd preline" id="sachiPriceGuide">-</div>
               </div>
             </section>
           </section>

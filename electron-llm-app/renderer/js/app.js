@@ -16,8 +16,16 @@ const PAGE_TRANSITION_MS = 180;
 let isPageTransitioning = false;
 const PAGE_ROLE_ACCESS = {
   attendance_requests: ["admin", "ceo"],
+  attendance_admin: ["admin", "ceo", "leader"],
+  system_permissions: ["admin", "ceo"],
+  system_monitor: ["admin", "ceo"],
+  system_logs: ["admin", "ceo"],
+};
+const PAGE_PERMISSION_OVERRIDE = {
+  attendance_requests: "attendance_requests_access",
 };
 let cachedUserRole = null;
+const permissionCache = new Map();
 
 function prefersReducedMotion() {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
@@ -80,14 +88,48 @@ function getPageKeyFromPath(pathname) {
 
 async function canAccessPage(pageKey) {
   const allowRoles = PAGE_ROLE_ACCESS[String(pageKey || "").toLowerCase()];
+  const normalizedPage = String(pageKey || "").toLowerCase();
   if (!allowRoles || !allowRoles.length) return true;
   const role = await getCurrentUserRole();
-  const ok = allowRoles.includes(role);
-  if (!ok) {
-    if (typeof window.showAccessDenied === "function") window.showAccessDenied();
-    else window.showAlert?.("접근 불가");
+  if (allowRoles.includes(role)) return true;
+
+  const permissionKey = PAGE_PERMISSION_OVERRIDE[normalizedPage];
+  if (permissionKey) {
+    const granted = await fetchPermissionEnabled(permissionKey);
+    if (granted) return true;
   }
-  return ok;
+
+  if (typeof window.showAccessDenied === "function") window.showAccessDenied();
+  else window.showAlert?.("접근 불가");
+  return false;
+}
+
+async function buildAuthHeaders() {
+  const headers = {};
+  try {
+    const sessionKey = await window.session?.getKey?.();
+    if (sessionKey) headers["X-Sessionid"] = sessionKey;
+  } catch (_e) {}
+  return headers;
+}
+
+async function fetchPermissionEnabled(key) {
+  if (permissionCache.has(key)) return permissionCache.get(key);
+  try {
+    const headers = await buildAuthHeaders();
+    const base = window.API_BASE || window?.config?.apiBase || "http://127.0.0.1:8000";
+    const res = await fetch(`${base}/api/data/system-permissions/me/?key=${encodeURIComponent(key)}`, {
+      credentials: "include",
+      headers,
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const enabled = Boolean(data?.enabled);
+    permissionCache.set(key, enabled);
+    return enabled;
+  } catch (_e) {
+    return false;
+  }
 }
 
 async function navigate(page) {

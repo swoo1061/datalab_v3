@@ -16,7 +16,14 @@ from apps.data.serializers_attendance import (
     AttendanceRecordSerializer,
     AttendanceCorrectionRequestSerializer,
 )
-from apps.data.views_api import CsrfExemptSessionAuthentication, HeaderSessionAuthentication
+from apps.data.views_api import (
+    CsrfExemptSessionAuthentication,
+    HeaderSessionAuthentication,
+    ATTENDANCE_MEMO_PLATFORM,
+)
+from apps.data.permissions import get_user_permission
+from apps.data.models import SystemPermission
+from apps.data.permissions import normalize_user_role
 
 
 def _parse_month(value: str):
@@ -72,15 +79,19 @@ def _make_requester_label(user):
 
 def _notify_ceo_for_correction(req: AttendanceCorrectionRequest):
     User = get_user_model()
-    notify_users = User.objects.filter(
-        is_active=True,
-    ).filter(
-        Q(profile__position__in=["ceo", "manager", "leader"])
-        | Q(is_superuser=True)
-        | Q(groups__name="staff")
-    ).distinct()
-    if not notify_users.exists():
-        notify_users = User.objects.filter(is_active=True, is_superuser=True).distinct()
+    candidates = (
+        User.objects
+        .filter(is_active=True)
+        .select_related("profile")
+        .prefetch_related("groups")
+        .distinct()
+    )
+    notify_users = [
+        user for user in candidates
+        if get_user_permission(user, SystemPermission.KEY_ATTENDANCE_REQUESTS)
+    ]
+    if not notify_users:
+        notify_users = list(User.objects.filter(is_active=True, is_superuser=True).distinct())
 
     requester = _make_requester_label(req.user)
     check_in_text = req.requested_check_in_at.astimezone(timezone.get_current_timezone()).strftime("%Y-%m-%d %H:%M") if req.requested_check_in_at else "-"
@@ -100,10 +111,14 @@ def _notify_ceo_for_correction(req: AttendanceCorrectionRequest):
             clinic=None,
             date=today,
             content=content,
-            platform="",
+            platform=ATTENDANCE_MEMO_PLATFORM,
             remind_at=now,
             is_read=False,
         )
+
+
+def _is_attendance_admin(user) -> bool:
+    return normalize_user_role(user) in {"admin", "ceo", "leader"}
 
 
 class MyAttendanceMonthView(APIView):
@@ -247,3 +262,213 @@ class MyAttendanceCorrectionListCreateView(APIView):
             {"ok": True, "request": AttendanceCorrectionRequestSerializer(correction).data},
             status=status.HTTP_201_CREATED,
         )
+
+
+class AttendanceAdminListView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not _is_attendance_admin(request.user):
+            return Response({"message": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        month_start = _parse_month(request.GET.get("month"))
+        if not month_start:
+            return Response({"message": "invalid month"}, status=status.HTTP_400_BAD_REQUEST)
+        month_end = _next_month(month_start)
+
+        q = (request.GET.get("q") or "").strip().lower()
+        status_filter = (request.GET.get("status") or "all").strip().lower()
+        if status_filter not in {"all", "working", "completed"}:
+            status_filter = "all"
+
+        users = get_user_model().objects.filter(is_active=True).select_related("profile")
+        total_user_count = 0
+        user_by_id = {}
+        for user in users:
+            profile = getattr(user, "profile", None)
+            name = getattr(profile, "name", None) or user.get_full_name() or user.username
+            user_role = normalize_user_role(user)
+            if user_role == "admin":
+                continue
+            total_user_count += 1
+            if q:
+                hay = f"{name} {user.username} {user_role}".lower()
+                if q not in hay:
+                    continue
+            user_by_id[user.id] = {
+                "user_id": user.id,
+                "user_name": name,
+                "username": user.username,
+                "role": user_role,
+            }
+
+        qs = AttendanceRecord.objects.filter(
+            work_date__gte=month_start,
+            work_date__lt=month_end,
+            user_id__in=list(user_by_id.keys()),
+        ).select_related("user")
+        if status_filter != "all":
+            qs = qs.filter(status=status_filter)
+
+        rows = []
+        total_minutes = 0
+        worked_days = 0
+        for rec in qs.order_by("-work_date", "user__username"):
+            user_meta = user_by_id.get(rec.user_id)
+            if not user_meta:
+                continue
+            rows.append(
+                {
+                    "id": rec.id,
+                    "user_id": rec.user_id,
+                    "user_name": user_meta["user_name"],
+                    "username": user_meta["username"],
+                    "role": user_meta["role"],
+                    "work_date": rec.work_date.isoformat(),
+                    "check_in_at": rec.check_in_at,
+                    "check_out_at": rec.check_out_at,
+                    "worked_minutes": rec.worked_minutes,
+                    "status": rec.status,
+                    "note": rec.note or "",
+                }
+            )
+            if rec.check_in_at:
+                worked_days += 1
+            total_minutes += int(rec.worked_minutes or 0)
+
+        return Response(
+            {
+                "month": month_start.strftime("%Y-%m"),
+                "count": len(rows),
+                "users_count": total_user_count,
+                "users": list(user_by_id.values()),
+                "summary": {
+                    "worked_days": worked_days,
+                    "total_minutes": total_minutes,
+                },
+                "results": rows,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AttendanceCorrectionAdminListView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not _is_attendance_admin(request.user):
+            return Response({"message": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        month_start = _parse_month(request.GET.get("month"))
+        if not month_start:
+            return Response({"message": "invalid month"}, status=status.HTTP_400_BAD_REQUEST)
+        month_end = _next_month(month_start)
+
+        status_filter = (request.GET.get("status") or "pending").strip().lower()
+        if status_filter not in {"all", "pending", "approved", "rejected"}:
+            status_filter = "pending"
+
+        q = (request.GET.get("q") or "").strip().lower()
+
+        qs = AttendanceCorrectionRequest.objects.filter(
+            work_date__gte=month_start,
+            work_date__lt=month_end,
+        ).select_related("user", "user__profile", "reviewed_by", "reviewed_by__profile")
+        if status_filter != "all":
+            qs = qs.filter(status=status_filter)
+
+        rows = []
+        for item in qs.order_by("-created_at"):
+            profile = getattr(item.user, "profile", None)
+            user_name = getattr(profile, "name", None) or item.user.get_full_name() or item.user.username
+            user_role = normalize_user_role(item.user)
+            if user_role == "admin":
+                continue
+            if q:
+                hay = f"{user_name} {item.user.username} {item.reason or ''}".lower()
+                if q not in hay:
+                    continue
+            rows.append(
+                {
+                    "id": item.id,
+                    "user_id": item.user_id,
+                    "user_name": user_name,
+                    "username": item.user.username,
+                    "work_date": item.work_date.isoformat(),
+                    "status": item.status,
+                    "reason": item.reason,
+                    "current_check_in_at": item.current_check_in_at,
+                    "current_check_out_at": item.current_check_out_at,
+                    "requested_check_in_at": item.requested_check_in_at,
+                    "requested_check_out_at": item.requested_check_out_at,
+                    "review_note": item.review_note or "",
+                    "reviewed_at": item.reviewed_at,
+                    "created_at": item.created_at,
+                }
+            )
+
+        return Response(
+            {
+                "month": month_start.strftime("%Y-%m"),
+                "count": len(rows),
+                "results": rows,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AttendanceCorrectionAdminDetailView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, correction_id):
+        if not _is_attendance_admin(request.user):
+            return Response({"message": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        row = AttendanceCorrectionRequest.objects.filter(id=correction_id).select_related("user").first()
+        if not row:
+            return Response({"message": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+
+        action = (request.data or {}).get("action")
+        review_note = ((request.data or {}).get("review_note") or "").strip()
+        if action not in {"approve", "reject"}:
+            return Response({"message": "invalid_action"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if action == "reject":
+            row.status = "rejected"
+            row.review_note = review_note
+            row.reviewed_by = request.user
+            row.reviewed_at = timezone.now()
+            row.save(update_fields=["status", "review_note", "reviewed_by", "reviewed_at", "updated_at"])
+            return Response({"ok": True, "status": row.status}, status=status.HTTP_200_OK)
+
+        # approve
+        record, _ = AttendanceRecord.objects.get_or_create(
+            user=row.user,
+            work_date=row.work_date,
+            defaults={"status": "working"},
+        )
+
+        if row.requested_check_in_at:
+            record.check_in_at = row.requested_check_in_at
+        if row.requested_check_out_at:
+            record.check_out_at = row.requested_check_out_at
+
+        if record.check_out_at:
+            record.status = "completed"
+        elif record.check_in_at:
+            record.status = "working"
+
+        record.recalculate_minutes()
+        record.save(update_fields=["check_in_at", "check_out_at", "status", "worked_minutes", "updated_at"])
+
+        row.record = record
+        row.status = "approved"
+        row.review_note = review_note
+        row.reviewed_by = request.user
+        row.reviewed_at = timezone.now()
+        row.save(update_fields=["record", "status", "review_note", "reviewed_by", "reviewed_at", "updated_at"])
+
+        return Response({"ok": True, "status": row.status}, status=status.HTTP_200_OK)

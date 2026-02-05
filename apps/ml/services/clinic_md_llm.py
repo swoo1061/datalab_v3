@@ -112,6 +112,58 @@ def _normalize_result(data: Dict[str, Any]) -> Dict[str, Any]:
     return base
 
 
+def _clean_md_block(text: str) -> str:
+    t = str(text or "")
+    t = re.sub(r"</?aside>", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"!\[[^\]]*\]\([^)]+\)", "", t)
+    t = re.sub(r"\*\*", "", t)
+    t = re.sub(r"\r\n?", "\n", t)
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    return t.strip()
+
+
+def _extract_special_sections(md_content: str) -> Dict[str, str]:
+    """
+    사치바이오형 제품 가이드 섹션을 원문에서 직접 추출.
+    LLM 출력 누락 시에도 UI에 필요한 raw_data를 보장한다.
+    """
+    content = str(md_content or "")
+    sections: Dict[str, str] = {}
+
+    def row_value(pattern: str) -> str:
+        m = re.search(pattern, content, re.DOTALL | re.IGNORECASE)
+        if not m:
+            return ""
+        return _clean_md_block(m.group(1))
+
+    product_intro = row_value(r"\|\s*\*\*제품소개\*\*\s*\|\s*(.*?)(?=\n\|\s*\*\*|$)")
+    timeline = row_value(r"\|\s*\*\*제품 기전 및[\s\S]*?\*\*\s*\|\s*(.*?)(?=\n\|\s*\*\*|$)")
+    keywords = row_value(r"\|\s*\*\*제품 키워드\*\*\s*\|\s*(.*?)(?=\n\|\s*\*\*|\n-\s*\*\*커뮤니티|$)")
+
+    comm_match = re.search(
+        r"-\s*\*\*커뮤니티 참고사항\*\*\s*(.*?)(?=\n-\s*\*\*수가표\*\*|$)",
+        content,
+        re.DOTALL | re.IGNORECASE,
+    )
+    community = _clean_md_block(comm_match.group(1)) if comm_match else ""
+
+    price_match = re.search(r"-\s*\*\*수가표\*\*\s*(.*)$", content, re.DOTALL | re.IGNORECASE)
+    price_guide = _clean_md_block(price_match.group(1)) if price_match else ""
+
+    if product_intro:
+        sections["제품소개"] = product_intro
+    if timeline:
+        sections["제품 기전 및 타임라인별 소구포인트"] = timeline
+    if keywords:
+        sections["제품 키워드"] = keywords
+    if community:
+        sections["커뮤니티 참고사항"] = community
+    if price_guide:
+        sections["수가표"] = price_guide
+
+    return sections
+
+
 def parse_clinic_md_with_llm(md_content: str, model: str = "gpt-5-mini") -> Dict[str, Any]:
     """
     Notion MD(또는 너가 올린 탭/줄 형태 텍스트) → JSON 구조화
@@ -149,4 +201,15 @@ JSON 스키마 예시:
     )
 
     data = _extract_json(result)
-    return _normalize_result(data)
+    normalized = _normalize_result(data)
+
+    # 사치바이오형 문서는 표/섹션이 길어서 LLM이 일부 키를 누락할 수 있어 원문 보강.
+    special_sections = _extract_special_sections(md_content)
+    if special_sections:
+        raw = normalized.get("raw_data")
+        if not isinstance(raw, dict):
+            raw = {}
+        raw.update(special_sections)
+        normalized["raw_data"] = raw
+
+    return normalized

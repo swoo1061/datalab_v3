@@ -66,13 +66,13 @@
   </div>
 </div>
 
-<div id="mailComposeModal" class="modal hidden">
+<div id="mailComposeModal" class="modal modal-lock hidden">
   <div class="modal-backdrop"></div>
   <div class="modal-card">
     <div class="modal-head">
       <div>
         <div class="modal-title">새 메일</div>
-        <div class="modal-sub">보낼 사람을 이름으로 선택해 전송합니다.</div>
+        <div class="modal-sub">보낼 사람을 이름으로 선택해 전송합니다. (첨부 최대 10개)</div>
       </div>
       <button class="modal-close" data-close="true">닫기</button>
     </div>
@@ -88,7 +88,7 @@
         </div>
         <div class="ai-field span-2">
           <label>본문</label>
-          <textarea id="mailContentInput" class="input" rows="7"></textarea>
+          <input id="mailContentInput" class="input" rows="7"></input>
         </div>
         <div class="ai-field span-2">
           <label>첨부파일</label>

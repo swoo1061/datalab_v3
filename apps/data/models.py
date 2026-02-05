@@ -1204,6 +1204,44 @@ class ClinicAssignee(models.Model):
     def __str__(self):
         return f"{self.clinic.name} - {self.user.username}"
 
+
+class SystemPermission(models.Model):
+    """사용자별 시스템 권한 토글"""
+
+    KEY_ATTENDANCE_REQUESTS = "attendance_requests_access"
+    KEY_WEB_DASHBOARD = "web_dashboard_access"
+
+    KEY_CHOICES = [
+        (KEY_ATTENDANCE_REQUESTS, "근태 정정요청 접근"),
+        (KEY_WEB_DASHBOARD, "웹 대시보드 접근"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="system_permissions",
+    )
+    key = models.CharField(max_length=64, choices=KEY_CHOICES, db_index=True)
+    is_enabled = models.BooleanField(default=False)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="updated_system_permissions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "key")
+        ordering = ["user_id", "key"]
+        verbose_name = "시스템 권한"
+        verbose_name_plural = "시스템 권한"
+
+    def __str__(self):
+        return f"{self.user_id}:{self.key}={'on' if self.is_enabled else 'off'}"
+
 from .models_worklog import DailyWorkLog
 from .models_attendance import AttendanceRecord, AttendanceCorrectionRequest
 from .models_message import InternalMessage, InternalMessageAttachment

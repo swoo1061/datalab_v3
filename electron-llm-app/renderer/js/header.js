@@ -199,11 +199,20 @@ async function buildAuthHeaders() {
 
 let notifyPollTimer = null;
 let notifyItemsById = new Map();
+const ATTENDANCE_MEMO_PLATFORM = "__attendance_correction__";
 
 function getNotifyItemTime(item) {
   const raw = item?.remind_at || item?.created_at || item?.updated_at;
   const d = raw ? new Date(raw) : null;
   return d && !Number.isNaN(d.valueOf()) ? d.getTime() : 0;
+}
+
+function classifyHeaderAlert(item) {
+  const platform = String(item?.platform || "").toLowerCase();
+  if (platform === ATTENDANCE_MEMO_PLATFORM) return "attendance";
+  const text = `${item?.content || ""} ${platform}`.toLowerCase();
+  if (text.includes("근태") || text.includes("정정요청")) return "attendance";
+  return "memo";
 }
 
 function bindNotifications() {
@@ -337,7 +346,9 @@ function renderNotifications(items) {
 
   list.innerHTML = items
     .map((item) => {
-      const kindLabel = item._kind === "mail" ? "메일" : "알림";
+      const alertType = item._kind === "mail" ? "mail" : classifyHeaderAlert(item);
+      const kindLabel =
+        alertType === "mail" ? "메일" : alertType === "attendance" ? "근태" : "메모";
       const title = item._kind === "mail"
         ? (item.subject || "").trim() || "제목 없음"
         : (item.content || "").trim() || "메모";
@@ -419,6 +430,25 @@ function openMemoFromNotification({ id, date }) {
   }
 }
 
+function openNotifyCenterByType(type, item) {
+  try {
+    if (item?.id) sessionStorage.setItem("openNotifyId", String(item.id));
+    if (type) sessionStorage.setItem("openNotifyType", type);
+    if (item?.date) sessionStorage.setItem("openNotifyDate", item.date);
+  } catch (e) {
+    // ignore
+  }
+  if (window.nav?.go) {
+    if (type === "attendance") window.nav.go("attendance_admin");
+    else if (type === "mail") window.nav.go("mail_center");
+    else window.nav.go("notifications_center");
+  } else {
+    if (type === "attendance") window.location.href = "attendance_admin.html";
+    else if (type === "mail") window.location.href = "mail_center.html";
+    else window.location.href = "notifications_center.html";
+  }
+}
+
 function openNotificationDetail(itemKey) {
   const detail = document.getElementById("notifyDetail");
   const list = document.getElementById("notifyList");
@@ -448,16 +478,16 @@ function openNotificationDetail(itemKey) {
     deleteBtn.textContent = "메일함으로";
     deleteBtn.onclick = async (e) => {
       e.stopPropagation();
-      if (window.nav?.go) window.nav.go("mail_center");
-      else window.location.href = "mail_center.html";
+      openNotifyCenterByType("mail", item);
     };
     openBtn.textContent = "메일센터 열기";
     openBtn.onclick = (e) => {
       e.stopPropagation();
-      if (window.nav?.go) window.nav.go("mail_center");
-      else window.location.href = "mail_center.html";
+      openNotifyCenterByType("mail", item);
     };
   } else {
+    const alertType = classifyHeaderAlert(item);
+    const isAttendance = alertType === "attendance";
     const clinic = item.clinic_name || "전체";
     const dateLabel = item.date || "-";
     const remindAt = item.remind_at ? new Date(item.remind_at) : null;
@@ -469,11 +499,12 @@ function openNotificationDetail(itemKey) {
     const password = item.account_password || "";
     const author = item.user_name || "-";
 
-    if (titleEl) titleEl.innerText = `${dateLabel} 메모`;
+    if (titleEl) titleEl.innerText = isAttendance ? "근태 정정요청" : `${dateLabel} 메모`;
     metaEl.innerHTML = `
-      <div class="meta-row"><span>병원</span><span>${clinic}</span></div>
+      <div class="meta-row"><span>유형</span><span>${isAttendance ? "근태 정정요청" : "메모"}</span></div>
+      ${isAttendance ? "" : `<div class="meta-row"><span>병원</span><span>${clinic}</span></div>`}
       <div class="meta-row"><span>알림</span><span>${dateLabel} ${timeLabel}</span></div>
-      ${platform ? `<div class="meta-row"><span>플랫폼</span><span>${platform}</span></div>` : ""}
+      ${!isAttendance && platform ? `<div class="meta-row"><span>플랫폼</span><span>${platform}</span></div>` : ""}
       ${account ? `<div class="meta-row"><span>ID</span><span>${account}</span></div>` : ""}
       ${password ? `<div class="meta-row"><span>PW</span><span>${password}</span></div>` : ""}
       <div class="meta-row"><span>담당자</span><span>${author}</span></div>
@@ -484,17 +515,17 @@ function openNotificationDetail(itemKey) {
       markNotificationRead(item.id);
     }
 
-    deleteBtn.textContent = "삭제";
+    deleteBtn.textContent = "읽음 처리";
     deleteBtn.onclick = async (e) => {
       e.stopPropagation();
-      await deleteNotificationMemo(item.id);
+      await markNotificationRead(item.id);
       refreshNotifications();
     };
 
-    openBtn.textContent = "메모 상세로";
+    openBtn.textContent = isAttendance ? "근태 요청함 열기" : "메모함 열기";
     openBtn.onclick = (e) => {
       e.stopPropagation();
-      openMemoFromNotification({ id: item.id, date: item.date });
+      openNotifyCenterByType(isAttendance ? "attendance" : "memo", item);
     };
   }
 

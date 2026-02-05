@@ -68,7 +68,7 @@ class InternalMessageListCreateView(APIView):
         User = get_user_model()
         recipient = get_object_or_404(User, id=recipient_id, is_active=True)
         attachments = request.FILES.getlist("attachments")
-        if len(attachments) > 5:
+        if len(attachments) > 10:
             return Response({"message": "attachments_limit_exceeded"}, status=status.HTTP_400_BAD_REQUEST)
         max_size = 20 * 1024 * 1024
         for f in attachments:

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | 시스템 권한 관리</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/business_mode.css" />
+  <link rel="stylesheet" href="css/system_permissions.css" />
+</head>
+<body class="theme-vivid tone-sidebar" data-nav="system_permissions">
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope perms-page">
+      <section class="page-canvas">
+        <header class="page-head">
+          <h1 class="h1">시스템 권한 관리</h1>
+          <p class="sub">계정별 주요 시스템 접근 권한을 ON/OFF로 관리합니다.</p>
+        </header>
+
+        <section class="card perms-shell">
+          <div class="perms-toolbar">
+            <input id="permSearchInput" class="input" type="text" placeholder="이름/아이디 검색" />
+            <button id="permRefreshBtn" class="btn" type="button">새로고침</button>
+          </div>
+          <div class="perms-table-wrap">
+            <table class="table perms-table">
+              <thead>
+                <tr>
+                  <th style="width: 22%;">이름</th>
+                  <th style="width: 16%;">아이디</th>
+                  <th style="width: 14%;">직급</th>
+                  <th style="width: 24%;">근태 정정요청 권한</th>
+                  <th style="width: 24%;">웹 대시보드 접근</th>
+                </tr>
+              </thead>
+              <tbody id="permTableBody">
+                <tr><td colspan="5" class="muted">불러오는 중...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/header.js"></script>
+<script src="js/system_permissions.js"></script>
+<script>
+  (async () => {
+    await loadLayout();
+    await loadHeader("시스템 권한 관리");
+  })();
+</script>
+</body>
+</html>
+

@@ -87,7 +87,7 @@
 }
 
 body[data-notify-mode="mail"] .notify-shell {
-  grid-template-columns: 148px minmax(420px, 1fr) minmax(660px, 1fr);
+  grid-template-columns: 148px minmax(320px, 0.95fr) minmax(0, 1.05fr);
   gap: 0;
   border-radius: 10px;
   border: 1px solid #dbe2ef !important;
@@ -104,6 +104,7 @@ body[data-notify-mode="mail"] .notify-detail-col {
 
 body[data-notify-mode="mail"] .notify-detail-col {
   border-right: none;
+  min-width: 0;
 }
 
 .mail-quick-tabs {
@@ -351,6 +352,25 @@ body[data-notify-mode="mail"] .notify-mail-preview {
   color: #64748b;
 }
 
+body[data-notify-mode="mail"] .notify-mail-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  line-height: 1.2;
+}
+
+body[data-notify-mode="mail"] .notify-mail-time .date {
+  font-size: 11px;
+  color: #64748b;
+}
+
+body[data-notify-mode="mail"] .notify-mail-time .time {
+  font-size: 11px;
+  color: #334155;
+  font-weight: 600;
+}
+
 body[data-notify-mode="mail"] .notify-mail-list {
   padding: 0;
   gap: 0;
@@ -367,6 +387,10 @@ body[data-notify-mode="mail"] .notify-mail-row {
 
 body[data-notify-mode="mail"] .notify-mail-row.unread {
   background: #f7fbff;
+}
+
+body[data-notify-mode="mail"] .notify-mail-row.is-read .notify-mail-title {
+  color: #94a3b8;
 }
 
 body[data-notify-mode="mail"] .notify-mail-time {
@@ -670,6 +694,10 @@ body[data-notify-mode="mail"] .notify-mail-body {
   box-shadow: 0 28px 48px rgba(15, 23, 42, 0.28);
 }
 
+#mailComposeModal .modal-card {
+  width: min(620px, calc(100vw - 32px));
+}
+
 .modal-head {
   display: flex;
   justify-content: space-between;
@@ -720,6 +748,40 @@ body[data-notify-mode="mail"] .notify-mail-body {
 .ai-field .input,
 .ai-field .select {
   width: 100%;
+}
+
+#mailAttachmentInput {
+  height: 40px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+#mailAttachmentInput::file-selector-button {
+  height: 30px;
+  padding: 0 12px;
+  margin-right: 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#mailAttachmentInput::-webkit-file-upload-button {
+  height: 30px;
+  padding: 0 12px;
+  margin-right: 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .mail-attachment-list {

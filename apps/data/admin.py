@@ -26,6 +26,7 @@ from .models import (
     PromptTemplate,
     PromptTemplateVersion,
     Review,
+    SystemPermission,
 )
 
 
@@ -442,6 +443,14 @@ class PromptTemplateVersionAdmin(admin.ModelAdmin):
     list_filter = ["template", "created_at"]
     search_fields = ["template__name", "changed_by", "change_note"]
     readonly_fields = ["created_at"]
+
+
+@admin.register(SystemPermission)
+class SystemPermissionAdmin(admin.ModelAdmin):
+    list_display = ["id", "user", "key", "is_enabled", "updated_by", "updated_at"]
+    list_filter = ["key", "is_enabled", "updated_at"]
+    search_fields = ["user__username", "user__profile__name", "updated_by__username"]
+    readonly_fields = ["created_at", "updated_at"]
 
 
 # Admin 사이트 설정

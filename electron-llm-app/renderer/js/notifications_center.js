@@ -4,8 +4,8 @@ window.globalSearchIndex = window.globalSearchIndex || {
     { key: "알림", page: "notifications_center" },
     { key: "메모센터", page: "notifications_center" },
     { key: "메일센터", page: "mail_center" },
-    { key: "근태 정정요청", page: "attendance_requests" },
-    { key: "정정요청", page: "attendance_requests" },
+    { key: "근태 정정요청", page: "attendance_admin" },
+    { key: "정정요청", page: "attendance_admin" },
     { key: "메모", page: "notifications_center" },
     { key: "메일", page: "mail_center" },
     { key: "대시보드", page: "my_dashboard" },
@@ -71,7 +71,9 @@ function buildHeaders() {
 }
 
 function classifyAlert(item) {
-  const text = `${item?.content || ""} ${item?.platform || ""}`.toLowerCase();
+  const platform = String(item?.platform || "").toLowerCase();
+  if (platform === "__attendance_correction__") return "attendance";
+  const text = `${item?.content || ""} ${platform}`.toLowerCase();
   if (text.includes("근태") || text.includes("정정요청")) return "attendance";
   return "system";
 }
@@ -130,6 +132,23 @@ function timeLabel(item) {
   return d.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
+function mailListTimeHtml(item) {
+  const raw = item?.created_at;
+  if (!raw) return "-";
+  const d = new Date(raw);
+  if (Number.isNaN(d.valueOf())) return "-";
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const hour24 = d.getHours();
+  const minute = String(d.getMinutes()).padStart(2, "0");
+  const meridiem = hour24 < 12 ? "오전" : "오후";
+  const hour12 = String(((hour24 + 11) % 12) + 1).padStart(2, "0");
+  return `
+    <span class="date">${month}월 ${day}일</span>
+    <span class="time">${meridiem} ${hour12}:${minute}</span>
+  `;
+}
+
 function escapeHtml(text) {
   return String(text || "")
     .replaceAll("&", "&amp;")
@@ -176,7 +195,6 @@ function buildMailDetailBody(item) {
     `<div class="mail-detail-divider"></div>`,
     `<div class="mail-detail-attach-summary">`,
     `<div class="left">첨부 ${attachments.length}개 ${attachments.length ? `<span class="sum-size">${formatSize(totalSize)}</span>` : ""}</div>`,
-    `<div class="right">${attachments.length ? "모두저장" : ""}</div>`,
     `</div>`,
     `<div class="notify-detail-files">${attachmentListHtml}</div>`,
     `<div class="mail-detail-divider"></div>`,
@@ -188,7 +206,8 @@ function buildMailDetailBody(item) {
 
 async function fetchAlerts() {
   const headers = await buildHeaders();
-  const res = await fetch(`${window.API_BASE}/api/data/notifications/?limit=200`, { credentials: "include", headers });
+  const params = new URLSearchParams({ limit: "200", center: state.center || "memo" });
+  const res = await fetch(`${window.API_BASE}/api/data/notifications/?${params.toString()}`, { credentials: "include", headers });
   if (!res.ok) throw new Error("notification_fetch_failed");
   const data = await res.json();
   state.alert.items = data.results || [];
@@ -339,6 +358,8 @@ function renderList() {
   }
   root.innerHTML = rows
     .map((item) => {
+      const isRead = item?.is_read === true || item?.is_read === 1 || item?.is_read === "true";
+      const rowStateClass = isRead ? "is-read" : "unread";
       if (state.mode === "mail") {
         const sender = escapeHtml(item.sender_name || "-");
         const title = escapeHtml(titleOf(item));
@@ -346,7 +367,7 @@ function renderList() {
         const attCount = attachmentCount(item);
         const attBadge = attCount ? `<span class="notify-mail-attach">📎 ${attCount}</span>` : "";
         return `
-          <div class="notify-mail-row ${item.is_read ? "" : "unread"}" data-id="${item.id}">
+          <div class="notify-mail-row ${rowStateClass}" data-id="${item.id}">
             <input class="notify-check" type="checkbox" data-id="${item.id}" ${state.checked.has(item.id) ? "checked" : ""} />
             <div class="notify-mail-sender">${sender}</div>
             <div class="notify-mail-main">
@@ -356,12 +377,12 @@ function renderList() {
               </div>
               <div class="notify-mail-preview">${preview}</div>
             </div>
-            <div class="notify-mail-time">${timeLabel(item)}</div>
+            <div class="notify-mail-time">${mailListTimeHtml(item)}</div>
           </div>
         `;
       }
       return `
-        <div class="notify-mail-row ${item.is_read ? "" : "unread"}" data-id="${item.id}">
+        <div class="notify-mail-row ${rowStateClass}" data-id="${item.id}">
           <input class="notify-check" type="checkbox" data-id="${item.id}" ${state.checked.has(item.id) ? "checked" : ""} />
           <div class="notify-mail-main">
             <div class="notify-mail-title">${titleOf(item)}</div>
@@ -508,6 +529,26 @@ function renderAll() {
   renderDetail();
 }
 
+function applyPendingOpenFromHeader() {
+  let pendingId = "";
+  try {
+    pendingId = (sessionStorage.getItem("openNotifyId") || "").trim();
+    sessionStorage.removeItem("openNotifyId");
+    sessionStorage.removeItem("openNotifyType");
+    sessionStorage.removeItem("openNotifyDate");
+  } catch (e) {
+    return;
+  }
+  if (!pendingId) return;
+  const idNum = Number(pendingId);
+  if (!Number.isFinite(idNum)) return;
+  const rows = currentItems();
+  const found = rows.find((x) => Number(x.id) === idNum);
+  if (!found) return;
+  state.selectedId = idNum;
+  state.selectedItemCache = found;
+}
+
 function bindComposeModal() {
   const openBtn = document.getElementById("notifyComposeBtn");
   const modal = document.getElementById("mailComposeModal");
@@ -584,6 +625,10 @@ function bindComposeModal() {
         existing.add(key);
       }
     });
+    if (composeFiles.length > 10) {
+      composeFiles = composeFiles.slice(0, 10);
+      window.showAlert?.("첨부파일은 최대 10개까지 가능합니다.");
+    }
     attachmentInput.value = "";
     renderComposeFiles();
   });
@@ -595,6 +640,7 @@ function bindComposeModal() {
     if (!recipientId) return window.showAlert?.("받는 사람을 선택하세요.");
     if (!title) return window.showAlert?.("제목을 입력하세요.");
     if (!body) return window.showAlert?.("본문을 입력하세요.");
+    if (composeFiles.length > 10) return window.showAlert?.("첨부파일은 최대 10개까지 가능합니다.");
 
     const headers = await buildHeaders();
     const form = new FormData();
@@ -720,8 +766,6 @@ function bindUi() {
     state.checked.clear();
     state.mail.folder = "inbox";
     await Promise.all([fetchMails(), fetchUsers()]);
-    await markAllInboxRead();
-    await fetchMails();
     renderAll();
   });
 
@@ -739,12 +783,18 @@ async function ensureAttendanceAccess() {
   });
 
   try {
-    const me = await window.api?.getMe?.();
-    const role = normalizeRoleFromMe(me);
-    if (role === "admin" || role === "ceo") {
-      contentShell?.classList.remove("hidden");
-      deniedModal?.classList.add("hidden");
-      return true;
+    const headers = await buildHeaders();
+    const res = await fetch(`${window.API_BASE}/api/data/system-permissions/me/?key=attendance_requests_access`, {
+      credentials: "include",
+      headers,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.enabled) {
+        contentShell?.classList.remove("hidden");
+        deniedModal?.classList.add("hidden");
+        return true;
+      }
     }
   } catch (e) {
     // ignore
@@ -762,12 +812,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (state.mode === "mail") {
       await Promise.all([fetchMails(), fetchUsers()]);
-      await markAllInboxRead();
-      await fetchMails();
     } else {
       await fetchAlerts();
       if (state.center === "attendance") state.alert.folder = "all";
     }
+    applyPendingOpenFromHeader();
     renderAll();
   } catch (e) {
     const root = document.getElementById("notifyMailList");

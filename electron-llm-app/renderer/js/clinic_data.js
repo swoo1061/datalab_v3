@@ -18,13 +18,14 @@ const clinics = [
   { id: 16, name: "아우어 <br> 성형외과", type: "성형외과", typeClass: "type-ps", logo: "아우어.jpg" },
   { id: 17, name: "강남12의원", type: "성형외과", typeClass: "type-ps", logo: "강남12.jpg" },
   { id: 18, name: "프리마 <br> 성형외과", type: "성형외과", typeClass: "type-ps", logo: "프리마.jpg" },
-  { id: 27, name: "서진 성형외과", type: "성형외과", typeClass: "type-ps", logo: "서진.jpg" },
+  { id: 33, name: "서진 성형외과", type: "성형외과", typeClass: "type-ps", logo: "서진.jpg" },
   { id: 21, name: "라라 성형외과", type: "성형외과", typeClass: "type-ps", logo: "라라.jpg" },
 
   // 피부과
-  { id: 22, name: "사치바이오", type: "피부과", typeClass: "type-derma", logo: "사치바이오.jpg" },
+  { id: 34, name: "사치바이오", type: "피부과", typeClass: "type-derma", logo: "사치바이오.jpg" },
   { id: 23, name: "PHD피부과", type: "피부과", typeClass: "type-derma", logo: "PHD.jpg" },
   { id: 24, name: "리프톤 피부과", type: "피부과", typeClass: "type-derma", logo: "리프톤.jpg" },
+  { id: 31, name: "용닥터의원", type: "피부과", typeClass: "type-derma", logo: "용닥터.jpg" },
 ];
 
 // 🔥 전역 노출

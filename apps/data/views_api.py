@@ -24,6 +24,8 @@ from rest_framework.authentication import SessionAuthentication, BaseAuthenticat
 from .models import FavoriteClinic, ClinicAssignee
 from .serializers import FavoriteClinicSerializer, ClinicPostSerializer, CalendarMemoSerializer
 
+ATTENDANCE_MEMO_PLATFORM = "__attendance_correction__"
+
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
     def enforce_csrf(self, request):
@@ -107,6 +109,7 @@ def clinic_detail_api(request, clinic_id):
         "price_list": prices,
         "consultants": clinic.consultants or [],
         "aftercare": list(clinic.aftercare.values()) if isinstance(clinic.aftercare, dict) else clinic.aftercare,
+        "raw_data": clinic.raw_data or {},
     }, json_dumps_params={"ensure_ascii": False})
 
 def normalize_consultants(consultants):
@@ -658,7 +661,7 @@ class CalendarMemoListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        qs = CalendarMemo.objects.filter(user=request.user)
+        qs = CalendarMemo.objects.filter(user=request.user).exclude(platform=ATTENDANCE_MEMO_PLATFORM)
 
         clinic_id = request.GET.get("clinic_id")
         if clinic_id:
@@ -796,6 +799,13 @@ class NotificationListView(APIView):
             .filter(user=request.user, remind_at__isnull=False, remind_at__lte=now)
             .order_by("-remind_at")
         )
+
+        center = (request.GET.get("center") or "").strip().lower()
+        if center == "attendance":
+            qs = qs.filter(platform=ATTENDANCE_MEMO_PLATFORM)
+        elif center == "memo":
+            qs = qs.exclude(platform=ATTENDANCE_MEMO_PLATFORM)
+
         unread_count = qs.filter(is_read=False).count()
         data = CalendarMemoSerializer(qs[:limit], many=True).data
         return Response(
