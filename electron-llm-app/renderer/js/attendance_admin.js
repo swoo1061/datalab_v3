@@ -46,7 +46,25 @@ function statusLabel(status) {
   if (status === "pending") return "대기";
   if (status === "approved") return "승인";
   if (status === "rejected") return "반려";
+  if (status === "vacation_annual") return "연차";
+  if (status === "vacation_half_am") return "오전반차";
+  if (status === "vacation_half_pm") return "오후반차";
   return "-";
+}
+
+function isVacationStatus(status) {
+  return String(status || "").startsWith("vacation_");
+}
+
+function vacationTypeLabel(type) {
+  if (type === "annual") return "연차";
+  if (type === "half_am") return "오전반차";
+  if (type === "half_pm") return "오후반차";
+  return "";
+}
+
+function vacationTypeClass(type) {
+  return type ? `vacation_${type}` : "";
 }
 
 function formatDateTime(raw) {
@@ -109,10 +127,10 @@ function exportCsv() {
         r.work_date || "",
         r.user_name || "",
         roleLabel(r.role),
-        formatDateTime(r.check_in_at),
-        formatDateTime(r.check_out_at),
+        isVacationStatus(r.status) ? statusLabel(r.status) : formatDateTime(r.check_in_at),
+        isVacationStatus(r.status) ? statusLabel(r.status) : formatDateTime(r.check_out_at),
         Number(r.worked_minutes || 0),
-        statusLabel(r.status),
+        r.vacation_type ? vacationTypeLabel(r.vacation_type) : statusLabel(r.status),
       ])
     : rows.map((r) => [
         statusLabel(r.status),
@@ -150,10 +168,10 @@ function exportExcel() {
         r.work_date || "",
         r.user_name || "",
         roleLabel(r.role),
-        formatDateTime(r.check_in_at),
-        formatDateTime(r.check_out_at),
+        isVacationStatus(r.status) ? statusLabel(r.status) : formatDateTime(r.check_in_at),
+        isVacationStatus(r.status) ? statusLabel(r.status) : formatDateTime(r.check_out_at),
         Number(r.worked_minutes || 0),
-        statusLabel(r.status),
+        r.vacation_type ? vacationTypeLabel(r.vacation_type) : statusLabel(r.status),
       ])
     : rows.map((r) => [
         statusLabel(r.status),
@@ -323,6 +341,25 @@ function renderMonthlyMatrix() {
         .map((d) => {
           const row = grouped.get(`${u.user_id}::${d.key}`);
           if (!row) return `<td><span class="cell-empty">-</span></td>`;
+          if (isVacationStatus(row.status)) {
+            const label = statusLabel(row.status);
+            return `
+              <td>
+                <span class="status-dot ${escapeHtml(row.status || "")}">${escapeHtml(label)}</span>
+              </td>
+            `;
+          }
+          if (row.vacation_type) {
+            const label = vacationTypeLabel(row.vacation_type);
+            const cls = vacationTypeClass(row.vacation_type);
+            return `
+              <td>
+                <span class="cell-time ${row.check_in_at ? "" : "muted"}">${escapeHtml(formatTime(row.check_in_at))}</span>
+                <span class="cell-time ${row.check_out_at ? "" : "muted"}">${escapeHtml(formatTime(row.check_out_at))}</span>
+                <span class="status-dot ${escapeHtml(cls)}">${escapeHtml(label)}</span>
+              </td>
+            `;
+          }
           return `
             <td>
               <span class="cell-time ${row.check_in_at ? "" : "muted"}">${escapeHtml(formatTime(row.check_in_at))}</span>

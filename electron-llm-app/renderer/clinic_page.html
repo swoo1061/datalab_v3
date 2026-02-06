@@ -239,7 +239,6 @@
                         <div class="calendar-card-left">
                           <div class="card-title" id="calendarBoardTitle">작업 캘린더</div>
                           <button class="btn toggle active" id="clinicCalendarWorkToggle">작업 캘린더</button>
-                          <button class="btn toggle" id="clinicCalendarMemoToggle">메모 캘린더</button>
                         </div>
                         <div class="calendar-month-nav">
                           <div class="month-nav" id="calendarMonthNav">
@@ -275,65 +274,7 @@
     <button class="btn" id="clinicCalendarDetailClose">닫기</button>
   </div>
   <div class="calendar-detail-body">
-    <div class="calendar-memo-panel hidden" id="clinicCalendarMemoPanel">
-      <div class="memo-list-panel">
-        <div class="memo-list-head">
-          <div class="memo-title">
-            <span class="memo-kicker">메모 캘린더</span>
-            <strong>메모 리스트</strong>
-          </div>
-          <div class="memo-actions">
-            <span class="memo-badge" id="clinicCalendarMemoDate">-</span>
-            <span class="memo-badge outline">담당자 <strong id="clinicCalendarMemoAuthor">-</strong></span>
-            <button class="btn primary" id="clinicCalendarMemoOpen">메모 작성</button>
-          </div>
-        </div>
-        <div class="memo-list-sub">선택한 날짜 기준</div>
-        <div id="clinicCalendarMemoList" class="memo-list"></div>
-      </div>
-    </div>
     <div id="clinicCalendarList" class="schedule-list" data-panel="clinicCalendarDetailPanel" data-variant="compact"></div>
-  </div>
-</div>
-
-<div id="clinicCalendarMemoModal" class="modal hidden">
-  <div class="modal-backdrop" data-close="true"></div>
-  <div class="modal-card">
-    <div class="modal-head">
-      <div>
-        <div class="modal-title">메모 작성</div>
-        <div class="modal-sub">선택한 날짜에 메모를 추가합니다.</div>
-      </div>
-      <button class="modal-close" data-close="true">닫기</button>
-    </div>
-    <div class="modal-body">
-      <div class="modal-grid">
-        <div class="ai-field span-2">
-          <label>내용</label>
-          <textarea id="clinicCalendarMemoContent" class="input" placeholder="메모를 입력하세요"></textarea>
-        </div>
-        <div class="ai-field">
-          <label>플랫폼</label>
-          <select id="clinicCalendarMemoPlatform" class="select"></select>
-        </div>
-        <div class="ai-field">
-          <label>알림 시간</label>
-          <input id="clinicCalendarMemoRemind" class="input" type="datetime-local" />
-        </div>
-        <div class="ai-field">
-          <label>ID</label>
-          <input id="clinicCalendarMemoAccount" class="input" />
-        </div>
-        <div class="ai-field">
-          <label>PW</label>
-          <input id="clinicCalendarMemoPassword" class="input" type="password" />
-        </div>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn" data-close="true">취소</button>
-      <button class="btn primary" id="clinicCalendarMemoSave">저장</button>
-    </div>
   </div>
 </div>
 

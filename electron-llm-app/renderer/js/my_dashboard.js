@@ -713,24 +713,30 @@ function initMemoCalendar() {
   const modal = document.getElementById("myMemoModal");
   if (!listEl || !openBtn || !saveBtn || !modal) return;
 
-  const platformSelect = document.getElementById("myMemoPlatform");
-  if (platformSelect && !platformSelect.options.length) {
-    platformSelect.innerHTML = `
-      <option value="">플랫폼 선택</option>
-      ${PLATFORM_PILLS.map((p) => `<option value="${p.key}">${p.label}</option>`).join("")}
-    `;
-  }
-
-  const clinicSelect = document.getElementById("myMemoClinicSelect");
-  if (clinicSelect) {
-    const list = Array.isArray(window.clinics) ? window.clinics : [];
-    clinicSelect.innerHTML = list.length
-      ? list.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")
-      : `<option value="">병원 없음</option>`;
-    if (!clinicSelect.value) {
-      clinicSelect.value = clinicSelect.options?.[0]?.value || "";
+  const initFlatpickr = (input) => {
+    if (!input || !window.flatpickr) return null;
+    if (window.flatpickr.l10ns?.ko) {
+      window.flatpickr.localize(window.flatpickr.l10ns.ko);
     }
-  }
+    if (input._flatpickr) return input._flatpickr;
+    const fp = window.flatpickr(input, {
+      enableTime: true,
+      dateFormat: "Y-m-d H:i",
+      time_24hr: false,
+      allowInput: true,
+      onOpen: (selectedDates, dateStr, instance) => {
+        if (instance?.calendarContainer) {
+          instance.calendarContainer.classList.add("memo-flatpickr");
+        }
+      },
+    });
+    input.addEventListener("focus", () => fp.open());
+    return fp;
+  };
+
+  document.querySelectorAll('input[data-flatpickr="datetime"]').forEach((input) => {
+    initFlatpickr(input);
+  });
 
   const today = new Date();
   const toYmd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -770,11 +776,7 @@ function initMemoCalendar() {
     listEl.innerHTML = sorted
       .map((memo) => {
         const timeLabel = memo.remind_at ? new Date(memo.remind_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "";
-        const platformLabel = memo.platform ? getPlatformLabel(memo.platform) : "";
-        const accountLabel = memo.account ? `ID ${memo.account}` : "";
-        const passwordLabel = memo.account_password ? `PW ${memo.account_password}` : "";
-        const metaLabel = [platformLabel, timeLabel].filter(Boolean).join(" · ");
-        const accountLine = [accountLabel, passwordLabel].filter(Boolean).join(" · ");
+        const metaLabel = [timeLabel].filter(Boolean).join(" · ");
         return `
           <div class="memo-item" data-id="${memo.id}">
             <span class="memo-date">${memo.date || "-"}</span>
@@ -782,7 +784,6 @@ function initMemoCalendar() {
               <span>${metaLabel || "-"}</span>
               <span></span>
             </div>
-            ${accountLine ? `<div class="memo-meta"><span>${accountLine}</span><span></span></div>` : ""}
             <div class="memo-content">${memo.content}</div>
             <div class="memo-actions">
               <button class="memo-delete" data-id="${memo.id}">삭제</button>
@@ -827,31 +828,46 @@ function initMemoCalendar() {
     }
   };
 
-  modal.addEventListener("click", (e) => closeModal(e.target));
+  const modalCard = modal.querySelector(".modal-card");
+  if (modalCard) {
+    ["click", "pointerdown"].forEach((eventName) => {
+      modalCard.addEventListener(
+        eventName,
+        (e) => {
+          e.stopPropagation();
+        },
+        true
+      );
+    });
+  }
+
+  modal.addEventListener(
+    "click",
+    (e) => {
+      e.stopPropagation();
+      closeModal(e.target);
+    },
+    true
+  );
   openBtn.addEventListener("click", openModal);
   saveBtn.addEventListener("click", () => {
     const contentEl = document.getElementById("myMemoContent");
     const remindEl = document.getElementById("myMemoRemind");
-    const platformEl = document.getElementById("myMemoPlatform");
-    const clinicSelectEl = document.getElementById("myMemoClinicSelect");
-    const accountEl = document.getElementById("myMemoAccount");
-    const passwordEl = document.getElementById("myMemoPassword");
     const content = (contentEl?.value || "").trim();
     if (!content) {
       window.showAlert?.("메모 내용을 입력하세요.");
       return;
     }
-    const remindAt = remindEl?.value ? new Date(remindEl.value) : null;
+    const remindAt = (() => {
+      const fp = remindEl?._flatpickr;
+      if (fp?.selectedDates?.length) return fp.selectedDates[0];
+      return remindEl?.value ? new Date(remindEl.value) : null;
+    })();
     const dateValue = currentDate;
     const payload = {
       date: dateValue,
       content,
     };
-    const clinicId = clinicSelectEl?.value;
-    if (clinicId) payload.clinic_id = Number(clinicId);
-    if (platformEl?.value) payload.platform = platformEl.value;
-    if (accountEl?.value) payload.account = (accountEl.value || "").trim();
-    if (passwordEl?.value) payload.account_password = (passwordEl.value || "").trim();
     if (remindAt && !Number.isNaN(remindAt.valueOf())) {
       payload.remind_at = remindAt.toISOString();
     }
@@ -872,10 +888,6 @@ function initMemoCalendar() {
         memoCache.delete(getMonthKey(dateValue));
         if (contentEl) contentEl.value = "";
         if (remindEl) remindEl.value = "";
-        if (platformEl) platformEl.value = "";
-        if (clinicSelectEl) clinicSelectEl.value = clinicSelectEl.options?.[0]?.value || "";
-        if (accountEl) accountEl.value = "";
-        if (passwordEl) passwordEl.value = "";
         modal.classList.add("hidden");
         renderList();
       } catch (e) {

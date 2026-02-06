@@ -771,6 +771,38 @@
   box-shadow: 0 6px 14px rgba(var(--theme-primary-rgb, 79, 70, 229), 0.12);
 }
 
+#myMemoContent {
+  min-height: 140px;
+  height: 140px;
+  resize: vertical;
+}
+
+#myMemoRemind {
+  width: 100%;
+  max-width: 180px;
+}
+
+.flatpickr-calendar {
+  z-index: 9999;
+}
+
+.flatpickr-calendar {
+  z-index: 9999;
+  transform: scale(0.85);
+  transform-origin: top left;
+  animation: none !important;
+  transition: none !important;
+}
+
+.flatpickr-calendar * {
+  transition: none !important;
+}
+
+.modal-grid.memo-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 220px);
+  align-items: start;
+}
+
 #myMemoModal .input:focus,
 #myMemoModal .select:focus {
   outline: none;

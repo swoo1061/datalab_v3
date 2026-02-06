@@ -933,7 +933,6 @@ function initClinicCalendar() {
   const nextBtn = document.getElementById("calendarNextMonth");
   const monthInput = document.getElementById("calendarMonth");
   const workToggle = document.getElementById("clinicCalendarWorkToggle");
-  const memoToggle = document.getElementById("clinicCalendarMemoToggle");
 
   if (prevBtn) {
     prevBtn.addEventListener("click", () => shiftCalendarMonth(-1));
@@ -949,21 +948,11 @@ function initClinicCalendar() {
       refreshClinicCalendar();
     });
   }
-  if (workToggle && memoToggle) {
+  if (workToggle) {
     workToggle.addEventListener("click", () => {
       workToggle.classList.add("active");
-      memoToggle.classList.remove("active");
       calendarMemoOnly = false;
       updateCalendarBoardTitle(false);
-      updateMemoMode(false);
-      refreshClinicCalendar();
-    });
-    memoToggle.addEventListener("click", () => {
-      memoToggle.classList.add("active");
-      workToggle.classList.remove("active");
-      calendarMemoOnly = true;
-      updateCalendarBoardTitle(true);
-      updateMemoMode(true);
       refreshClinicCalendar();
     });
   }
@@ -971,12 +960,7 @@ function initClinicCalendar() {
   updateCalendarLabel();
   initCalendarDetailPanel();
   updateCalendarBoardTitle(calendarMemoOnly);
-  updateMemoMode(calendarMemoOnly);
-  initMemoModal();
   initCalendarEditModal();
-  setMemoAuthor();
-  document.getElementById("clinicCalendarMemoSave")?.addEventListener("click", saveCalendarMemo);
-  document.getElementById("clinicCalendarMemoOpen")?.addEventListener("click", openMemoModal);
   refreshClinicCalendar();
 }
 
@@ -1143,31 +1127,7 @@ function shiftCalendarMonth(delta) {
 function updateCalendarBoardTitle(isMemoOnly) {
   const titleEl = document.getElementById("calendarBoardTitle");
   if (!titleEl) return;
-  titleEl.innerText = isMemoOnly ? "메모 캘린더" : "작업 캘린더";
-}
-
-function updateMemoMode(isMemoOnly) {
-  const panel = document.getElementById("clinicCalendarMemoPanel");
-  const list = document.getElementById("clinicCalendarList");
-  if (!panel || !list) return;
-  panel.classList.toggle("hidden", !isMemoOnly);
-  list.classList.toggle("hidden", isMemoOnly);
-}
-
-async function fetchCalendarMemos(month) {
-  const params = new URLSearchParams({ month });
-  const headers = await buildAuthHeaders();
-  const res = await fetch(`${API_BASE}/api/data/calendar-memos/?${params}`, {
-    credentials: "include",
-    headers,
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data.results || [];
-}
-
-function filterMemosByClinic(memos) {
-  return memos.filter((memo) => String(memo.clinic_id) === String(currentClinicId));
+  titleEl.innerText = "작업 캘린더";
 }
 
 function getPlatformLabel(platformKey) {
@@ -1183,73 +1143,51 @@ async function refreshClinicCalendar() {
   const list = document.getElementById(listId);
   if (!calendar || !list) return;
 
-  let items = [];
-  if (!calendarMemoOnly) {
-    const [opinions, reviews] = await Promise.all([
-      fetchPostsByMonth("opinion"),
-      fetchPostsByMonth("review"),
-    ]);
+  const [opinions, reviews] = await Promise.all([
+    fetchPostsByMonth("opinion"),
+    fetchPostsByMonth("review"),
+  ]);
 
-    const mapPost = (post, type) => ({
-      kind: "post",
-      date: getPostDate(post),
-      title: post.title,
-      title_display: post.title_display,
-      url: post.url,
-      platform: post.platform,
-      platform_label: post.platform_label,
-      type,
-      review_subtype: post.review_subtype,
-      opinion_subtype: post.opinion_subtype,
-      views: post.views,
-      comments: post.comments,
-      message_count: post.message_count,
-      account: post.account,
-      account_password: post.account_password,
-      doctor_name: post.doctor_name,
-      assignee: getAssigneeDisplay(post),
-      photos: Array.isArray(post.photos)
-        ? post.photos.map((p) => (p?.url ? p.url : p)).filter(Boolean)
-        : [],
-      post_id: post.id,
-      clinicId: currentClinicId,
-      clinic: currentClinicName,
-    });
+  const mapPost = (post, type) => ({
+    kind: "post",
+    date: getPostDate(post),
+    title: post.title,
+    title_display: post.title_display,
+    url: post.url,
+    platform: post.platform,
+    platform_label: post.platform_label,
+    type,
+    review_subtype: post.review_subtype,
+    opinion_subtype: post.opinion_subtype,
+    views: post.views,
+    comments: post.comments,
+    message_count: post.message_count,
+    account: post.account,
+    account_password: post.account_password,
+    doctor_name: post.doctor_name,
+    assignee: getAssigneeDisplay(post),
+    photos: Array.isArray(post.photos)
+      ? post.photos.map((p) => (p?.url ? p.url : p)).filter(Boolean)
+      : [],
+    post_id: post.id,
+    clinicId: currentClinicId,
+    clinic: currentClinicName,
+  });
 
-    items = [
-      ...opinions.map((post) => mapPost(post, "opinion")),
-      ...reviews.map((post) => mapPost(post, "review")),
-    ].filter((item) => item.date);
-  } else {
-    const memos = await fetchCalendarMemos(currentCalendarMonth);
-    calendarMemos = filterMemosByClinic(memos);
-    items = calendarMemos.map((memo) => ({
-      kind: "memo",
-      date: memo.date,
-      memo: memo.content,
-      remind_at: formatMemoTime(memo.remind_at),
-      clinic: currentClinicName,
-      clinicId: currentClinicId,
-    }));
-  }
+  const items = [
+    ...opinions.map((post) => mapPost(post, "opinion")),
+    ...reviews.map((post) => mapPost(post, "review")),
+  ].filter((item) => item.date);
 
   renderScheduleCalendar({
     calendarId,
     listId,
     items,
     yearMonth: currentCalendarMonth,
-    emptyMessage: calendarMemoOnly ? "등록된 메모가 없습니다." : "선택한 날짜의 일정이 없습니다.",
-    allowEmptyClick: calendarMemoOnly,
-    onDateSelect: calendarMemoOnly
-      ? (date) => {
-          setMemoDate(date);
-        }
-      : null,
+    emptyMessage: "선택한 날짜의 일정이 없습니다.",
+    allowEmptyClick: false,
+    onDateSelect: null,
   });
-
-  if (calendarMemoOnly && calendarSelectedDate) {
-    renderMemoList(calendarSelectedDate);
-  }
 }
 
 function initCalendarDetailPanel() {
@@ -1309,13 +1247,6 @@ function initMemoModal() {
       modal.classList.add("hidden");
     }
   });
-  const platformSelect = document.getElementById("clinicCalendarMemoPlatform");
-  if (platformSelect && !platformSelect.options.length) {
-    platformSelect.innerHTML = `
-      <option value="">플랫폼 선택</option>
-      ${PLATFORM_PILLS.filter((p) => p.key !== "all").map((p) => `<option value="${p.key}">${p.label}</option>`).join("")}
-    `;
-  }
 }
 
 function openMemoModal() {
@@ -1355,18 +1286,13 @@ function renderMemoList(date) {
   list.innerHTML = memos
     .map((memo) => {
       const timeLabel = formatMemoTime(memo.remind_at);
-      const platformLabel = getPlatformLabel(memo.platform);
-      const accountLabel = memo.account ? `ID ${memo.account}` : "";
-      const passwordLabel = memo.account_password ? `PW ${memo.account_password}` : "";
-      const accountLine = [accountLabel, passwordLabel].filter(Boolean).join(" · ");
-      const metaLabel = [platformLabel, timeLabel].filter(Boolean).join(" · ");
+      const metaLabel = [timeLabel].filter(Boolean).join(" · ");
       return `
         <div class="memo-item" data-id="${memo.id}">
           <div class="memo-meta">
             <span>${metaLabel || "-"}</span>
             <span></span>
           </div>
-          ${accountLine ? `<div class="memo-meta"><span>${accountLine}</span><span></span></div>` : ""}
           <div class="memo-content">${memo.content}</div>
           <div class="memo-actions">
             <button class="memo-delete" data-id="${memo.id}">삭제</button>
@@ -1392,9 +1318,6 @@ async function saveCalendarMemo() {
   }
   const contentEl = document.getElementById("clinicCalendarMemoContent");
   const remindEl = document.getElementById("clinicCalendarMemoRemind");
-  const platformEl = document.getElementById("clinicCalendarMemoPlatform");
-  const accountEl = document.getElementById("clinicCalendarMemoAccount");
-  const passwordEl = document.getElementById("clinicCalendarMemoPassword");
   const content = (contentEl?.value || "").trim();
   if (!content) {
     window.showAlert?.("메모 내용을 입력하세요.");
@@ -1407,9 +1330,6 @@ async function saveCalendarMemo() {
     content,
     clinic_id: Number(currentClinicId),
   };
-  if (platformEl?.value) payload.platform = platformEl.value;
-  if (accountEl?.value) payload.account = accountEl.value.trim();
-  if (passwordEl?.value) payload.account_password = passwordEl.value.trim();
   if (remindAt && !Number.isNaN(remindAt.valueOf())) {
     payload.remind_at = remindAt.toISOString();
   }
@@ -1428,9 +1348,6 @@ async function saveCalendarMemo() {
     }
     if (contentEl) contentEl.value = "";
     if (remindEl) remindEl.value = "";
-    if (platformEl) platformEl.value = "";
-    if (accountEl) accountEl.value = "";
-    if (passwordEl) passwordEl.value = "";
     document.getElementById("clinicCalendarMemoModal")?.classList.add("hidden");
     await refreshClinicCalendar();
     setMemoDate(calendarSelectedDate);

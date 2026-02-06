@@ -733,6 +733,39 @@ document.addEventListener(
   true
 );
 
+// Keep modals open when clicking the backdrop.
+document.addEventListener(
+  "click",
+  (e) => {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    if (target.classList.contains("modal-backdrop")) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  },
+  true
+);
+
+function lockModalBackdropClicks() {
+  document.querySelectorAll(".modal-backdrop").forEach((backdrop) => {
+    if (backdrop.dataset.locked === "true") return;
+    backdrop.dataset.locked = "true";
+    ["click", "pointerdown"].forEach((eventName) => {
+      backdrop.addEventListener(
+        eventName,
+        (e) => {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        },
+        true
+      );
+    });
+  });
+}
+
+document.addEventListener("DOMContentLoaded", lockModalBackdropClicks);
+
 // If a hidden backdrop is still catching clicks, remove it and focus the real target.
 document.addEventListener(
   "pointerdown",

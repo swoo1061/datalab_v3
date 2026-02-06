@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.data.models import AttendanceRecord, AttendanceCorrectionRequest, CalendarMemo
+from apps.data.models_vacation import VacationRequest
 from apps.data.serializers_attendance import (
     AttendanceRecordSerializer,
     AttendanceCorrectionRequestSerializer,
@@ -314,28 +315,75 @@ class AttendanceAdminListView(APIView):
         rows = []
         total_minutes = 0
         worked_days = 0
+        existing_keys = set()
+        row_by_key = {}
         for rec in qs.order_by("-work_date", "user__username"):
             user_meta = user_by_id.get(rec.user_id)
             if not user_meta:
                 continue
-            rows.append(
-                {
-                    "id": rec.id,
-                    "user_id": rec.user_id,
-                    "user_name": user_meta["user_name"],
-                    "username": user_meta["username"],
-                    "role": user_meta["role"],
-                    "work_date": rec.work_date.isoformat(),
-                    "check_in_at": rec.check_in_at,
-                    "check_out_at": rec.check_out_at,
-                    "worked_minutes": rec.worked_minutes,
-                    "status": rec.status,
-                    "note": rec.note or "",
-                }
-            )
+            work_date_key = rec.work_date.isoformat()
+            existing_keys.add(f"{rec.user_id}::{work_date_key}")
+            payload = {
+                "id": rec.id,
+                "user_id": rec.user_id,
+                "user_name": user_meta["user_name"],
+                "username": user_meta["username"],
+                "role": user_meta["role"],
+                "work_date": rec.work_date.isoformat(),
+                "check_in_at": rec.check_in_at,
+                "check_out_at": rec.check_out_at,
+                "worked_minutes": rec.worked_minutes,
+                "status": rec.status,
+                "note": rec.note or "",
+            }
+            rows.append(payload)
+            row_by_key[f"{rec.user_id}::{work_date_key}"] = payload
             if rec.check_in_at:
                 worked_days += 1
             total_minutes += int(rec.worked_minutes or 0)
+
+        vac_qs = VacationRequest.objects.filter(
+            status="approved",
+            user_id__in=list(user_by_id.keys()),
+            start_date__lt=month_end,
+            end_date__gte=month_start,
+        ).select_related("user", "user__profile")
+        for req in vac_qs:
+            user_meta = user_by_id.get(req.user_id)
+            if not user_meta:
+                continue
+            start_date = max(req.start_date, month_start)
+            end_date = min(req.end_date, month_end - timedelta(days=1))
+            cur = start_date
+            while cur <= end_date:
+                work_date_key = cur.isoformat()
+                key = f"{req.user_id}::{work_date_key}"
+                if key in existing_keys:
+                    existing_row = row_by_key.get(key)
+                    if existing_row and not existing_row.get("vacation_type"):
+                        existing_row["vacation_type"] = req.type
+                    cur += timedelta(days=1)
+                    continue
+                rows.append(
+                    {
+                        "id": None,
+                        "user_id": req.user_id,
+                        "user_name": user_meta["user_name"],
+                        "username": user_meta["username"],
+                        "role": user_meta["role"],
+                        "work_date": work_date_key,
+                        "check_in_at": None,
+                        "check_out_at": None,
+                        "worked_minutes": 0,
+                        "status": f"vacation_{req.type}",
+                        "vacation_type": req.type,
+                        "note": req.reason or "",
+                    }
+                )
+                existing_keys.add(key)
+                cur += timedelta(days=1)
+
+        rows.sort(key=lambda r: (r.get("work_date") or "", r.get("username") or ""), reverse=True)
 
         return Response(
             {

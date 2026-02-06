@@ -21,11 +21,9 @@ window.POSITION_LABEL = window.POSITION_LABEL || {
 };
 
 let calendarItems = [];
-let calendarMemos = [];
 let calendarSelectedDate = "";
 const assigneeCache = new Map();
 const postsCache = new Map();
-const memosCache = new Map();
 
 const askConfirm = async (message) => {
   if (typeof window.appConfirm === "function") {
@@ -204,11 +202,6 @@ function getSelectedClinicId() {
   return clinicSelect?.value || "";
 }
 
-function filterMemosByClinic(memos, clinicId) {
-  if (!clinicId) return memos;
-  return memos.filter((memo) => memo.clinic_id === Number(clinicId) || memo.clinic_id === null);
-}
-
 function getPlatformLabel(platformKey) {
   if (!platformKey) return "";
   const match = PLATFORM_PILLS.find((p) => p.key === platformKey);
@@ -221,9 +214,6 @@ async function loadCalendar({ keepPanelOpen = false } = {}) {
   if (!clinicSelect || !month) return;
   const detailPanel = document.getElementById("calendarDetailPanel");
   if (detailPanel && !keepPanelOpen) detailPanel.classList.remove("open");
-  const memoOnly = document.getElementById("calendarMemoToggle")?.classList.contains("active");
-  updateMemoMode(memoOnly);
-
   const clinicId = clinicSelect.value;
   const clinics = clinicSelect.dataset.clinics
     ? JSON.parse(clinicSelect.dataset.clinics)
@@ -235,12 +225,11 @@ async function loadCalendar({ keepPanelOpen = false } = {}) {
 
   const items = [];
 
-  if (!memoOnly) {
-    await Promise.all(targetClinics.map(async (clinic) => {
-      const posts = await fetchClinicPosts(clinic.id, month, "all");
+  await Promise.all(targetClinics.map(async (clinic) => {
+    const posts = await fetchClinicPosts(clinic.id, month, "all");
 
-      posts.forEach((post) => {
-        const normalizedSubtype = post.review_subtype || getSubtypeByPhotos(post);
+    posts.forEach((post) => {
+      const normalizedSubtype = post.review_subtype || getSubtypeByPhotos(post);
       const subtype = normalizedSubtype === "photo"
         ? "사진"
         : normalizedSubtype === "text"
@@ -248,67 +237,44 @@ async function loadCalendar({ keepPanelOpen = false } = {}) {
           : normalizedSubtype === "consultation"
             ? "상담"
             : "";
-        const typeLabel = post.type === "review" ? "후기" : "여론";
-        const titlePrefix = `[${typeLabel}]`;
-        items.push({
-          date: getPostDate(post),
-          title: post.title,
-          title_display: `${titlePrefix} ${post.title}`,
-          url: post.url,
+      const typeLabel = post.type === "review" ? "후기" : "여론";
+      const titlePrefix = `[${typeLabel}]`;
+      items.push({
+        date: getPostDate(post),
+        title: post.title,
+        title_display: `${titlePrefix} ${post.title}`,
+        url: post.url,
         platform: post.platform,
         platform_label: post.platform_label,
         status: post.status,
         account: post.account || "",
         account_password: post.account_password || "",
         memo: post.memo || "",
-          views: post.views ?? 0,
-          comments: post.comments ?? 0,
-          message_count: post.message_count ?? 0,
-          post_id: post.id,
-          type: post.type,
-          review_subtype: normalizedSubtype,
-          doctor_name: getDoctorLabel(post),
-          assignee: getAssigneeLabel(post),
-          photos: (post.photos || []).map((p) => p.url),
-          clinic: clinic.name,
-          clinicId: clinic.id,
-        });
+        views: post.views ?? 0,
+        comments: post.comments ?? 0,
+        message_count: post.message_count ?? 0,
+        post_id: post.id,
+        type: post.type,
+        review_subtype: normalizedSubtype,
+        doctor_name: getDoctorLabel(post),
+        assignee: getAssigneeLabel(post),
+        photos: (post.photos || []).map((p) => p.url),
+        clinic: clinic.name,
+        clinicId: clinic.id,
       });
-    }));
-  }
-
-  const memos = await fetchCalendarMemos(month);
-  const filteredMemos = filterMemosByClinic(memos, clinicId);
-  calendarMemos = filteredMemos;
-
-  const memoItems = filteredMemos.map((memo) => ({
-    kind: "memo",
-    date: memo.date,
-    memo: memo.content,
-    remind_at: formatMemoTime(memo.remind_at),
-    clinic: memo.clinic_name || "전체",
-    clinicId: memo.clinic_id || null,
+    });
   }));
 
-  const filteredItems = memoOnly ? memoItems : items;
-  calendarItems = filteredItems;
+  calendarItems = items;
   renderScheduleCalendar({
     calendarId: "calendarBoard",
     listId: "calendarDetailList",
-    items: filteredItems,
+    items,
     yearMonth: month,
-    emptyMessage: memoOnly ? "등록된 메모가 없습니다." : "선택된 기간에 작업이 없습니다.",
-    allowEmptyClick: memoOnly,
-    onDateSelect: memoOnly
-      ? (date) => {
-          setMemoDate(date);
-        }
-      : null,
+    emptyMessage: "선택된 기간에 작업이 없습니다.",
+    allowEmptyClick: false,
+    onDateSelect: null,
   });
-
-  if (memoOnly && calendarSelectedDate) {
-    renderMemoList(calendarSelectedDate);
-  }
 }
 
 async function initCalendarDashboard() {
@@ -321,26 +287,7 @@ async function initCalendarDashboard() {
     ? clinics.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")
     : `<option value="">병원 목록 없음</option>`;
 
-  const memoClinicSelect = document.getElementById("calendarMemoClinicSelect");
-  if (memoClinicSelect) {
-    memoClinicSelect.innerHTML = clinics.length
-      ? clinics.map((c) => `<option value="${c.id}">${c.name}</option>`).join("")
-      : `<option value="">병원 없음</option>`;
-    memoClinicSelect.value = clinicSelect.value || memoClinicSelect.options?.[0]?.value || "";
-  }
-
-  const memoPlatform = document.getElementById("calendarMemoPlatform");
-  if (memoPlatform) {
-    memoPlatform.innerHTML = `
-      <option value="">플랫폼 선택</option>
-      ${PLATFORM_PILLS.map((p) => `<option value="${p.key}">${p.label}</option>`).join("")}
-    `;
-  }
-
   clinicSelect.onchange = () => {
-    if (memoClinicSelect) {
-      memoClinicSelect.value = clinicSelect.value || memoClinicSelect.options?.[0]?.value || "";
-    }
     loadCalendar();
   };
   const monthInput = document.getElementById("calendarMonth");
@@ -366,28 +313,13 @@ async function initCalendarDashboard() {
     });
   }
   const workToggle = document.getElementById("calendarWorkToggle");
-  const memoToggle = document.getElementById("calendarMemoToggle");
-  if (workToggle && memoToggle) {
+  if (workToggle) {
     workToggle.addEventListener("click", () => {
       workToggle.classList.add("active");
-      memoToggle.classList.remove("active");
       updateCalendarBoardTitle(false);
-      updateMemoMode(false);
-      loadCalendar();
-    });
-    memoToggle.addEventListener("click", () => {
-      memoToggle.classList.add("active");
-      workToggle.classList.remove("active");
-      updateCalendarBoardTitle(true);
-      updateMemoMode(true);
       loadCalendar();
     });
   }
-
-  document.getElementById("calendarMemoSave")?.addEventListener("click", saveCalendarMemo);
-  document.getElementById("calendarMemoOpen")?.addEventListener("click", openMemoModal);
-  initMemoModal();
-  setMemoAuthor();
 
   const detailPanel = document.getElementById("calendarDetailPanel");
   const detailClose = document.getElementById("calendarDetailClose");
@@ -421,42 +353,8 @@ async function initCalendarDashboard() {
     openCalendarEditModal(post, clinicId);
   };
 
-  const pendingMemoDate = (() => {
-    try {
-      return sessionStorage.getItem("openMemoDate") || "";
-    } catch (e) {
-      return "";
-    }
-  })();
-  const hasPendingMemo = Boolean(pendingMemoDate || (() => {
-    try {
-      return sessionStorage.getItem("openMemoId");
-    } catch (e) {
-      return "";
-    }
-  })());
-
-  if (hasPendingMemo && memoToggle && workToggle) {
-    memoToggle.classList.add("active");
-    workToggle.classList.remove("active");
-  }
-
-  updateCalendarBoardTitle(memoToggle?.classList.contains("active"));
-  updateMemoMode(memoToggle?.classList.contains("active"));
+  updateCalendarBoardTitle(false);
   await loadCalendar();
-
-  if (hasPendingMemo) {
-    if (pendingMemoDate) {
-      setMemoDate(pendingMemoDate);
-    }
-    document.getElementById("calendarDetailPanel")?.classList.add("open");
-    try {
-      sessionStorage.removeItem("openMemoDate");
-      sessionStorage.removeItem("openMemoId");
-    } catch (e) {
-      // ignore
-    }
-  }
 }
 
 document.addEventListener("DOMContentLoaded", initCalendarDashboard);
@@ -574,18 +472,13 @@ function renderMemoList(date) {
     .map((memo) => {
       const timeLabel = formatMemoTime(memo.remind_at);
       const clinicLabel = memo.clinic_name || "전체";
-      const platformLabel = getPlatformLabel(memo.platform);
       const userLabel = memo.user_name || "-";
-      const accountLabel = memo.account ? `ID ${memo.account}` : "";
-      const passwordLabel = memo.account_password ? `PW ${memo.account_password}` : "";
-      const accountLine = [accountLabel, passwordLabel].filter(Boolean).join(" · ");
       return `
         <div class="memo-item" data-id="${memo.id}">
           <div class="memo-meta">
-            <span>${clinicLabel}${platformLabel ? ` · ${platformLabel}` : ""}</span>
+            <span>${clinicLabel}</span>
             <span>${timeLabel || "-"}</span>
           </div>
-          ${accountLine ? `<div class="memo-meta"><span>${accountLine}</span><span></span></div>` : ""}
           <div class="memo-meta">
             <span>담당자 ${userLabel}</span>
             <span></span>
@@ -624,9 +517,6 @@ async function saveCalendarMemo() {
   const contentEl = document.getElementById("calendarMemoContent");
   const remindEl = document.getElementById("calendarMemoRemind");
   const memoClinicSelect = document.getElementById("calendarMemoClinicSelect");
-  const memoPlatform = document.getElementById("calendarMemoPlatform");
-  const memoAccount = document.getElementById("calendarMemoAccount");
-  const memoPassword = document.getElementById("calendarMemoPassword");
   const content = (contentEl?.value || "").trim();
   if (!content) {
     window.showAlert?.("메모 내용을 입력하세요.");
@@ -635,24 +525,12 @@ async function saveCalendarMemo() {
 
   const clinicId = memoClinicSelect?.value || getSelectedClinicId();
   const remindAt = remindEl?.value ? new Date(remindEl.value) : null;
-  const platform = memoPlatform?.value || "";
-  const account = (memoAccount?.value || "").trim();
-  const accountPassword = (memoPassword?.value || "").trim();
   const payload = {
     date,
     content,
   };
   if (clinicId) {
     payload.clinic_id = Number(clinicId);
-  }
-  if (platform) {
-    payload.platform = platform;
-  }
-  if (account) {
-    payload.account = account;
-  }
-  if (accountPassword) {
-    payload.account_password = accountPassword;
   }
   if (remindAt && !Number.isNaN(remindAt.valueOf())) {
     payload.remind_at = remindAt.toISOString();
@@ -672,9 +550,6 @@ async function saveCalendarMemo() {
     }
     if (contentEl) contentEl.value = "";
     if (remindEl) remindEl.value = "";
-    if (memoPlatform) memoPlatform.value = "";
-    if (memoAccount) memoAccount.value = "";
-    if (memoPassword) memoPassword.value = "";
     document.getElementById("calendarMemoModal")?.classList.add("hidden");
     await loadCalendar({ keepPanelOpen: true });
     setMemoDate(date);

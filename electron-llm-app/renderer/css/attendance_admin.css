@@ -247,6 +247,19 @@
   border: 1px solid #86efac;
 }
 
+.status-dot.vacation_annual {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+}
+
+.status-dot.vacation_half_am,
+.status-dot.vacation_half_pm {
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #c4b5fd;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;

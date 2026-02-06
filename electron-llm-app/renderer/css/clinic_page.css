@@ -1199,6 +1199,11 @@ btn.primary {
   gap: 10px;
 }
 
+.modal-grid.memo-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 220px);
+  align-items: start;
+}
+
 .modal-actions {
   margin-top: 16px;
   display: flex;
@@ -2149,6 +2154,17 @@ btn.primary {
   font-size: 11px;
   cursor: pointer;
   padding: 0;
+}
+
+#clinicCalendarMemoContent {
+  min-height: 140px;
+  height: 140px;
+  resize: vertical;
+}
+
+#clinicCalendarMemoRemind {
+  width: 100%;
+  max-width: 100%;
 }
 
 body.resizing-panel {

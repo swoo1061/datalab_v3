@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/header.css" />
   <link rel="stylesheet" href="css/dashboard.css" />
+  <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css" />
   <link rel="stylesheet" href="css/my_dashboard.css" />
   <link rel="stylesheet" href="css/schedule.css" />
   <link rel="stylesheet" href="css/calendar_dashboard.css" />
@@ -153,18 +154,18 @@
       <button class="modal-close" data-close="true">닫기</button>
     </div>
     <div class="modal-body">
-      <div class="modal-grid">
+      <div class="modal-grid memo-grid">
         <div class="ai-field">
           <label>대상일</label>
           <input id="attReqDate" class="input" type="date" />
         </div>
         <div class="ai-field">
           <label>요청 출근시각</label>
-          <input id="attReqCheckIn" class="input" type="datetime-local" />
+          <input id="attReqCheckIn" class="input" type="text" data-flatpickr="datetime" placeholder="날짜/시간 선택" />
         </div>
         <div class="ai-field">
           <label>요청 퇴근시각</label>
-          <input id="attReqCheckOut" class="input" type="datetime-local" />
+          <input id="attReqCheckOut" class="input" type="text" data-flatpickr="datetime" placeholder="날짜/시간 선택" />
         </div>
         <div class="ai-field span-2">
           <label>정정 사유</label>
@@ -201,8 +202,8 @@
   </div>
 </div>
 
-<div id="myMemoModal" class="modal hidden">
-  <div class="modal-backdrop" data-close="true"></div>
+<div id="myMemoModal" class="modal modal-lock hidden">
+  <div class="modal-backdrop"></div>
   <div class="modal-card">
     <div class="modal-head">
       <div>
@@ -213,29 +214,13 @@
     </div>
     <div class="modal-body">
       <div class="modal-grid">
+        <div class="ai-field">
+          <label>알림 시간</label>
+          <input id="myMemoRemind" class="input" type="text" data-flatpickr="datetime" placeholder="날짜/시간 선택" />
+        </div>
         <div class="ai-field span-2">
           <label>내용</label>
           <textarea id="myMemoContent" class="input" placeholder="메모를 입력하세요"></textarea>
-        </div>
-        <div class="ai-field">
-          <label>병원</label>
-          <select id="myMemoClinicSelect" class="select"></select>
-        </div>
-        <div class="ai-field">
-          <label>플랫폼</label>
-          <select id="myMemoPlatform" class="select"></select>
-        </div>
-        <div class="ai-field">
-          <label>알림 시간</label>
-          <input id="myMemoRemind" class="input" type="datetime-local" />
-        </div>
-        <div class="ai-field">
-          <label>ID</label>
-          <input id="myMemoAccount" class="input" />
-        </div>
-        <div class="ai-field">
-          <label>PW</label>
-          <input id="myMemoPassword" class="input" type="password" />
         </div>
       </div>
     </div>
@@ -251,6 +236,8 @@
 <script src="js/header.js"></script>
 <script src="js/clinic_data.js"></script>
 <script src="js/clinic_cards.js"></script>
+<script src="vendor/flatpickr/flatpickr.min.js"></script>
+<script src="vendor/flatpickr/l10n/ko.js"></script>
 <script src="js/my_dashboard.js"></script>
 <script>
   (async () => {
