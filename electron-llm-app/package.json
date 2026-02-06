@@ -4,6 +4,8 @@
   "main": "main.js",
   "scripts": {
     "dev": "electron .",
+    "dev:local": "cmd /c copy /Y .env.local .env && electron .",
+    "dev:office": "cmd /c copy /Y .env.office .env && electron .",
     "build": "electron-builder --win",
     "dist": "electron-builder --win"
   },
