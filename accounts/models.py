@@ -20,7 +20,9 @@ class UserProfile(models.Model):
         choices=POSITION_CHOICES
     )
     birth_date = models.DateField(null=True, blank=True)
+    hire_date = models.DateField(null=True, blank=True)
     phone = models.CharField(max_length=20, blank=True)
+    work_start_hour = models.PositiveSmallIntegerField(default=9)
     
 
     is_approved = models.BooleanField(default=False)  # 관리자 승인용

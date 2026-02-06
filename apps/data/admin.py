@@ -6,6 +6,7 @@ from .models import (
     AccessLog,
     AttendanceCorrectionRequest,
     AttendanceRecord,
+    VacationRequest,
     Campaign,
     CalendarMemo,
     CafeProfile,
@@ -407,6 +408,28 @@ class AttendanceCorrectionRequestAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     ]
+
+    def requester_name(self, obj):
+        profile = getattr(obj.user, "profile", None)
+        return getattr(profile, "name", None) or obj.user.username
+    requester_name.short_description = "요청자"
+
+
+@admin.register(VacationRequest)
+class VacationRequestAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "requester_name",
+        "start_date",
+        "end_date",
+        "type",
+        "days",
+        "status",
+        "created_at",
+    ]
+    list_filter = ["status", "type", "start_date", "created_at"]
+    search_fields = ["user__username", "user__profile__name", "reason", "review_note"]
+    readonly_fields = ["created_at", "updated_at", "days"]
 
     def requester_name(self, obj):
         profile = getattr(obj.user, "profile", None)

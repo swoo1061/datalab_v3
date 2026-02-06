@@ -7,6 +7,9 @@ const state = {
 
 const KEY_ATTENDANCE = "attendance_requests_access";
 const KEY_WEB_DASHBOARD = "web_dashboard_access";
+const KEY_VACATION_ADMIN = "vacation_admin_access";
+const KEY_EMPLOYEE_MANAGEMENT = "employee_management_access";
+const KEY_SYSTEM_MONITOR = "system_monitor_access";
 
 async function buildHeaders() {
   const headers = {};
@@ -50,20 +53,27 @@ function renderRows() {
   const tbody = document.getElementById("permTableBody");
   if (!tbody) return;
   if (!state.rows.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="muted">표시할 계정이 없습니다.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="muted">표시할 계정이 없습니다.</td></tr>`;
     return;
   }
   tbody.innerHTML = state.rows
     .map((row) => {
       const attendanceOn = Boolean(row?.permissions?.[KEY_ATTENDANCE]);
       const webOn = Boolean(row?.permissions?.[KEY_WEB_DASHBOARD]);
+      const vacationOn = Boolean(row?.permissions?.[KEY_VACATION_ADMIN]);
+      const employeeOn = Boolean(row?.permissions?.[KEY_EMPLOYEE_MANAGEMENT]);
+      const monitorOn = Boolean(row?.permissions?.[KEY_SYSTEM_MONITOR]);
       return `
         <tr data-user-id="${row.id}">
-          <td>${escapeHtml(row.name || "-")}</td>
-          <td>${escapeHtml(row.username || "-")}</td>
-          <td><span class="perm-role">${escapeHtml(roleLabel(row.role))}</span></td>
+          <td>
+            <div class="perm-name">${escapeHtml(row.name || "-")}</div>
+            <div class="perm-role-sub">${escapeHtml(roleLabel(row.role))}</div>
+          </td>
           <td><button type="button" class="perm-toggle ${attendanceOn ? "on" : ""}" data-key="${KEY_ATTENDANCE}" aria-label="근태 권한 토글"></button></td>
-          <td><button type="button" class="perm-toggle ${webOn ? "on" : ""}" data-key="${KEY_WEB_DASHBOARD}" aria-label="웹 대시보드 권한 토글"></button></td>
+          <td><button type="button" class="perm-toggle ${webOn ? "on" : ""}" data-key="${KEY_WEB_DASHBOARD}" aria-label="웹 접근 권한 토글"></button></td>
+          <td><button type="button" class="perm-toggle ${vacationOn ? "on" : ""}" data-key="${KEY_VACATION_ADMIN}" aria-label="휴가 관리 권한 토글"></button></td>
+          <td><button type="button" class="perm-toggle ${employeeOn ? "on" : ""}" data-key="${KEY_EMPLOYEE_MANAGEMENT}" aria-label="직원 관리 권한 토글"></button></td>
+          <td><button type="button" class="perm-toggle ${monitorOn ? "on" : ""}" data-key="${KEY_SYSTEM_MONITOR}" aria-label="서버 관리 권한 토글"></button></td>
         </tr>
       `;
     })
@@ -127,7 +137,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderRows();
   } catch (err) {
     const tbody = document.getElementById("permTableBody");
-    if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="muted">데이터를 불러오지 못했습니다.</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="muted">데이터를 불러오지 못했습니다.</td></tr>`;
   }
 });
-

@@ -26,6 +26,28 @@
   vertical-align: middle;
 }
 
+.perms-table th,
+.perms-table td {
+  text-align: center;
+}
+
+.perms-table th:first-child,
+.perms-table td:first-child {
+  text-align: left;
+}
+
+.perms-table td {
+  padding: 8px 6px;
+}
+
+.perms-table td .perm-toggle {
+  margin: 0 auto;
+}
+
+.perms-table {
+  table-layout: fixed;
+}
+
 .perm-toggle {
   width: 46px;
   height: 26px;
@@ -65,3 +87,13 @@
   color: #64748b;
 }
 
+.perm-name {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.perm-role-sub {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+}

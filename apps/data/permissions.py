@@ -19,6 +19,12 @@ def default_permission_for_user(user, key: str) -> bool:
         return role in {"admin", "ceo"}
     if key == SystemPermission.KEY_WEB_DASHBOARD:
         return role in {"admin", "ceo", "leader"}
+    if key == SystemPermission.KEY_VACATION_ADMIN:
+        return role in {"admin", "ceo", "leader"}
+    if key == SystemPermission.KEY_EMPLOYEE_MANAGEMENT:
+        return role in {"admin", "ceo", "leader"}
+    if key == SystemPermission.KEY_SYSTEM_MONITOR:
+        return role in {"admin", "ceo"}
     return False
 
 
@@ -38,4 +44,3 @@ def get_user_permission(user, key: str) -> bool:
 
 def can_access_web_dashboard(user) -> bool:
     return get_user_permission(user, SystemPermission.KEY_WEB_DASHBOARD)
-

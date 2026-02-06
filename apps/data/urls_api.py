@@ -19,6 +19,12 @@ from apps.data.views_attendance_api import (
     AttendanceCorrectionAdminListView,
     AttendanceCorrectionAdminDetailView,
 )
+from apps.data.views_vacation_api import (
+    MyVacationListCreateView,
+    VacationAdminListView,
+    VacationAdminDetailView,
+    VacationAdminSummaryView,
+)
 from apps.data.views_message_api import (
     InternalMessageListCreateView,
     InternalMessageDetailView,
@@ -69,6 +75,10 @@ urlpatterns = [
     path("attendance/me/check-in/", MyAttendanceCheckInView.as_view()),
     path("attendance/me/check-out/", MyAttendanceCheckOutView.as_view()),
     path("attendance/me/corrections/", MyAttendanceCorrectionListCreateView.as_view()),
+    path("vacations/me/", MyVacationListCreateView.as_view()),
+    path("vacations/admin/", VacationAdminListView.as_view()),
+    path("vacations/admin/<int:request_id>/", VacationAdminDetailView.as_view()),
+    path("vacations/admin/summary/", VacationAdminSummaryView.as_view()),
     path("system-permissions/me/", SystemPermissionMeView.as_view()),
     path("system-permissions/users/", SystemPermissionUserListView.as_view()),
     path("system-permissions/users/<int:user_id>/", SystemPermissionUserDetailView.as_view()),

@@ -1,8 +1,8 @@
-version: 0.10.2
+version: 0.10.3
 files:
-  - url: Datalab90 Staff Setup 0.10.2.exe
-    sha512: x8z4Rfddi4/aPTonsoVk7sxYtUYkjJGFYZVbFaRufGTJI1+z1iLuIVUvEz+feY3GVvOlJHIItgKCWZuGYdnzfQ==
-    size: 78462800
-path: Datalab90 Staff Setup 0.10.2.exe
-sha512: x8z4Rfddi4/aPTonsoVk7sxYtUYkjJGFYZVbFaRufGTJI1+z1iLuIVUvEz+feY3GVvOlJHIItgKCWZuGYdnzfQ==
-releaseDate: '2026-02-05T06:58:11.386Z'
+  - url: Datalab90 Staff Setup 0.10.3.exe
+    sha512: 9pq/n2mtrG1Pr3Kd7jbSzjUeaI2ABf/4+uAI1Gc2xF9Bqki27ZBIUfvBr8e5eCWxoIaR+Nza/Pl1TeSut7bz1A==
+    size: 80415925
+path: Datalab90 Staff Setup 0.10.3.exe
+sha512: 9pq/n2mtrG1Pr3Kd7jbSzjUeaI2ABf/4+uAI1Gc2xF9Bqki27ZBIUfvBr8e5eCWxoIaR+Nza/Pl1TeSut7bz1A==
+releaseDate: '2026-02-06T03:25:15.190Z'

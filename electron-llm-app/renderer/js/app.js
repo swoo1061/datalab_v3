@@ -17,12 +17,17 @@ let isPageTransitioning = false;
 const PAGE_ROLE_ACCESS = {
   attendance_requests: ["admin", "ceo"],
   attendance_admin: ["admin", "ceo", "leader"],
+  vacation_admin: ["admin", "ceo", "leader"],
+  employee_management: ["admin", "ceo", "leader"],
   system_permissions: ["admin", "ceo"],
   system_monitor: ["admin", "ceo"],
   system_logs: ["admin", "ceo"],
 };
 const PAGE_PERMISSION_OVERRIDE = {
   attendance_requests: "attendance_requests_access",
+  vacation_admin: "vacation_admin_access",
+  employee_management: "employee_management_access",
+  system_monitor: "system_monitor_access",
 };
 let cachedUserRole = null;
 const permissionCache = new Map();

@@ -1,0 +1,76 @@
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | 휴가 관리</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/business_mode.css" />
+  <link rel="stylesheet" href="css/vacation.css" />
+</head>
+<body class="theme-vivid tone-sidebar" data-nav="vacation_admin">
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope">
+      <section class="page-canvas">
+        <header class="page-head">
+          <h1 class="h1">휴가 관리</h1>
+          <p class="sub">대표/팀장/관리자 전용 휴가 승인 페이지입니다.</p>
+        </header>
+
+        <section class="card vacation-shell">
+          <div class="vacation-list">
+            <div class="vacation-toolbar">
+              <select id="vacationAdminYear" class="select"></select>
+              <input id="vacationAdminSearch" class="input" type="text" placeholder="이름 검색" />
+              <select id="vacationAdminStatus" class="select">
+                <option value="">전체 상태</option>
+                <option value="pending">대기</option>
+                <option value="approved">승인</option>
+                <option value="rejected">반려</option>
+              </select>
+            </div>
+            <div style="max-height: 620px; overflow:auto;">
+              <table class="vacation-table">
+                <thead>
+                  <tr>
+                    <th style="width: 10%;">상태</th>
+                    <th style="width: 12%;">신청자</th>
+                    <th style="width: 12%;">신청일</th>
+                    <th style="width: 16%;">기간</th>
+                    <th style="width: 12%;">유형</th>
+                    <th style="width: 10%;">사용일수</th>
+                    <th style="width: 10%;">남은연차</th>
+                    <th style="width: 18%;">처리</th>
+                  </tr>
+                </thead>
+                <tbody id="vacationAdminBody">
+                  <tr><td colspan="8" class="muted">불러오는 중...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/header.js"></script>
+<script src="js/vacation_admin.js"></script>
+<script>
+  (async () => {
+    await loadLayout();
+    await loadHeader("휴가 관리");
+  })();
+</script>
+</body>
+</html>

@@ -136,6 +136,7 @@ def me_api(request):
                     "phone": None,
                     "position": "admin",
                     "is_approved": True,
+                    "work_start_hour": 9,
                 },
                 json_dumps_params={"ensure_ascii": False},
             )
@@ -151,9 +152,11 @@ def me_api(request):
             "email": user.email,
             "name": p.name,
             "birth_date": p.birth_date,
+            "hire_date": getattr(p, "hire_date", None),
             "phone": p.phone,
             "position": p.position,
             "is_approved": p.is_approved,
+            "work_start_hour": getattr(p, "work_start_hour", 9),
         },
         json_dumps_params={"ensure_ascii": False},
     )
@@ -181,6 +184,7 @@ def api_signup(request):
     name = data.get("name")
     position = data.get("position")
     birth_date = data.get("birth_date")
+    hire_date = data.get("hire_date")
     phone = data.get("phone")
 
     if not all([username, password, email, name, position]):
@@ -203,6 +207,7 @@ def api_signup(request):
             position=position,
             is_approved=False,
             birth_date=birth_date or None,
+            hire_date=hire_date or None,
             phone=phone,
         )
 
@@ -230,6 +235,9 @@ def users_api(request):
             "username": u.username,
             "name": name,
             "position": position,
+            "email": u.email,
+            "hire_date": getattr(profile, "hire_date", None),
+            "work_start_hour": getattr(profile, "work_start_hour", 9),
         }
         if q:
             hay = f"{item['name']} {item['username']} {item['position']}".lower()

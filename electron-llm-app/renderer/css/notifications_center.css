@@ -378,7 +378,7 @@ body[data-notify-mode="mail"] .notify-mail-list {
 }
 
 body[data-notify-mode="mail"] .notify-mail-row {
-  grid-template-columns: 24px 140px minmax(0, 1fr) 74px;
+  grid-template-columns: 24px 40px minmax(0, 1fr) 74px;
   border: none;
   border-bottom: 1px solid #eef2f7;
   border-radius: 0;
@@ -660,7 +660,7 @@ body[data-notify-mode="mail"] .notify-mail-body {
     grid-template-columns: 120px minmax(0, 1fr) 70px;
   }
   body[data-notify-mode="mail"] .notify-mail-row {
-    grid-template-columns: 24px 120px minmax(0, 1fr) 70px;
+    grid-template-columns: 24px 40px minmax(0, 1fr) 70px;
   }
 }
 

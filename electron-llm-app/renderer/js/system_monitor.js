@@ -28,6 +28,11 @@ const STATIC_CHECKS = [
   { key: "notifications", label: "알림 API", path: "/api/data/notifications/?limit=1" },
   { key: "attendance_me", label: "출퇴근 API", path: "/api/data/attendance/me/" },
   { key: "attendance_corrections", label: "정정요청 목록 API", path: "/api/data/attendance/me/corrections/?limit=1" },
+  { key: "attendance_admin_records", label: "출퇴근 관리 API", path: "/api/data/attendance/admin/records/?month=2026-02&status=all" },
+  { key: "attendance_admin_corrections", label: "정정요청 관리 API", path: "/api/data/attendance/admin/corrections/?month=2026-02&status=pending" },
+  { key: "vacation_me", label: "휴가 신청 API", path: "/api/data/vacations/me/?year=2026" },
+  { key: "vacation_admin", label: "휴가 관리 API", path: "/api/data/vacations/admin/?year=2026" },
+  { key: "employee_summary", label: "직원 관리 API", path: "/api/data/vacations/admin/summary/?year=2026" },
   { key: "permissions_me", label: "내 권한 API", path: "/api/data/system-permissions/me/?key=web_dashboard_access" },
   { key: "permissions_users", label: "권한 유저목록 API", path: "/api/data/system-permissions/users/" },
   { key: "messages", label: "메일 API", path: "/api/data/messages/?box=inbox&limit=1" },
@@ -206,7 +211,7 @@ function renderInfo() {
     <div class="monitor-row"><span class="k">클라이언트 OS</span><span class="v">${detectClientOs()}</span></div>
     <div class="monitor-row"><span class="k">실행 앱</span><span class="v">${detectClientApp()}</span></div>
     <div class="monitor-row"><span class="k">앱 버전</span><span class="v">${state.appVersion || "-"}</span></div>
-    <div class="monitor-row"><span class="k">API 주소</span><span class="v">${window.API_BASE}</span></div>
+    <div class="monitor-row"><span class="k">IP 주소</span><span class="v">${window.API_BASE}</span></div>
     <div class="monitor-row"><span class="k">로그인 계정</span><span class="v">${me?.name || me?.username || "-"}</span></div>
     <div class="monitor-row"><span class="k">권한</span><span class="v">${roleLabel(me?.position || me?.role)}</span></div>
     <div class="monitor-row"><span class="k">세션 모듈</span><span class="v">${sessionExists ? "연결됨" : "없음"}</span></div>

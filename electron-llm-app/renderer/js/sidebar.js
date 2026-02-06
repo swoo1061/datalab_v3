@@ -250,8 +250,8 @@ async function refreshSidebarNotificationBadge() {
 }
 
 function initSidebarNotifyBadge() {
-  refreshSidebarNotificationBadge();
-  setInterval(refreshSidebarNotificationBadge, 30000);
+  const badge = document.getElementById("sidebarNotifyBadge");
+  if (badge) badge.classList.add("hidden");
 }
 
 if (document.readyState === "loading") {

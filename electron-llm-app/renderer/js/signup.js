@@ -22,6 +22,7 @@ async function signup() {
   const payload = {
     name: document.getElementById("name").value.trim(),
     birth_date: document.getElementById("birthDate").value.trim(), // ✅ 수정
+    hire_date: document.getElementById("hireDate").value.trim(),
     phone: document.getElementById("phone").value.trim(),
     email: document.getElementById("email").value.trim(),
     username: document.getElementById("username").value.trim(),
@@ -31,7 +32,7 @@ async function signup() {
 
   console.log("SIGNUP PAYLOAD:", payload); // 디버깅용 로그
 
-  if (!payload.name || !payload.email || !payload.username || !payload.password) {
+  if (!payload.name || !payload.email || !payload.username || !payload.password || !payload.hire_date) {
     window.showAlert?.("모든 항목을 입력하세요.");
     return;
   }

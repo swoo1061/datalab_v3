@@ -1210,10 +1210,16 @@ class SystemPermission(models.Model):
 
     KEY_ATTENDANCE_REQUESTS = "attendance_requests_access"
     KEY_WEB_DASHBOARD = "web_dashboard_access"
+    KEY_VACATION_ADMIN = "vacation_admin_access"
+    KEY_EMPLOYEE_MANAGEMENT = "employee_management_access"
+    KEY_SYSTEM_MONITOR = "system_monitor_access"
 
     KEY_CHOICES = [
         (KEY_ATTENDANCE_REQUESTS, "근태 정정요청 접근"),
         (KEY_WEB_DASHBOARD, "웹 대시보드 접근"),
+        (KEY_VACATION_ADMIN, "휴가 관리 접근"),
+        (KEY_EMPLOYEE_MANAGEMENT, "직원 관리 접근"),
+        (KEY_SYSTEM_MONITOR, "서버 관리 접근"),
     ]
 
     user = models.ForeignKey(
@@ -1245,3 +1251,4 @@ class SystemPermission(models.Model):
 from .models_worklog import DailyWorkLog
 from .models_attendance import AttendanceRecord, AttendanceCorrectionRequest
 from .models_message import InternalMessage, InternalMessageAttachment
+from .models_vacation import VacationRequest

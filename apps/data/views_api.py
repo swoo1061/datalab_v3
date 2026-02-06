@@ -25,6 +25,7 @@ from .models import FavoriteClinic, ClinicAssignee
 from .serializers import FavoriteClinicSerializer, ClinicPostSerializer, CalendarMemoSerializer
 
 ATTENDANCE_MEMO_PLATFORM = "__attendance_correction__"
+VACATION_MEMO_PLATFORM = "__vacation__"
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
@@ -661,7 +662,12 @@ class CalendarMemoListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        qs = CalendarMemo.objects.filter(user=request.user).exclude(platform=ATTENDANCE_MEMO_PLATFORM)
+        qs = (
+            CalendarMemo.objects
+            .filter(user=request.user)
+            .exclude(platform=ATTENDANCE_MEMO_PLATFORM)
+            .exclude(platform=VACATION_MEMO_PLATFORM)
+        )
 
         clinic_id = request.GET.get("clinic_id")
         if clinic_id:
@@ -803,8 +809,12 @@ class NotificationListView(APIView):
         center = (request.GET.get("center") or "").strip().lower()
         if center == "attendance":
             qs = qs.filter(platform=ATTENDANCE_MEMO_PLATFORM)
+        elif center == "vacation":
+            qs = qs.filter(platform=VACATION_MEMO_PLATFORM)
+        elif center == "system":
+            qs = qs.filter(platform__in=[ATTENDANCE_MEMO_PLATFORM, VACATION_MEMO_PLATFORM])
         elif center == "memo":
-            qs = qs.exclude(platform=ATTENDANCE_MEMO_PLATFORM)
+            qs = qs.exclude(platform=ATTENDANCE_MEMO_PLATFORM).exclude(platform=VACATION_MEMO_PLATFORM)
 
         unread_count = qs.filter(is_read=False).count()
         data = CalendarMemoSerializer(qs[:limit], many=True).data

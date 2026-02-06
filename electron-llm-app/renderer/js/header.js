@@ -199,10 +199,12 @@ async function buildAuthHeaders() {
 
 let notifyPollTimer = null;
 let notifyItemsById = new Map();
+let notifyItems = [];
 const ATTENDANCE_MEMO_PLATFORM = "__attendance_correction__";
+const VACATION_MEMO_PLATFORM = "__vacation__";
 
 function getNotifyItemTime(item) {
-  const raw = item?.remind_at || item?.created_at || item?.updated_at;
+  const raw = item?.created_at || item?.updated_at;
   const d = raw ? new Date(raw) : null;
   return d && !Number.isNaN(d.valueOf()) ? d.getTime() : 0;
 }
@@ -210,8 +212,7 @@ function getNotifyItemTime(item) {
 function classifyHeaderAlert(item) {
   const platform = String(item?.platform || "").toLowerCase();
   if (platform === ATTENDANCE_MEMO_PLATFORM) return "attendance";
-  const text = `${item?.content || ""} ${platform}`.toLowerCase();
-  if (text.includes("근태") || text.includes("정정요청")) return "attendance";
+  if (platform === VACATION_MEMO_PLATFORM) return "vacation";
   return "memo";
 }
 
@@ -253,6 +254,10 @@ function bindNotifications() {
 
   openCenterBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
+    if (typeof window.navigate === "function") {
+      window.navigate("notifications_center");
+      return;
+    }
     if (window.nav?.go) {
       window.nav.go("notifications_center");
     } else {
@@ -273,12 +278,25 @@ async function refreshNotifications() {
 
   try {
     const headers = await buildAuthHeaders();
-    const res = await fetch(`${window.API_BASE}/api/data/notifications/?limit=20`, {
-      credentials: "include",
-      headers,
-    });
-    if (!res.ok) throw new Error("notification fetch failed");
-    const data = await res.json();
+    let memoItems = [];
+    let unreadNotify = 0;
+    try {
+      const res = await fetch(`${window.API_BASE}/api/data/notifications/?limit=20`, {
+        credentials: "include",
+        headers,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        unreadNotify = Number(data?.unread_count || 0);
+        memoItems = (data?.results || []).map((item) => ({
+          ...item,
+          _kind: "memo",
+          _key: `memo:${item.id}`,
+        }));
+      }
+    } catch (_e) {
+      // ignore notification fetch errors
+    }
     let mailItems = [];
     let unreadMail = 0;
     try {
@@ -295,11 +313,6 @@ async function refreshNotifications() {
       // ignore mail unread fetch errors
     }
 
-    const memoItems = (data.results || []).map((item) => ({
-      ...item,
-      _kind: "memo",
-      _key: `memo:${item.id}`,
-    }));
     const inboxItems = mailItems.map((item) => ({
       ...item,
       _kind: "mail",
@@ -309,7 +322,6 @@ async function refreshNotifications() {
       .sort((a, b) => getNotifyItemTime(b) - getNotifyItemTime(a))
       .slice(0, 30);
 
-    const unreadNotify = Number.isFinite(data.unread_count) ? data.unread_count : items.filter((i) => !i.is_read).length;
     const unreadCount = unreadNotify + unreadMail;
     renderNotifications(items);
 
@@ -339,7 +351,8 @@ function renderNotifications(items) {
     return;
   }
 
-  notifyItemsById = new Map(items.map((item) => [String(item._key || item.id), item]));
+  notifyItems = items.slice();
+  notifyItemsById = new Map(notifyItems.map((item) => [String(item._key || item.id), item]));
   if (detail) detail.classList.add("hidden");
   if (empty) empty.classList.add("hidden");
   list.classList.remove("hidden");
@@ -348,11 +361,13 @@ function renderNotifications(items) {
     .map((item) => {
       const alertType = item._kind === "mail" ? "mail" : classifyHeaderAlert(item);
       const kindLabel =
-        alertType === "mail" ? "메일" : alertType === "attendance" ? "근태" : "메모";
+        alertType === "mail" ? "메일" : alertType === "attendance" ? "근태" : alertType === "vacation" ? "휴가" : "메모";
       const title = item._kind === "mail"
         ? (item.subject || "").trim() || "제목 없음"
         : (item.content || "").trim() || "메모";
-      const dateLabel = item._kind === "mail" ? (item.sender_name || "-") : (item.date || "-");
+      const dateLabel = item._kind === "mail"
+        ? (item.sender_name || "-")
+        : (item.date || "-");
 
       return `
         <div class="notify-item ${item.is_read ? "is-read" : ""}" data-id="${item._key || item.id}" data-date="${dateLabel}">
@@ -371,18 +386,21 @@ function renderNotifications(items) {
   });
 }
 
-async function markNotificationRead(memoId) {
-  try {
-    const headers = await buildAuthHeaders();
-    await fetch(`${window.API_BASE}/api/data/calendar-memos/${memoId}/`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify({ is_read: true }),
-    });
-  } catch (e) {
-    console.warn("mark notification read failed", e);
-  }
+function updateHeaderBadgeFromItems() {
+  const badge = document.getElementById("notifyBadge");
+  if (!badge) return;
+  const unread = notifyItems.filter((i) => !i.is_read).length;
+  badge.textContent = unread > 99 ? "99+" : String(unread);
+  badge.classList.toggle("hidden", unread <= 0);
+}
+
+function removeNotifyItemByKey(itemKey) {
+  const key = String(itemKey || "");
+  if (!key) return;
+  notifyItems = notifyItems.filter((item) => String(item._key || item.id) !== key);
+  notifyItemsById = new Map(notifyItems.map((item) => [String(item._key || item.id), item]));
+  renderNotifications(notifyItems);
+  updateHeaderBadgeFromItems();
 }
 
 async function markMailRead(messageId) {
@@ -399,7 +417,7 @@ async function markMailRead(messageId) {
   }
 }
 
-async function deleteNotificationMemo(memoId) {
+async function markNotificationRead(memoId) {
   try {
     const headers = await buildAuthHeaders();
     await fetch(`${window.API_BASE}/api/data/calendar-memos/${memoId}/`, {
@@ -409,24 +427,7 @@ async function deleteNotificationMemo(memoId) {
       body: JSON.stringify({ is_read: true }),
     });
   } catch (e) {
-    console.warn("delete notification memo failed", e);
-  }
-}
-
-function openMemoFromNotification({ id, date }) {
-  try {
-    sessionStorage.setItem("openMemoId", String(id));
-    if (date) {
-      sessionStorage.setItem("openMemoDate", date);
-    }
-  } catch (e) {
-    console.warn("sessionStorage unavailable", e);
-  }
-
-  if (window.nav?.go) {
-    window.nav.go("calendar_dashboard");
-  } else {
-    window.location.href = "calendar_dashboard.html";
+    console.warn("mark notification read failed", e);
   }
 }
 
@@ -438,14 +439,19 @@ function openNotifyCenterByType(type, item) {
   } catch (e) {
     // ignore
   }
+  const page =
+    type === "mail" ? "mail_center"
+      : type === "attendance" ? "attendance_admin"
+        : type === "vacation" ? "vacation_admin"
+          : "notifications_center";
+  if (typeof window.navigate === "function") {
+    window.navigate(page);
+    return;
+  }
   if (window.nav?.go) {
-    if (type === "attendance") window.nav.go("attendance_admin");
-    else if (type === "mail") window.nav.go("mail_center");
-    else window.nav.go("notifications_center");
+    window.nav.go(page);
   } else {
-    if (type === "attendance") window.location.href = "attendance_admin.html";
-    else if (type === "mail") window.location.href = "mail_center.html";
-    else window.location.href = "notifications_center.html";
+    window.location.href = `${page}.html`;
   }
 }
 
@@ -475,10 +481,10 @@ function openNotificationDetail(itemKey) {
     if (!item.is_read) {
       markMailRead(item.id);
     }
-    deleteBtn.textContent = "메일함으로";
-    deleteBtn.onclick = async (e) => {
+    deleteBtn.textContent = "알림에서 삭제";
+    deleteBtn.onclick = (e) => {
       e.stopPropagation();
-      openNotifyCenterByType("mail", item);
+      removeNotifyItemByKey(item._key || item.id);
     };
     openBtn.textContent = "메일센터 열기";
     openBtn.onclick = (e) => {
@@ -487,45 +493,61 @@ function openNotificationDetail(itemKey) {
     };
   } else {
     const alertType = classifyHeaderAlert(item);
-    const isAttendance = alertType === "attendance";
-    const clinic = item.clinic_name || "전체";
     const dateLabel = item.date || "-";
     const remindAt = item.remind_at ? new Date(item.remind_at) : null;
     const timeLabel = remindAt && !Number.isNaN(remindAt.valueOf())
       ? remindAt.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
       : "-";
-    const platform = item.platform_label || item.platform || "";
-    const account = item.account || "";
-    const password = item.account_password || "";
-    const author = item.user_name || "-";
 
-    if (titleEl) titleEl.innerText = isAttendance ? "근태 정정요청" : `${dateLabel} 메모`;
-    metaEl.innerHTML = `
-      <div class="meta-row"><span>유형</span><span>${isAttendance ? "근태 정정요청" : "메모"}</span></div>
-      ${isAttendance ? "" : `<div class="meta-row"><span>병원</span><span>${clinic}</span></div>`}
-      <div class="meta-row"><span>알림</span><span>${dateLabel} ${timeLabel}</span></div>
-      ${!isAttendance && platform ? `<div class="meta-row"><span>플랫폼</span><span>${platform}</span></div>` : ""}
-      ${account ? `<div class="meta-row"><span>ID</span><span>${account}</span></div>` : ""}
-      ${password ? `<div class="meta-row"><span>PW</span><span>${password}</span></div>` : ""}
-      <div class="meta-row"><span>담당자</span><span>${author}</span></div>
-    `;
+    if (alertType === "memo") {
+      const clinic = item.clinic_name || "전체";
+      const platform = item.platform_label || item.platform || "";
+      const account = item.account || "";
+      const password = item.account_password || "";
+      const author = item.user_name || "-";
+      if (titleEl) titleEl.innerText = `${dateLabel} 메모`;
+      metaEl.innerHTML = `
+        <div class="meta-row"><span>유형</span><span>메모</span></div>
+        <div class="meta-row"><span>병원</span><span>${clinic}</span></div>
+        <div class="meta-row"><span>알림</span><span>${dateLabel} ${timeLabel}</span></div>
+        ${platform ? `<div class="meta-row"><span>플랫폼</span><span>${platform}</span></div>` : ""}
+        ${account ? `<div class="meta-row"><span>ID</span><span>${account}</span></div>` : ""}
+        ${password ? `<div class="meta-row"><span>PW</span><span>${password}</span></div>` : ""}
+        <div class="meta-row"><span>담당자</span><span>${author}</span></div>
+      `;
+    } else {
+      if (titleEl) {
+        titleEl.innerText =
+          alertType === "attendance" ? "근태 정정요청"
+            : alertType === "vacation" ? "휴가 신청 알림"
+              : "알림";
+      }
+      metaEl.innerHTML = `
+        <div class="meta-row"><span>유형</span><span>${alertType === "attendance" ? "근태 정정요청" : alertType === "vacation" ? "휴가 신청" : "알림"}</span></div>
+        <div class="meta-row"><span>알림</span><span>${dateLabel} ${timeLabel}</span></div>
+      `;
+    }
     contentEl.innerText = item.content || "";
 
     if (!item.is_read) {
       markNotificationRead(item.id);
     }
 
-    deleteBtn.textContent = "읽음 처리";
-    deleteBtn.onclick = async (e) => {
+    deleteBtn.textContent = "알림에서 삭제";
+    deleteBtn.onclick = (e) => {
       e.stopPropagation();
-      await markNotificationRead(item.id);
-      refreshNotifications();
+      removeNotifyItemByKey(item._key || item.id);
     };
 
-    openBtn.textContent = isAttendance ? "근태 요청함 열기" : "메모함 열기";
+    openBtn.textContent =
+      alertType === "attendance" ? "근태 관리 열기"
+        : alertType === "vacation" ? "휴가 관리 열기"
+          : "메모함 열기";
     openBtn.onclick = (e) => {
       e.stopPropagation();
-      openNotifyCenterByType(isAttendance ? "attendance" : "memo", item);
+      if (alertType === "attendance") openNotifyCenterByType("attendance", item);
+      else if (alertType === "vacation") openNotifyCenterByType("vacation", item);
+      else openNotifyCenterByType("memo", item);
     };
   }
 
