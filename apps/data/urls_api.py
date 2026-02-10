@@ -37,6 +37,9 @@ from apps.data.views_permissions_api import (
 from apps.data.views_monitor_api import (
     SystemMonitorLLMStatusView,
 )
+from apps.data.views_audit_api import (
+    AuditEventListView,
+)
 
 worklog_list = ClinicDailyWorkLogViewSet.as_view({
     "get": "list",
@@ -83,6 +86,7 @@ urlpatterns = [
     path("system-permissions/users/", SystemPermissionUserListView.as_view()),
     path("system-permissions/users/<int:user_id>/", SystemPermissionUserDetailView.as_view()),
     path("system-monitor/llm-status/", SystemMonitorLLMStatusView.as_view()),
+    path("audit-events/", AuditEventListView.as_view()),
     path("messages/", InternalMessageListCreateView.as_view()),
     path("messages/<int:message_id>/", InternalMessageDetailView.as_view()),
 ]

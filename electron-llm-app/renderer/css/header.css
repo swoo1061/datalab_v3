@@ -792,3 +792,1765 @@
   text-align: center;
   padding: 18px 0 10px;
 }
+
+/* ==============================
+   Header Mode + Agent Panel
+============================== */
+
+.header-mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-right: 8px;
+  background: #ffffff;
+}
+
+.header-mode-toggle .mode-btn {
+  height: 34px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+}
+
+.header-mode-toggle .mode-btn.active {
+  background: #111827;
+  color: #ffffff;
+}
+
+.header-ai-launch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-ai-launch .ai-launch-btn {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.header-ai-launch .ai-launch-btn.active {
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}
+
+.header-ai-launch.cat-roam-zone {
+  position: relative;
+  width: min(640px, 100%);
+  height: 46px;
+  overflow: hidden;
+}
+
+.header-ai-launch .ai-cat-runner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 94px;
+  height: 46px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transform: translate3d(12px, 0, 0);
+  z-index: 6;
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.header-ai-launch .ai-cat {
+  position: relative;
+  width: 92px;
+  height: 46px;
+  transform-origin: center bottom;
+  animation: aiCatIdle 2.8s ease-in-out infinite;
+  filter: drop-shadow(0 4px 8px rgba(17, 24, 39, 0.22));
+}
+
+.header-ai-launch .ai-cat-runner:hover .ai-cat {
+  filter: drop-shadow(0 6px 12px rgba(17, 24, 39, 0.28));
+}
+
+.header-ai-launch .cat-shadow {
+  position: absolute;
+  left: 20px;
+  bottom: 0;
+  width: 54px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.18);
+}
+
+.header-ai-launch .cat-body {
+  position: absolute;
+  left: 28px;
+  bottom: 12px;
+  width: 32px;
+  height: 18px;
+  border-radius: 15px;
+  background: #c7ccd6;
+  border: 2px solid #0f172a;
+}
+
+.header-ai-launch .cat-body .stripe {
+  position: absolute;
+  width: 5px;
+  height: 10px;
+  border-radius: 4px;
+  background: #111827;
+  opacity: 0.95;
+}
+
+.header-ai-launch .cat-body .stripe.b1 { left: 5px; top: 3px; transform: rotate(-15deg); }
+.header-ai-launch .cat-body .stripe.b2 { left: 13px; top: 2px; transform: rotate(8deg); }
+.header-ai-launch .cat-body .stripe.b3 { left: 21px; top: 3px; transform: rotate(-8deg); }
+
+.header-ai-launch .cat-head {
+  position: absolute;
+  left: 56px;
+  bottom: 16px;
+  width: 28px;
+  height: 24px;
+  border-radius: 50%;
+  background: #d9dde4;
+  border: 2px solid #0f172a;
+}
+
+.header-ai-launch .cat-head .ear {
+  position: absolute;
+  top: -9px;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  border: 2px solid #0f172a;
+  background: #c6cbd6;
+  transform: rotate(45deg);
+}
+
+.header-ai-launch .cat-head .ear.left { left: 2px; }
+.header-ai-launch .cat-head .ear.right { right: 2px; }
+.header-ai-launch .cat-head .ear .inner {
+  position: absolute;
+  inset: 2px;
+  border-radius: 2px;
+  background: #f6c9d0;
+}
+
+.header-ai-launch .cat-head .forehead-stripe {
+  position: absolute;
+  top: 1px;
+  width: 4px;
+  height: 7px;
+  border-radius: 3px;
+  background: #111827;
+}
+.header-ai-launch .cat-head .forehead-stripe.f1 { left: 9px; transform: rotate(-11deg); }
+.header-ai-launch .cat-head .forehead-stripe.f2 { left: 15px; transform: rotate(9deg); }
+
+.header-ai-launch .cat-head .eye {
+  position: absolute;
+  top: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #0f172a;
+}
+.header-ai-launch .cat-head .eye::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #111827;
+}
+.header-ai-launch .cat-head .eye.left { left: 3px; animation: aiCatBlinkEye 3.8s infinite; }
+.header-ai-launch .cat-head .eye.right { right: 3px; animation: aiCatBlinkEye 3.8s infinite; }
+
+.header-ai-launch .cat-head .nose {
+  position: absolute;
+  left: 50%;
+  top: 16px;
+  width: 5px;
+  height: 4px;
+  margin-left: -2.5px;
+  border-radius: 2px;
+  background: #111827;
+}
+
+.header-ai-launch .cat-head .mouth {
+  position: absolute;
+  left: 50%;
+  top: 20px;
+  width: 8px;
+  height: 4px;
+  margin-left: -4px;
+  border-bottom: 2px solid #111827;
+  border-radius: 0 0 8px 8px;
+}
+
+.header-ai-launch .cat-head .whisker {
+  position: absolute;
+  top: 16px;
+  width: 10px;
+  height: 1.5px;
+  background: #0f172a;
+  transform-origin: left center;
+}
+.header-ai-launch .cat-head .whisker.w1 { left: -8px; transform: rotate(-12deg); }
+.header-ai-launch .cat-head .whisker.w2 { left: -8px; top: 19px; transform: rotate(8deg); }
+.header-ai-launch .cat-head .whisker.w3 { right: -10px; transform: rotate(12deg); }
+.header-ai-launch .cat-head .whisker.w4 { right: -10px; top: 19px; transform: rotate(-8deg); }
+
+.header-ai-launch .cat-tail {
+  position: absolute;
+  left: 16px;
+  bottom: 19px;
+  width: 17px;
+  height: 7px;
+  border-radius: 7px;
+  border: 2px solid #0f172a;
+  border-right: none;
+  background: #b7bdc9;
+  transform-origin: right center;
+  animation: aiCatTailIdle 2.2s ease-in-out infinite alternate;
+}
+
+.header-ai-launch .cat-leg {
+  position: absolute;
+  bottom: 4px;
+  width: 7px;
+  height: 14px;
+  border-radius: 5px;
+  background: #d5d9e0;
+  border: 2px solid #0f172a;
+  transform-origin: top center;
+}
+.header-ai-launch .cat-leg.back-left { left: 33px; }
+.header-ai-launch .cat-leg.back-right { left: 43px; }
+.header-ai-launch .cat-leg.front-left { left: 56px; }
+.header-ai-launch .cat-leg.front-right { left: 66px; }
+
+.header-ai-launch .ai-cat-runner.is-moving .cat-leg.back-left,
+.header-ai-launch .ai-cat-runner.is-moving .cat-leg.front-right {
+  animation: aiCatLegA 0.64s ease-in-out infinite;
+}
+
+.header-ai-launch .ai-cat-runner.is-moving .cat-leg.back-right,
+.header-ai-launch .ai-cat-runner.is-moving .cat-leg.front-left {
+  animation: aiCatLegB 0.64s ease-in-out infinite;
+}
+
+.header-ai-launch .ai-cat-runner.is-moving .cat-tail {
+  animation: aiCatTailWalk 0.64s ease-in-out infinite alternate;
+}
+
+.header-ai-launch .ai-cat-runner.active .cat-body {
+  left: 30px;
+  bottom: 10px;
+  width: 28px;
+  height: 20px;
+}
+.header-ai-launch .ai-cat-runner.active .cat-head {
+  left: 54px;
+  bottom: 19px;
+}
+.header-ai-launch .ai-cat-runner.active .cat-tail {
+  left: 18px;
+  bottom: 12px;
+  width: 12px;
+  transform: rotate(-24deg);
+  animation: none;
+}
+.header-ai-launch .ai-cat-runner.active .cat-leg {
+  animation: none;
+  height: 16px;
+}
+.header-ai-launch .ai-cat-runner.active .cat-leg.back-left { left: 36px; }
+.header-ai-launch .ai-cat-runner.active .cat-leg.back-right { left: 45px; }
+.header-ai-launch .ai-cat-runner.active .cat-leg.front-left { left: 56px; }
+.header-ai-launch .ai-cat-runner.active .cat-leg.front-right { left: 65px; }
+.header-ai-launch .ai-cat-runner.active .ai-cat {
+  animation: aiCatSitIdle 2.6s ease-in-out infinite;
+}
+
+.header-ai-launch .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes aiCatIdle {
+  0%, 100% { transform: translateY(0) rotate(-0.35deg); }
+  50% { transform: translateY(-0.45px) rotate(0.35deg); }
+}
+
+@keyframes aiCatSitIdle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-0.35px) rotate(0.12deg); }
+}
+
+@keyframes aiCatLegA {
+  0%, 100% { transform: rotate(8deg); }
+  50% { transform: rotate(-8deg); }
+}
+
+@keyframes aiCatLegB {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+
+@keyframes aiCatTailIdle {
+  0% { transform: rotate(-8deg); }
+  100% { transform: rotate(4deg); }
+}
+
+@keyframes aiCatTailWalk {
+  0% { transform: rotate(-12deg); }
+  100% { transform: rotate(10deg); }
+}
+
+@keyframes aiCatBlinkEye {
+  0%, 46%, 50%, 100% { transform: scaleY(1); }
+  48% { transform: scaleY(0.2); }
+}
+
+/* Refined cat skin: minimal silhouette, less toy-like */
+.header-ai-launch .ai-cat {
+  width: 74px;
+  height: 42px;
+  animation: none;
+  filter: drop-shadow(0 3px 8px rgba(15, 23, 42, 0.2));
+}
+
+.header-ai-launch .cat-shadow {
+  left: 16px;
+  width: 42px;
+  height: 8px;
+  background: rgba(15, 23, 42, 0.14);
+}
+
+.header-ai-launch .cat-core {
+  position: absolute;
+  left: 18px;
+  bottom: 10px;
+  width: 30px;
+  height: 24px;
+  border-radius: 14px 14px 12px 12px;
+  background: linear-gradient(180deg, #7f8b9f 0%, #647187 100%);
+  border: 1.5px solid #3b4658;
+}
+
+.header-ai-launch .cat-ear {
+  position: absolute;
+  top: 3px;
+  width: 10px;
+  height: 10px;
+  background: #718096;
+  border: 1.5px solid #3b4658;
+  transform: rotate(45deg);
+  border-radius: 2px;
+}
+
+.header-ai-launch .cat-ear.left { left: 21px; }
+.header-ai-launch .cat-ear.right { left: 35px; }
+
+.header-ai-launch .cat-eye {
+  position: absolute;
+  top: 15px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #111827;
+  animation: aiCatBlinkDot 4.5s ease-in-out infinite;
+}
+
+.header-ai-launch .cat-eye.left { left: 29px; }
+.header-ai-launch .cat-eye.right { left: 38px; }
+
+.header-ai-launch .cat-tail {
+  left: 9px;
+  bottom: 16px;
+  width: 12px;
+  height: 5px;
+  border-radius: 999px;
+  background: #6b778c;
+  border: 1.5px solid #3b4658;
+  animation: aiCatTailRefined 2.8s ease-in-out infinite alternate;
+}
+
+.header-ai-launch .cat-base {
+  position: absolute;
+  left: 22px;
+  bottom: 6px;
+  width: 22px;
+  height: 10px;
+  border-radius: 6px;
+  background: #d2d9e4;
+  border: 1.5px solid #3b4658;
+}
+
+.header-ai-launch .ai-cat-runner.is-moving .cat-base {
+  animation: aiCatBaseMove 0.85s ease-in-out infinite;
+}
+
+.header-ai-launch .ai-cat-runner.is-sitting .cat-core {
+  bottom: 9px;
+  width: 28px;
+  height: 26px;
+  border-radius: 16px 16px 10px 10px;
+}
+
+.header-ai-launch .ai-cat-runner.is-sitting .cat-tail {
+  bottom: 9px;
+  left: 12px;
+  width: 9px;
+  transform: rotate(-16deg);
+  animation: none;
+}
+
+.header-ai-launch .ai-cat-runner.is-sitting .cat-base {
+  width: 18px;
+  left: 25px;
+  animation: none;
+}
+
+/* Hide old detailed parts if cache/layout still references them */
+.header-ai-launch .cat-body,
+.header-ai-launch .cat-head,
+.header-ai-launch .cat-leg,
+.header-ai-launch .stripe,
+.header-ai-launch .forehead-stripe,
+.header-ai-launch .whisker,
+.header-ai-launch .mouth,
+.header-ai-launch .nose {
+  display: none;
+}
+
+@keyframes aiCatBlinkDot {
+  0%, 47%, 51%, 100% { transform: scaleY(1); }
+  49% { transform: scaleY(0.15); }
+}
+
+@keyframes aiCatTailRefined {
+  0% { transform: rotate(-10deg); }
+  100% { transform: rotate(8deg); }
+}
+
+@keyframes aiCatBaseMove {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+
+/* Cat Visual V3: clean illustration with walk/sit poses */
+.header-ai-launch .ai-cat {
+  width: 94px;
+  height: 46px;
+  animation: none !important;
+  filter: drop-shadow(0 3px 7px rgba(15, 23, 42, 0.22));
+}
+
+.header-ai-launch .cat-figure {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+
+.header-ai-launch .cat-figure svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.header-ai-launch .cat-figure.walk { display: block; }
+.header-ai-launch .cat-figure.sit { display: none; }
+
+.header-ai-launch .ai-cat-runner.is-sitting .cat-figure.walk { display: none; }
+.header-ai-launch .ai-cat-runner.is-sitting .cat-figure.sit { display: block; }
+
+.header-ai-launch .ai-cat-runner.is-moving .cat-figure.walk {
+  animation: catWalkPulse 0.9s ease-in-out infinite;
+}
+
+.header-ai-launch .ai-cat-runner.is-sitting .cat-figure.sit {
+  animation: catSitBreath 2.2s ease-in-out infinite;
+}
+
+/* Disable old handcrafted parts */
+.header-ai-launch .cat-core,
+.header-ai-launch .cat-ear,
+.header-ai-launch .cat-eye,
+.header-ai-launch .cat-tail,
+.header-ai-launch .cat-base,
+.header-ai-launch .cat-body,
+.header-ai-launch .cat-head,
+.header-ai-launch .cat-leg,
+.header-ai-launch .stripe,
+.header-ai-launch .forehead-stripe,
+.header-ai-launch .whisker,
+.header-ai-launch .mouth,
+.header-ai-launch .nose,
+.header-ai-launch .cat-shadow {
+  display: none !important;
+}
+
+@keyframes catWalkPulse {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.7px); }
+}
+
+@keyframes catSitBreath {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-0.5px) scale(1.01); }
+}
+
+/* Real-cat visual override */
+.header-ai-launch .ai-cat {
+  width: 98px !important;
+  height: 48px !important;
+  animation: none !important;
+  filter: drop-shadow(0 4px 10px rgba(15, 23, 42, 0.24)) !important;
+}
+
+.header-ai-launch .cat-photo-wrap {
+  position: absolute;
+  inset: 0;
+  display: block !important;
+}
+
+.header-ai-launch .cat-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.header-ai-launch .cat-photo.walk {
+  display: block;
+}
+
+.header-ai-launch .ai-cat-runner.is-sitting .cat-photo.walk {
+  display: none;
+}
+
+.header-ai-launch .ai-cat-runner.is-sitting .cat-photo.sit {
+  display: block;
+}
+
+.header-ai-launch .ai-cat-runner.is-moving .cat-photo.walk {
+  animation: catWalkPulse 0.95s ease-in-out infinite;
+}
+
+.header-ai-launch .ai-cat-runner.is-sitting .cat-photo.sit {
+  animation: catSitBreath 2.6s ease-in-out infinite;
+}
+
+/* hide legacy handcrafted pieces */
+.header-ai-launch .cat-core,
+.header-ai-launch .cat-ear,
+.header-ai-launch .cat-eye,
+.header-ai-launch .cat-tail,
+.header-ai-launch .cat-base,
+.header-ai-launch .cat-body,
+.header-ai-launch .cat-head,
+.header-ai-launch .cat-leg,
+.header-ai-launch .stripe,
+.header-ai-launch .forehead-stripe,
+.header-ai-launch .whisker,
+.header-ai-launch .mouth,
+.header-ai-launch .nose,
+.header-ai-launch .cat-shadow,
+.header-ai-launch .cat-figure {
+  display: none !important;
+}
+
+
+.agent-panel {
+  position: fixed;
+  top: calc(var(--header-h, 56px) + 8px);
+  right: 14px;
+  width: 360px;
+  max-width: calc(100vw - 28px);
+  height: calc(100vh - var(--header-h, 56px) - 20px);
+  background: #ffffff;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+  z-index: 3200;
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-panel-head {
+  height: 46px;
+  padding: 0 12px;
+  border-bottom: 1px solid #eef2f7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #111827;
+}
+
+.agent-close-btn {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.agent-chat-tools {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.agent-chat-tools select {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 12px;
+  color: #111827;
+  padding: 0 8px;
+}
+
+.agent-chat-tools button {
+  height: 30px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #111827;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.agent-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-empty {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.agent-message {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agent-message.user {
+  align-items: flex-end;
+}
+
+.agent-bubble {
+  max-width: 90%;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.agent-message.user .agent-bubble {
+  background: #111827;
+  color: #ffffff;
+}
+
+.agent-message.assistant .agent-bubble {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.agent-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.agent-action-btn {
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  border-radius: 8px;
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.agent-input-row {
+  border-top: 1px solid #eef2f7;
+  padding: 10px;
+  display: flex;
+  gap: 6px;
+}
+
+.agent-input-row input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: #111827;
+}
+
+.agent-input-row button {
+  border: none;
+  background: #111827;
+  color: #ffffff;
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+/* Motion/ratio tuning */
+.header-ai-launch.cat-roam-zone {
+  height: 52px !important;
+}
+
+.header-ai-launch .ai-cat-runner {
+  width: 110px !important;
+  height: 52px !important;
+  top: 0 !important;
+}
+
+.header-ai-launch .ai-cat {
+  width: 110px !important;
+  height: 52px !important;
+  animation: none !important;
+  filter: drop-shadow(0 3px 8px rgba(15, 23, 42, 0.2)) !important;
+}
+
+.header-ai-launch .cat-photo {
+  object-fit: contain !important;
+  image-rendering: auto;
+}
+
+.header-ai-launch .ai-cat-runner.is-moving .cat-photo.walk {
+  animation: catWalkStep 0.6s ease-in-out infinite !important;
+}
+
+.header-ai-launch .ai-cat-runner.is-sitting .cat-photo.sit {
+  animation: catSitBreath 2.4s ease-in-out infinite !important;
+}
+
+@keyframes catWalkStep {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.35px); }
+}
+
+/* Final AI cat skin (asset-based) */
+.header-ai-launch.cat-roam-zone {
+  position: relative;
+  width: min(640px, 100%);
+  height: 48px;
+  overflow: hidden;
+}
+
+.header-ai-launch .ai-cat-runner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 98px;
+  height: 48px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate3d(12px, 0, 0);
+  cursor: pointer;
+  z-index: 12;
+}
+
+.header-ai-launch .ai-cat {
+  position: relative;
+  width: 98px;
+  height: 48px;
+  filter: drop-shadow(0 4px 10px rgba(15, 23, 42, 0.24));
+}
+
+.header-ai-launch .cat-photo-wrap {
+  position: absolute;
+  inset: 0;
+}
+
+.header-ai-launch .cat-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+}
+
+.header-ai-launch .cat-photo.walk { display: block; }
+.header-ai-launch .cat-photo.sit { display: none; }
+
+.header-ai-launch .ai-cat-runner.is-sitting .cat-photo.walk { display: none; }
+.header-ai-launch .ai-cat-runner.is-sitting .cat-photo.sit { display: block; }
+
+.header-ai-launch .ai-cat-runner.is-moving .cat-photo.walk {
+  animation: catWalkPulse 0.95s ease-in-out infinite;
+}
+
+.header-ai-launch .ai-cat-runner.is-sitting .cat-photo.sit {
+  animation: catSitBreath 2.6s ease-in-out infinite;
+}
+
+.header-ai-launch .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* CAT HOTFIX: force-override at file end */
+#appHeader .header-center .header-ai-launch {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone {
+  position: relative !important;
+  width: min(640px, 100%) !important;
+  height: 52px !important;
+  overflow: hidden !important;
+}
+
+#appHeader .header-center .header-ai-launch .ai-launch-btn {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch .ai-cat-runner {
+  display: inline-flex !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 110px !important;
+  height: 52px !important;
+  transform: translate3d(12px, 0, 0) !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  z-index: 30 !important;
+}
+
+#appHeader .header-center .header-ai-launch .ai-cat {
+  width: 110px !important;
+  height: 52px !important;
+  animation: none !important;
+  filter: drop-shadow(0 3px 8px rgba(15, 23, 42, 0.2)) !important;
+}
+
+#appHeader .header-center .header-ai-launch .cat-photo-wrap {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+}
+
+#appHeader .header-center .header-ai-launch .cat-photo {
+  display: none !important;
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+#appHeader .header-center .header-ai-launch .cat-photo.walk {
+  display: block !important;
+}
+
+#appHeader .header-center .header-ai-launch .ai-cat-runner.is-sitting .cat-photo.walk {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch .ai-cat-runner.is-sitting .cat-photo.sit {
+  display: block !important;
+}
+
+/* rollback mode: plain AI button */
+#appHeader .header-center .header-ai-launch:not(.cat-roam-zone) .ai-launch-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#appHeader .header-center .header-ai-launch:not(.cat-roam-zone) .ai-cat-runner {
+  display: none !important;
+}
+
+/* Stable AI launcher override */
+#appHeader .header-center .header-ai-launch {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#appHeader .header-center .header-ai-launch .ai-cat-runner {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch .ai-launch-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 38px !important;
+  padding: 6px 12px !important;
+  border-radius: 999px !important;
+}
+
+#appHeader .header-center .header-ai-launch .ai-launch-btn .ai-launch-icon {
+  width: 24px !important;
+  height: 24px !important;
+  object-fit: cover !important;
+  border-radius: 50% !important;
+  flex: 0 0 24px !important;
+}
+
+/* Final: roaming cat in header (no button UI) */
+#appHeader .header-center .header-ai-launch.cat-roam-zone {
+  position: relative !important;
+  width: min(640px, 100%) !important;
+  height: 56px !important;
+  overflow: visible !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-launch-btn {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner {
+  display: inline-flex !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: auto !important;
+  bottom: -1px !important;
+  width: 110px !important;
+  height: 42px !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  z-index: 120 !important;
+  transform: translate3d(12px, 0, 0) scaleX(1);
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  pointer-events: auto !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat {
+  position: relative !important;
+  width: 110px !important;
+  height: 42px !important;
+  filter: drop-shadow(0 4px 12px rgba(17, 24, 39, 0.2)) !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo-wrap {
+  position: absolute !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center bottom !important;
+  image-rendering: -webkit-optimize-contrast !important;
+  display: none !important;
+  background: transparent !important;
+  mix-blend-mode: normal !important;
+  pointer-events: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo.walk {
+  display: block !important;
+  transform: scale(0.78) translateY(0) !important;
+  transform-origin: center bottom !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo.walk-b {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo.walk-c {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo.walk-legs {
+  display: none !important;
+  clip-path: polygon(0 56%, 100% 56%, 100% 100%, 0 100%) !important;
+  transform-origin: center bottom !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving .cat-photo.walk-legs-a {
+  display: block !important;
+  transform: scale(var(--cat-walk-scale)) translate(-1px, 1px) rotate(-1.2deg) !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving .cat-photo.walk-legs-b {
+  display: block !important;
+  transform: scale(var(--cat-walk-scale)) translate(1px, 0px) rotate(1.2deg) !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo.stretch {
+  display: none !important;
+  transform: scale(0.62) translateY(0) !important;
+  transform-origin: center bottom !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-step-1 .cat-photo.walk-a {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-step-1 .cat-photo.walk-b {
+  display: block !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-step-2 .cat-photo.walk-a {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-step-2 .cat-photo.walk-b {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-step-2 .cat-photo.walk-c {
+  display: block !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-sitting .cat-photo.walk {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-sitting .cat-photo.sit {
+  display: block !important;
+  transform: scale(0.9) translateY(0) !important;
+  transform-origin: center bottom !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-resting .cat-photo.walk,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-resting .cat-photo.stretch,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-resting .cat-photo.sit-side {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-resting .cat-photo.sit {
+  display: block !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-stretching .cat-photo.walk,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-stretching .cat-photo.sit {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-stretching .cat-photo.stretch {
+  display: block !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving .cat-photo.walk {
+  animation: none !important;
+}
+
+/* Final independent sizing per pose (walk/sit/stretch) */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner {
+  --cat-walk-scale: 0.74;
+  --cat-sit-scale: 0.90;
+  --cat-sit-side-scale: 1.0;
+  --cat-stretch-scale: 0.95;
+  --cat-walk-y: 0px;
+  --cat-sit-y: 0px;
+  --cat-sit-side-y: 0px;
+  --cat-stretch-y: 0px;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo.walk {
+  transform: scale(var(--cat-walk-scale)) translateY(var(--cat-walk-y)) !important;
+  transform-origin: center bottom !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-step-1 .cat-photo.walk-b {
+  transform: scale(calc(var(--cat-walk-scale) * 1.01)) translate(1px, -1px) rotate(-1.2deg) !important;
+  transform-origin: center bottom !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-step-2 .cat-photo.walk-c {
+  transform: scale(calc(var(--cat-walk-scale) * 0.99)) translate(-1px, 0px) rotate(1.2deg) !important;
+  transform-origin: center bottom !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-step-1 .cat-photo.walk-legs-a {
+  transform: scale(var(--cat-walk-scale)) translate(-2px, 1px) rotate(-2.2deg) !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-step-1 .cat-photo.walk-legs-b {
+  transform: scale(var(--cat-walk-scale)) translate(2px, 0px) rotate(2.2deg) !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-step-2 .cat-photo.walk-legs-a {
+  transform: scale(var(--cat-walk-scale)) translate(2px, 0px) rotate(2.2deg) !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-step-2 .cat-photo.walk-legs-b {
+  transform: scale(var(--cat-walk-scale)) translate(-2px, 1px) rotate(-2.2deg) !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-sitting .cat-photo.sit {
+  transform: scale(var(--cat-sit-scale)) translateY(var(--cat-sit-y)) !important;
+  transform-origin: center bottom !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo.sit-side {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-idle-sit .cat-photo.walk,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-idle-sit .cat-photo.sit,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-idle-sit .cat-photo.stretch {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-idle-sit .cat-photo.sit-side {
+  display: block !important;
+  transform: scale(var(--cat-sit-side-scale)) translateY(var(--cat-sit-side-y)) !important;
+  transform-origin: center bottom !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-stretching .cat-photo.stretch {
+  transform: scale(var(--cat-stretch-scale)) translateY(var(--cat-stretch-y)) !important;
+  transform-origin: center bottom !important;
+}
+
+/* Walk motion boost */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo.walk {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="0"] .cat-photo.walk-f0,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="1"] .cat-photo.walk-f1,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="2"] .cat-photo.walk-f2,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="3"] .cat-photo.walk-f3,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="4"] .cat-photo.walk-f4,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="5"] .cat-photo.walk-f5 {
+  display: block !important;
+  transform: scale(var(--cat-walk-scale)) translateY(var(--cat-walk-y)) !important;
+  transform-origin: center bottom !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="1"] .cat-photo.walk-f1,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="2"] .cat-photo.walk-f2 {
+  transform: scale(var(--cat-walk-scale)) translate(3px, 0px) !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="4"] .cat-photo.walk-f4,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="5"] .cat-photo.walk-f5 {
+  transform: scale(var(--cat-walk-scale)) translate(-3px, 0px) !important;
+}
+
+/* Final walk cycle: 6-frame sprite switching */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo.walk {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="0"] .cat-photo.walk-f0,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="1"] .cat-photo.walk-f1,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="2"] .cat-photo.walk-f2,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="3"] .cat-photo.walk-f3,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="4"] .cat-photo.walk-f4,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="5"] .cat-photo.walk-f5 {
+  display: block !important;
+}
+
+/* Final leg-motion overlay (strong visual walk) */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo.leg-overlay {
+  display: none !important;
+  transform-origin: center bottom !important;
+  pointer-events: none !important;
+  opacity: 0.92 !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving .cat-photo.leg-overlay-a,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving .cat-photo.leg-overlay-b {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving .cat-photo.leg-overlay-a {
+  clip-path: polygon(0 58%, 52% 58%, 52% 100%, 0 100%) !important;
+  animation: legSwingA 0.62s cubic-bezier(0.42, 0, 0.2, 1) infinite !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving .cat-photo.leg-overlay-b {
+  clip-path: polygon(48% 58%, 100% 58%, 100% 100%, 48% 100%) !important;
+  animation: legSwingB 0.62s cubic-bezier(0.42, 0, 0.2, 1) infinite !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-sitting .cat-photo.leg-overlay,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-stretching .cat-photo.leg-overlay,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-idle-sit .cat-photo.leg-overlay,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-resting .cat-photo.leg-overlay {
+  display: none !important;
+}
+
+@keyframes legSwingA {
+  0%, 18% { transform: scale(var(--cat-walk-scale)) translate(-0.4px, 0.7px) rotate(-0.3deg); }
+  36% { transform: scale(var(--cat-walk-scale)) translate(0.8px, -0.7px) rotate(0.5deg); }
+  52%, 100% { transform: scale(var(--cat-walk-scale)) translate(-0.2px, 0.5px) rotate(-0.2deg); }
+}
+
+@keyframes legSwingB {
+  0%, 18% { transform: scale(var(--cat-walk-scale)) translate(0.3px, 0.7px) rotate(0.2deg); }
+  36% { transform: scale(var(--cat-walk-scale)) translate(-0.7px, -0.7px) rotate(-0.5deg); }
+  52%, 100% { transform: scale(var(--cat-walk-scale)) translate(0.2px, 0.5px) rotate(0.2deg); }
+}
+
+/* === Cat Motion Final Override (single source of truth) === */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner {
+  --cat-walk-scale: 0.74;
+  --cat-sit-scale: 0.84;
+  --cat-sit-side-scale: 0.84;
+  --cat-stretch-scale: 0.92;
+  --cat-walk-y: 0px;
+  --cat-sit-y: 0px;
+  --cat-sit-side-y: 0px;
+  --cat-stretch-y: 0px;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo-wrap {
+  overflow: visible !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo {
+  display: none !important;
+  background: transparent !important;
+  filter: none !important;
+  image-rendering: auto !important;
+  transform-origin: center bottom !important;
+  backface-visibility: hidden !important;
+  will-change: transform, opacity !important;
+  transition: transform 90ms linear !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo.leg-overlay {
+  display: none !important;
+}
+
+/* moving: show only walk frames */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving .cat-photo.walk {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="0"] .cat-photo.walk-f0,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="1"] .cat-photo.walk-f1,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="2"] .cat-photo.walk-f2,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="3"] .cat-photo.walk-f3,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="4"] .cat-photo.walk-f4,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="5"] .cat-photo.walk-f5 {
+  display: block !important;
+}
+
+/* walk feels forward/backward by step */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="0"] .cat-photo.walk-f0 {
+  transform: scale(var(--cat-walk-scale)) translate(0px, 0px) !important;
+}
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="1"] .cat-photo.walk-f1 {
+  transform: scale(var(--cat-walk-scale)) translate(1px, 0px) !important;
+}
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="2"] .cat-photo.walk-f2 {
+  transform: scale(var(--cat-walk-scale)) translate(1px, 0px) !important;
+}
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="3"] .cat-photo.walk-f3 {
+  transform: scale(var(--cat-walk-scale)) translate(0px, 0px) !important;
+}
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="4"] .cat-photo.walk-f4 {
+  transform: scale(var(--cat-walk-scale)) translate(-1px, 0px) !important;
+}
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="5"] .cat-photo.walk-f5 {
+  transform: scale(var(--cat-walk-scale)) translate(-1px, 0px) !important;
+}
+
+/* default non-moving: sit */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner:not(.is-moving):not(.is-idle-sit):not(.is-stretching) .cat-photo.sit {
+  display: block !important;
+  transform: scale(var(--cat-sit-scale)) translateY(var(--cat-sit-y)) !important;
+}
+
+/* alternate idle sit */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-idle-sit .cat-photo.sit-side {
+  display: block !important;
+  transform: scale(var(--cat-sit-side-scale)) translateY(var(--cat-sit-side-y)) !important;
+}
+
+/* stretch */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-stretching .cat-photo.stretch {
+  display: block !important;
+  transform: scale(var(--cat-stretch-scale)) translateY(var(--cat-stretch-y)) !important;
+}
+
+/* step 14 uses only walk-f14 (no frame overlap) */
+
+/* === Cat Size Sync Hotfix === */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner {
+  --cat-walk-scale: 1.02 !important;
+  --cat-sit-scale: 0.72 !important;
+  --cat-sit-side-scale: 0.75 !important;
+  --cat-stretch-scale: 0.83 !important;
+  --cat-walk-y: 0px !important;
+  --cat-sit-y: 0px !important;
+  --cat-sit-side-y: 0px !important;
+  --cat-stretch-y: 0px !important;
+}
+
+/* Final hard-stop: no wobble frames, single walk image only */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo {
+  transition: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving .cat-photo.walk {
+  display: block !important;
+  animation: none !important;
+  transform: scale(var(--cat-walk-scale)) translateY(var(--cat-walk-y)) !important;
+}
+
+/* Final walk override: 8-frame only */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving .cat-photo.walk {
+  display: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="0"] .cat-photo.walk-f0,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="1"] .cat-photo.walk-f1,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="2"] .cat-photo.walk-f2,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="3"] .cat-photo.walk-f3,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="4"] .cat-photo.walk-f4,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="5"] .cat-photo.walk-f5,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="6"] .cat-photo.walk-f6,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="7"] .cat-photo.walk-f7,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="8"] .cat-photo.walk-f8,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="9"] .cat-photo.walk-f9,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="10"] .cat-photo.walk-f10,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="11"] .cat-photo.walk-f11,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="12"] .cat-photo.walk-f12,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="13"] .cat-photo.walk-f13,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="14"] .cat-photo.walk-f14,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="15"] .cat-photo.walk-f15,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="16"] .cat-photo.walk-f16,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="17"] .cat-photo.walk-f17,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="18"] .cat-photo.walk-f18,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="19"] .cat-photo.walk-f19,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="20"] .cat-photo.walk-f20,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="21"] .cat-photo.walk-f21 {
+  display: block !important;
+  animation: none !important;
+  transform: scale(var(--cat-walk-scale)) translateY(var(--cat-walk-y)) !important;
+}
+
+/* Frame-fit override: prevent clipping with mixed image ratios */
+#appHeader .header-center .header-ai-launch.cat-roam-zone {
+  height: 52px !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner {
+  width: 118px !important;
+  height: 52px !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat {
+  width: 118px !important;
+  height: 52px !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo-wrap {
+  overflow: visible !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center bottom !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner {
+  --cat-walk-scale: 0.70;
+  --cat-sit-scale: 0.70;
+  --cat-sit-side-scale: 0.70;
+  --cat-stretch-scale: 0.74;
+}
+
+/* === Cat Final Lock (single active sizing/motion) === */
+#appHeader .header-center .header-ai-launch.cat-roam-zone {
+  height: 52px !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo-wrap {
+  width: 118px !important;
+  height: 52px !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo-wrap {
+  overflow: visible !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .cat-photo {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center bottom !important;
+  background: transparent !important;
+  display: none !important;
+  transform-origin: center bottom !important;
+  transition: none !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner {
+  --cat-walk-scale: 0.50 !important;
+  --cat-sit-scale: 0.86 !important;
+  --cat-sit-side-scale: 0.86 !important;
+  --cat-stretch-scale: 0.86 !important;
+  --cat-walk-y: 0px !important;
+  --cat-sit-y: 0px !important;
+  --cat-sit-side-y: 0px !important;
+  --cat-stretch-y: 0px !important;
+}
+
+/* moving: 22 frames only */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="0"] .cat-photo.walk-f0,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="1"] .cat-photo.walk-f1,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="2"] .cat-photo.walk-f2,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="3"] .cat-photo.walk-f3,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="4"] .cat-photo.walk-f4,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="5"] .cat-photo.walk-f5,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="6"] .cat-photo.walk-f6,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="7"] .cat-photo.walk-f7,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="8"] .cat-photo.walk-f8,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="9"] .cat-photo.walk-f9,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="10"] .cat-photo.walk-f10,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="11"] .cat-photo.walk-f11,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="12"] .cat-photo.walk-f12,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="13"] .cat-photo.walk-f13,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="14"] .cat-photo.walk-f14,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="15"] .cat-photo.walk-f15,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="16"] .cat-photo.walk-f16,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="17"] .cat-photo.walk-f17,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="18"] .cat-photo.walk-f18,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="19"] .cat-photo.walk-f19,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="20"] .cat-photo.walk-f20,
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-moving[data-step="21"] .cat-photo.walk-f21 {
+  display: block !important;
+  transform: scale(var(--cat-walk-scale)) translateY(var(--cat-walk-y)) !important;
+}
+
+/* idle/pose states */
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner:not(.is-moving):not(.is-idle-sit):not(.is-stretching) .cat-photo.sit {
+  display: block !important;
+  transform: scale(var(--cat-sit-scale)) translateY(var(--cat-sit-y)) !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-idle-sit .cat-photo.sit-side {
+  display: block !important;
+  transform: scale(var(--cat-sit-side-scale)) translateY(var(--cat-sit-side-y)) !important;
+}
+
+#appHeader .header-center .header-ai-launch.cat-roam-zone .ai-cat-runner.is-stretching .cat-photo.stretch {
+  display: block !important;
+  transform: scale(var(--cat-stretch-scale)) translateY(var(--cat-stretch-y)) !important;
+}
+/* Agent UI refresh: match app tone (clean gray/blue), keep structure */
+.agent-panel {
+  background: linear-gradient(180deg, #fcfdff 0%, #f6f8fc 100%);
+  border: 1px solid #d7deea;
+  border-radius: 16px;
+  box-shadow: 0 16px 36px rgba(29, 45, 77, 0.16);
+}
+
+.agent-panel-head {
+  height: 50px;
+  padding: 0 12px 0 14px;
+  border-bottom: 1px solid #e4e9f3;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(4px);
+}
+
+.agent-panel-head strong {
+  font-size: 13px;
+  color: #1f2a44;
+  letter-spacing: 0.01em;
+}
+
+.agent-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-settings-btn,
+.agent-close-btn {
+  height: 30px;
+  min-width: 52px;
+  border-radius: 9px;
+  border: 1px solid #d5ddeb;
+  background: #ffffff;
+  color: #2f3d5d;
+  font-weight: 600;
+  font-size: 12px;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.agent-settings-btn:hover,
+.agent-close-btn:hover {
+  background: #f2f6ff;
+  border-color: #b9c7e0;
+}
+
+.agent-settings-btn:active,
+.agent-close-btn:active {
+  transform: translateY(1px);
+}
+
+.agent-chat-tools {
+  gap: 8px;
+  padding: 9px 10px;
+  border-bottom: 1px solid #e7ecf5;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.agent-chat-tools select,
+.agent-chat-tools button,
+.agent-input-row input,
+.agent-input-row button,
+.agent-settings-panel select {
+  border-radius: 10px;
+}
+
+.agent-chat-tools select {
+  height: 32px;
+  border: 1px solid #ced7e6;
+  background: #fff;
+  color: #24324d;
+}
+
+.agent-chat-tools button {
+  height: 32px;
+  border: 1px solid #ced7e6;
+  background: #fff;
+  color: #253352;
+  font-weight: 600;
+}
+
+.agent-chat-tools button:hover {
+  background: #edf3ff;
+  border-color: #b7c6e1;
+}
+
+.agent-settings-panel {
+  margin: 8px 10px 0;
+  padding: 10px;
+  border: 1px solid #dbe3f1;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8faff 0%, #f2f6ff 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.agent-settings-panel.hidden {
+  display: none;
+}
+
+.agent-setting-row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.agent-setting-row label {
+  font-size: 12px;
+  color: #31415f;
+  font-weight: 600;
+}
+
+.agent-settings-panel select {
+  height: 31px;
+  border: 1px solid #c8d3e7;
+  background: #fff;
+  color: #233250;
+  font-size: 12px;
+  padding: 0 8px;
+}
+
+.agent-setting-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  color: #2d3d5c;
+  font-size: 12px;
+}
+
+.agent-setting-check input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #5f84d8;
+}
+
+.agent-messages {
+  background:
+    radial-gradient(circle at top right, rgba(117, 152, 230, 0.07), transparent 48%),
+    linear-gradient(180deg, #fbfcff 0%, #f7f9fd 100%);
+  border-top: 1px solid #e8edf6;
+  border-bottom: 1px solid #e8edf6;
+  padding: 12px 10px;
+}
+
+.agent-msg.assistant {
+  background: #ffffff;
+  border: 1px solid #dce4f2;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8), 0 4px 10px rgba(21, 34, 58, 0.06);
+}
+
+.agent-msg.user {
+  background: #eaf2ff;
+  border: 1px solid #c8d9f5;
+  color: #213253;
+}
+
+.agent-input-row {
+  padding: 10px;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.agent-input-row input {
+  border: 1px solid #ccd6e8;
+  background: #fff;
+  color: #1f2d49;
+  height: 36px;
+}
+
+.agent-input-row input:focus {
+  border-color: #86a3df;
+  box-shadow: 0 0 0 3px rgba(104, 138, 214, 0.17);
+}
+
+.agent-input-row button {
+  height: 36px;
+  border: 1px solid #6f90d8;
+  background: linear-gradient(180deg, #88a8ea 0%, #6f90d8 100%);
+  color: #fff;
+  font-weight: 700;
+  padding: 0 14px;
+}
+
+.agent-input-row button:hover {
+  filter: brightness(1.03);
+}
+
+/* Agent font-size presets */
+.agent-panel.font-small .agent-settings-panel,
+.agent-panel.font-small .agent-messages,
+.agent-panel.font-small .agent-input-row,
+.agent-panel.font-small .agent-chat-tools {
+  font-size: 12px;
+}
+
+.agent-panel.font-small .agent-msg,
+.agent-panel.font-small .agent-empty,
+.agent-panel.font-small .agent-setting-row label,
+.agent-panel.font-small .agent-setting-check,
+.agent-panel.font-small .agent-input-row input,
+.agent-panel.font-small .agent-input-row button,
+.agent-panel.font-small .agent-chat-tools select,
+.agent-panel.font-small .agent-chat-tools button,
+.agent-panel.font-small .agent-settings-panel select {
+  font-size: 12px;
+}
+
+.agent-panel.font-normal .agent-msg,
+.agent-panel.font-normal .agent-empty,
+.agent-panel.font-normal .agent-setting-row label,
+.agent-panel.font-normal .agent-setting-check,
+.agent-panel.font-normal .agent-input-row input,
+.agent-panel.font-normal .agent-input-row button,
+.agent-panel.font-normal .agent-chat-tools select,
+.agent-panel.font-normal .agent-chat-tools button,
+.agent-panel.font-normal .agent-settings-panel select {
+  font-size: 13px;
+}
+
+.agent-panel.font-large .agent-settings-panel,
+.agent-panel.font-large .agent-messages,
+.agent-panel.font-large .agent-input-row,
+.agent-panel.font-large .agent-chat-tools {
+  font-size: 14px;
+}
+
+.agent-panel.font-large .agent-msg,
+.agent-panel.font-large .agent-empty,
+.agent-panel.font-large .agent-setting-row label,
+.agent-panel.font-large .agent-setting-check,
+.agent-panel.font-large .agent-input-row input,
+.agent-panel.font-large .agent-input-row button,
+.agent-panel.font-large .agent-chat-tools select,
+.agent-panel.font-large .agent-chat-tools button,
+.agent-panel.font-large .agent-settings-panel select {
+  font-size: 14px;
+}

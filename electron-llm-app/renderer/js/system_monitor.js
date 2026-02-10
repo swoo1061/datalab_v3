@@ -17,29 +17,6 @@ const state = {
 };
 const AUTO_REFRESH_STORAGE_KEY = "system_monitor_auto_refresh";
 
-const STATIC_CHECKS = [
-  { key: "accounts_me", label: "계정 인증 API", path: "/api/accounts/me/" },
-  { key: "accounts_users", label: "유저 목록 API", path: "/api/accounts/users/" },
-  { key: "clinics_list", label: "병원 목록 API", path: "/api/data/clinics/?limit=1" },
-  { key: "llm_models", label: "LLM 모델 목록 API", path: "/api/data/llm/models/" },
-  { key: "my_clinics", label: "내 병원 API", path: "/api/data/my-clinics/?months=1" },
-  { key: "favorites", label: "즐겨찾기 API", path: "/api/data/favorites/" },
-  { key: "calendar_memos", label: "캘린더 메모 API", path: "/api/data/calendar-memos/?limit=1" },
-  { key: "notifications", label: "알림 API", path: "/api/data/notifications/?limit=1" },
-  { key: "attendance_me", label: "출퇴근 API", path: "/api/data/attendance/me/" },
-  { key: "attendance_corrections", label: "정정요청 목록 API", path: "/api/data/attendance/me/corrections/?limit=1" },
-  { key: "attendance_admin_records", label: "출퇴근 관리 API", path: "/api/data/attendance/admin/records/?month=2026-02&status=all" },
-  { key: "attendance_admin_corrections", label: "정정요청 관리 API", path: "/api/data/attendance/admin/corrections/?month=2026-02&status=pending" },
-  { key: "vacation_me", label: "휴가 신청 API", path: "/api/data/vacations/me/?year=2026" },
-  { key: "vacation_admin", label: "휴가 관리 API", path: "/api/data/vacations/admin/?year=2026" },
-  { key: "employee_summary", label: "직원 관리 API", path: "/api/data/vacations/admin/summary/?year=2026" },
-  { key: "permissions_me", label: "내 권한 API", path: "/api/data/system-permissions/me/?key=web_dashboard_access" },
-  { key: "permissions_users", label: "권한 유저목록 API", path: "/api/data/system-permissions/users/" },
-  { key: "messages", label: "메일 API", path: "/api/data/messages/?box=inbox&limit=1" },
-  { key: "monitor_llm", label: "LLM 키 점검 API", path: "/api/data/system-monitor/llm-status/?connectivity=1" },
-  { key: "clinics_legacy", label: "병원 목록 API(legacy)", path: "/api/data/clinics/" },
-];
-
 function roleLabel(role) {
   const map = {
     admin: "ADMIN",
@@ -49,13 +26,6 @@ function roleLabel(role) {
   };
   const raw = String(role || "").toLowerCase();
   return map[raw] || (raw ? raw.toUpperCase() : "-");
-}
-
-async function buildHeaders() {
-  const headers = {};
-  const key = await window.session?.getKey?.();
-  if (key) headers["X-Sessionid"] = key;
-  return headers;
 }
 
 function formatDateTime(d) {
@@ -96,34 +66,6 @@ function statusText(item) {
   return `오류 (${item.status || "-"})`;
 }
 
-async function runSingleCheck(def) {
-  const headers = await buildHeaders();
-  const started = performance.now();
-  try {
-    const res = await fetch(`${window.API_BASE}${def.path}`, {
-      credentials: "include",
-      headers,
-    });
-    const latency = Math.round(performance.now() - started);
-    return {
-      key: def.key,
-      label: def.label,
-      ok: res.ok,
-      status: res.status,
-      latency,
-    };
-  } catch (e) {
-    const latency = Math.round(performance.now() - started);
-    return {
-      key: def.key,
-      label: def.label,
-      ok: false,
-      status: 0,
-      latency,
-    };
-  }
-}
-
 async function loadBaseInfo() {
   try {
     state.me = await window.api?.getMe?.();
@@ -137,55 +79,13 @@ async function loadBaseInfo() {
   }
 }
 
-async function loadChecks() {
-  const checks = await Promise.all(STATIC_CHECKS.map((def) => runSingleCheck(def)));
-
-  let firstClinicId = null;
-
+async function loadMonitorSnapshot() {
   try {
-    const headers = await buildHeaders();
-    const clinicsRes = await fetch(`${window.API_BASE}/api/data/clinics/?limit=1`, {
-      credentials: "include",
-      headers,
-    });
-    if (clinicsRes.ok) {
-      const clinicsData = await clinicsRes.json();
-      const first = Array.isArray(clinicsData?.results) ? clinicsData.results[0] : null;
-      firstClinicId = Number(first?.id || 0) || null;
-    }
-  } catch (_e) {}
-
-  const dynamicChecks = [];
-  if (firstClinicId) {
-    dynamicChecks.push(
-      { key: "clinic_detail", label: "병원 상세 API", path: `/api/data/clinics/${firstClinicId}/` },
-      { key: "clinic_doctors", label: "병원 의료진 API", path: `/api/data/clinics/${firstClinicId}/doctors/` },
-      { key: "clinic_worklogs", label: "병원 작업로그 API", path: `/api/data/clinics/${firstClinicId}/worklogs/` },
-      { key: "clinic_worklogs_summary", label: "작업로그 요약 API", path: `/api/data/clinics/${firstClinicId}/worklogs/summary/` },
-      { key: "clinic_posts", label: "병원 게시글 API", path: `/api/data/clinics/${firstClinicId}/posts/?type=all&platform=all` },
-      { key: "clinic_assignees", label: "병원 담당자 API", path: `/api/data/clinics/${firstClinicId}/assignees/` },
-      { key: "clinic_detail_legacy", label: "병원 상세 API(legacy)", path: `/api/data/clinics/${firstClinicId}/detail/` },
-    );
-  }
-
-  const dynamicResults = await Promise.all(dynamicChecks.map((def) => runSingleCheck(def)));
-  state.checks = [...checks, ...dynamicResults];
-}
-
-async function loadLlmStatus() {
-  const headers = await buildHeaders();
-  try {
-    const res = await fetch(`${window.API_BASE}/api/data/system-monitor/llm-status/?connectivity=1`, {
-      credentials: "include",
-      headers,
-    });
-    if (!res.ok) {
-      state.llm = [];
-      return;
-    }
-    const data = await res.json();
-    state.llm = Array.isArray(data?.providers) ? data.providers : [];
+    const data = await window.api?.getSystemMonitorSnapshot?.();
+    state.checks = Array.isArray(data?.checks) ? data.checks : [];
+    state.llm = Array.isArray(data?.llm) ? data.llm : [];
   } catch (_e) {
+    state.checks = [];
     state.llm = [];
   }
 }
@@ -321,7 +221,7 @@ function applyAutoRefreshTimer() {
 
 async function refreshAll() {
   await loadBaseInfo();
-  await Promise.all([loadChecks(), loadLlmStatus()]);
+  await loadMonitorSnapshot();
   renderInfo();
   renderSummary();
   renderChecks();

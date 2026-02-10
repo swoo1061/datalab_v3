@@ -1,0 +1,17 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'admin_custom/admin.css' %}">
+{% endblock %}
+
+{% block branding %}
+  <div class="brand-wrap">
+    <h1 id="site-name"><a href="{% url 'admin:index' %}">Datalab90 운영 어드민</a></h1>
+    <p class="brand-sub">데이터/권한/로그 통합 관리</p>
+  </div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+

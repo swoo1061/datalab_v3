@@ -10,12 +10,32 @@
 
   <!-- 가운데: 전체 검색 -->
   <div class="header-center">
-    <div class="global-search">
-      <input
-        id="globalSearch"
-        type="text"
-        placeholder="search"
-      />
+    <div class="header-ai-launch cat-roam-zone">
+      <button id="headerModeAgent" class="ai-cat-runner is-moving" type="button" aria-label="AI 에이전트 열기">
+        <span class="ai-cat">
+          <span class="cat-photo-wrap">
+            <img class="cat-photo walk walk-f0" src="./assets/cat1.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f1" src="./assets/cat2.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f2" src="./assets/cat3.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f3" src="./assets/cat4.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f4" src="./assets/cat5.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f5" src="./assets/cat6.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f6" src="./assets/cat7.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f7" src="./assets/cat8.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f8" src="./assets/cat9.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f9" src="./assets/cat10.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f10" src="./assets/cat11.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f11" src="./assets/cat12.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f12" src="./assets/cat13.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f13" src="./assets/cat14.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo walk walk-f14" src="./assets/cat15.png?v=1" alt="" aria-hidden="true" />
+            <img class="cat-photo sit" src="./assets/cat_sit_ui.png?v=12" alt="" aria-hidden="true" />
+            <img class="cat-photo sit-side" src="./assets/cat_sit_side_ui.png?v=12" alt="" aria-hidden="true" />
+            <img class="cat-photo stretch" src="./assets/cat_stretch_ui.png?v=12" alt="" aria-hidden="true" />
+          </span>
+        </span>
+        <span class="sr-only">AI 에이전트</span>
+      </button>
     </div>
   </div>
 
@@ -25,6 +45,70 @@
   <div class="clock-date" id="liveDate">----</div>
   <div class="clock-time" id="liveClock">--:--:--</div>
 </div>
+
+<aside id="agentPanel" class="agent-panel hidden" aria-hidden="true">
+  <div class="agent-panel-head">
+    <strong>AI 에이전트</strong>
+    <div class="agent-head-actions">
+      <button id="agentSettingsToggle" class="agent-settings-btn" type="button" aria-label="설정">설정</button>
+      <button id="agentPanelClose" class="agent-close-btn" type="button" aria-label="닫기">닫기</button>
+    </div>
+  </div>
+  <div class="agent-chat-tools">
+    <select id="agentChatSelect" aria-label="이전 채팅"></select>
+    <button id="agentNewChat" type="button">새 채팅</button>
+  </div>
+  <div id="agentSettingsPanel" class="agent-settings-panel hidden" aria-hidden="true">
+    <div class="agent-setting-row">
+      <label for="agentToneSelect">대화 톤</label>
+      <select id="agentToneSelect" aria-label="대화 톤">
+        <option value="calm">차분</option>
+        <option value="friendly" selected>친근</option>
+        <option value="coach">코치형</option>
+        <option value="cute">귀여운</option>
+      </select>
+    </div>
+    <div class="agent-setting-row">
+      <label for="agentResponseLength">답변 길이</label>
+      <select id="agentResponseLength" aria-label="답변 길이">
+        <option value="short">짧게</option>
+        <option value="balanced" selected>보통</option>
+        <option value="long">자세히</option>
+      </select>
+    </div>
+    <label class="agent-setting-check">
+      <input id="agentEnterToSend" type="checkbox" checked />
+      <span>Enter로 전송</span>
+    </label>
+    <label class="agent-setting-check">
+      <input id="agentAutoScroll" type="checkbox" checked />
+      <span>자동 스크롤</span>
+    </label>
+    <div class="agent-setting-row">
+      <label for="agentStreamSpeed">표시 속도</label>
+      <select id="agentStreamSpeed" aria-label="표시 속도">
+        <option value="fast">빠르게</option>
+        <option value="normal" selected>보통</option>
+        <option value="slow">천천히</option>
+      </select>
+    </div>
+    <div class="agent-setting-row">
+      <label for="agentFontSize">폰트 크기</label>
+      <select id="agentFontSize" aria-label="폰트 크기">
+        <option value="small">작게</option>
+        <option value="normal" selected>보통</option>
+        <option value="large">크게</option>
+      </select>
+    </div>
+  </div>
+  <div id="agentMessages" class="agent-messages">
+    <div class="agent-empty">자유롭게 대화하세요. 감정/상황까지 반영해서 도와드릴게요.</div>
+  </div>
+  <div class="agent-input-row">
+    <input id="agentInput" type="text" placeholder="예: 오늘 일정 너무 꼬였는데 우선순위부터 잡아줘" />
+    <button id="agentSend" type="button">전송</button>
+  </div>
+</aside>
 
     <div class="header-notify">
       <button class="notify-btn" id="notifyButton" aria-label="알림">
@@ -112,4 +196,6 @@
     <strong id="infoBirth">-</strong>
   </div>
 </div>
+
+
 

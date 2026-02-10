@@ -68,17 +68,20 @@ async function applySidebarRoleAccess() {
   }
   sidebarCurrentRole = myRole;
 
-  roleOnlyLinks.forEach((link) => {
+  for (const link of roleOnlyLinks) {
     const allow = String(link.dataset.roleOnly || "")
       .split(",")
       .map((x) => x.trim().toLowerCase())
       .filter(Boolean);
-
-    const visible = allow.includes(myRole);
+    const key = String(link.dataset.permission || "").trim();
+    const roleAllowed = allow.includes(myRole);
+    const permissionAllowed = key ? await fetchSidebarPermission(key) : false;
+    const visible = roleAllowed || permissionAllowed;
     link.classList.toggle("hidden", !visible);
-  });
+  }
 
   for (const link of permissionLinks) {
+    if (link.dataset.roleOnly) continue;
     const key = String(link.dataset.permission || "").trim();
     if (!key) continue;
     const visible = await fetchSidebarPermission(key);
@@ -171,8 +174,14 @@ document.addEventListener("click", async (e) => {
       }
     }
 
-    // 역할을 아직 판별 못한 경우엔 여기서 차단하지 않고 app.js 접근제어로 위임
-    if (role && !allow.includes(role)) {
+    const key = String(restrictedLink.dataset.permission || "").trim();
+    let permissionAllowed = false;
+    if (key) {
+      permissionAllowed = await fetchSidebarPermission(key);
+    }
+
+    // 역할 기반 차단 대신 role OR permission 규칙 적용
+    if (role && !allow.includes(role) && !permissionAllowed) {
       e.preventDefault();
       e.stopPropagation();
       if (typeof window.showAccessDenied === "function") window.showAccessDenied();

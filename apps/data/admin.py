@@ -4,6 +4,7 @@ Django Admin 설정 - presetss.txt 기반 144개 항목 반영
 from django.contrib import admin
 from .models import (
     AccessLog,
+    AuditEvent,
     AttendanceCorrectionRequest,
     AttendanceRecord,
     VacationRequest,
@@ -362,6 +363,13 @@ class AccessLogAdmin(admin.ModelAdmin):
     search_fields = ["ip_address", "path", "user_agent", "referer"]
     readonly_fields = ["created_at"]
 
+@admin.register(AuditEvent)
+class AuditEventAdmin(admin.ModelAdmin):
+    list_display = ["id", "event_type", "actor", "target_type", "target_id", "created_at"]
+    list_filter = ["event_type", "created_at"]
+    search_fields = ["event_type", "target_type", "target_id", "actor__username", "actor__profile__name"]
+    readonly_fields = ["created_at"]
+
 @admin.register(LLMUsageLog)
 class LLMUsageLogAdmin(admin.ModelAdmin):
     list_display = ["id", "user", "model", "total_tokens", "cost_usd", "cost_krw", "created_at"]
@@ -476,7 +484,120 @@ class SystemPermissionAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at", "updated_at"]
 
 
-# Admin 사이트 설정
-admin.site.site_header = 'MedViral 관리자'
-admin.site.site_title = 'MedViral Admin'
-admin.site.index_title = '리뷰 생성 시스템 관리'
+# Admin 사이트 설정 (한글 통일)
+admin.site.site_header = "Datalab90 관리자"
+admin.site.site_title = "Datalab90 관리자"
+admin.site.index_title = "운영 관리"
+
+
+# 어드민 목록 표시를 카테고리 중심으로 정렬/표기
+_CATEGORY_ORDER = {
+    "시스템": 0,
+    "인사/권한": 1,
+    "게시글/콘텐츠": 2,
+    "병원/가이드": 3,
+    "리뷰/AI": 4,
+    "커뮤니케이션": 5,
+    "기타": 99,
+}
+
+_MODEL_CATEGORY = {
+    "AuditEvent": "시스템",
+    "AccessLog": "시스템",
+    "SystemPermission": "인사/권한",
+    "AttendanceRecord": "인사/권한",
+    "AttendanceCorrectionRequest": "인사/권한",
+    "VacationRequest": "인사/권한",
+    "ClinicPost": "게시글/콘텐츠",
+    "ClinicPostPhoto": "게시글/콘텐츠",
+    "CrawledPostContent": "게시글/콘텐츠",
+    "CalendarMemo": "게시글/콘텐츠",
+    "ContentTypeProfile": "게시글/콘텐츠",
+    "PromptTemplate": "게시글/콘텐츠",
+    "PromptTemplateVersion": "게시글/콘텐츠",
+    "ClinicGuide": "병원/가이드",
+    "ClinicDoctor": "병원/가이드",
+    "ClinicPrice": "병원/가이드",
+    "ClinicAssignee": "병원/가이드",
+    "FavoriteClinic": "병원/가이드",
+    "Review": "리뷰/AI",
+    "GeneratedReview": "리뷰/AI",
+    "LLMUsageLog": "리뷰/AI",
+    "Campaign": "리뷰/AI",
+    "Persona": "리뷰/AI",
+    "CafeProfile": "리뷰/AI",
+    "ImageAsset": "리뷰/AI",
+    "InternalMessage": "커뮤니케이션",
+    "InternalMessageAttachment": "커뮤니케이션",
+}
+
+_MODEL_KO_NAME = {
+    "AuditEvent": "감사 로그",
+    "AccessLog": "접속 로그",
+    "SystemPermission": "시스템 권한",
+    "AttendanceRecord": "출퇴근 기록",
+    "AttendanceCorrectionRequest": "출퇴근 정정요청",
+    "VacationRequest": "휴가 요청",
+    "ClinicPost": "게시글",
+    "ClinicPostPhoto": "게시글 사진",
+    "CrawledPostContent": "크롤링 본문",
+    "CalendarMemo": "캘린더 메모",
+    "ContentTypeProfile": "컨텐츠 유형",
+    "PromptTemplate": "프롬프트 템플릿",
+    "PromptTemplateVersion": "프롬프트 버전",
+    "ClinicGuide": "병원 가이드",
+    "ClinicDoctor": "의료진",
+    "ClinicPrice": "수가표",
+    "ClinicAssignee": "병원 담당자",
+    "FavoriteClinic": "즐겨찾기 병원",
+    "Review": "원본 리뷰",
+    "GeneratedReview": "생성 리뷰",
+    "LLMUsageLog": "LLM 사용 로그",
+    "Campaign": "캠페인",
+    "Persona": "페르소나",
+    "CafeProfile": "카페 프로필",
+    "ImageAsset": "이미지 자산",
+    "InternalMessage": "쪽지",
+    "InternalMessageAttachment": "쪽지 첨부파일",
+}
+
+_original_get_app_list = admin.site.get_app_list
+
+
+def _custom_get_app_list(request, app_label=None):
+    raw_app_list = _original_get_app_list(request, app_label)
+    result = []
+
+    for app in raw_app_list:
+        if app.get("app_label") != "data":
+            result.append(app)
+            continue
+
+        grouped = {}
+        for model in app.get("models", []):
+            object_name = model.get("object_name") or ""
+            category = _MODEL_CATEGORY.get(object_name, "기타")
+            label = _MODEL_KO_NAME.get(object_name) or model.get("name") or object_name
+            cloned = dict(model)
+            cloned["name"] = label
+            grouped.setdefault(category, []).append(cloned)
+
+        for category, _order in sorted(_CATEGORY_ORDER.items(), key=lambda x: x[1]):
+            models = grouped.get(category, [])
+            if not models:
+                continue
+            models.sort(key=lambda m: m.get("name", ""))
+            result.append(
+                {
+                    "name": f"데이터 운영 · {category}",
+                    "app_label": app.get("app_label"),
+                    "app_url": app.get("app_url"),
+                    "has_module_perms": app.get("has_module_perms", True),
+                    "models": models,
+                }
+            )
+
+    return result
+
+
+admin.site.get_app_list = _custom_get_app_list

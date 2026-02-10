@@ -22,12 +22,16 @@ const PAGE_ROLE_ACCESS = {
   system_permissions: ["admin", "ceo"],
   system_monitor: ["admin", "ceo"],
   system_logs: ["admin", "ceo"],
+  audit_logs: ["admin", "ceo"],
 };
 const PAGE_PERMISSION_OVERRIDE = {
   attendance_requests: "attendance_requests_access",
   vacation_admin: "vacation_admin_access",
   employee_management: "employee_management_access",
   system_monitor: "system_monitor_access",
+  system_logs: "system_monitor_access",
+  system_permissions: "system_monitor_access",
+  audit_logs: "system_monitor_access",
 };
 let cachedUserRole = null;
 const permissionCache = new Map();
@@ -726,6 +730,8 @@ document.addEventListener(
   (e) => {
     const target = e.target;
     if (!(target instanceof HTMLElement)) return;
+    // Allow Enter handlers in header inputs (global search / AI agent).
+    if (e.key === "Enter" && target.closest("#appHeader")) return;
     if (target.isContentEditable || target.matches("input, textarea")) {
       e.stopImmediatePropagation();
     }

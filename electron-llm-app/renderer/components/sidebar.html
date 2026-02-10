@@ -195,14 +195,17 @@
       </div>
       <div class="nav-sub">
         <div class="nav-flyout-title">시스템</div>
-        <a href="system_monitor.html" data-nav="system_monitor" data-role-only="admin,ceo">
+        <a href="system_monitor.html" data-nav="system_monitor" data-role-only="admin,ceo" data-permission="system_monitor_access">
           <span class="nav-sub-label">서버 관리</span>
         </a>
-        <a href="system_logs.html" data-nav="system_logs" data-role-only="admin,ceo">
+        <a href="system_logs.html" data-nav="system_logs" data-role-only="admin,ceo" data-permission="system_monitor_access">
           <span class="nav-sub-label">시스템 로그</span>
         </a>
-        <a href="system_permissions.html" data-nav="system_permissions" data-role-only="admin,ceo">
+        <a href="system_permissions.html" data-nav="system_permissions" data-role-only="admin,ceo" data-permission="system_monitor_access">
           <span class="nav-sub-label">시스템 권한</span>
+        </a>
+        <a href="audit_logs.html" data-nav="audit_logs" data-role-only="admin,ceo" data-permission="system_monitor_access">
+          <span class="nav-sub-label">감사 로그</span>
         </a>
       </div>
     </div>

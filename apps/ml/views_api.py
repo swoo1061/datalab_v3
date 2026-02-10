@@ -1,15 +1,18 @@
 import json
 import random
 from datetime import datetime, timedelta
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from apps.ml.services.llm_service import (
     generate_review_with_prompt_enforced,
     generate_title_suggestions,
+    generate_review_with_prompt,
     apply_review_type_guard,
 )
 from apps.ml.services.prompt_generator import build_ft_prompt_from_models, build_prompt_from_models
@@ -48,6 +51,392 @@ def _resolve_request_user(request):
         return None
     User = get_user_model()
     return User.objects.filter(id=user_id).first()
+
+
+def _agent_context_summary(context):
+    if not isinstance(context, dict):
+        return "unknown"
+    page = str(context.get("page") or context.get("nav") or "unknown").strip()
+    title = str(context.get("title") or "").strip()
+    if title:
+        return f"{page} ({title})"
+    return page
+
+
+def _agent_fetch_json(request, path):
+    session_key = request.headers.get("X-Sessionid") or request.COOKIES.get("sessionid")
+    if not session_key:
+        return None
+    base = f"{request.scheme}://{request.get_host()}"
+    url = urljoin(base, path)
+    req = Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "X-Sessionid": session_key,
+            "Cookie": f"sessionid={session_key}",
+        },
+    )
+    try:
+        with urlopen(req, timeout=3.5) as resp:
+            raw = resp.read().decode("utf-8")
+            return json.loads(raw) if raw else None
+    except Exception:
+        return None
+
+
+def _agent_vacation_summary(data):
+    if not isinstance(data, dict):
+        return "휴가 데이터를 불러오지 못했습니다."
+    rows = data.get("results")
+    if not isinstance(rows, list):
+        return "휴가 데이터 형식을 확인할 수 없습니다."
+    pending = 0
+    approved = 0
+    rejected = 0
+    for row in rows:
+        status = str((row or {}).get("status") or "").lower()
+        if status == "pending":
+            pending += 1
+        elif status == "approved":
+            approved += 1
+        elif status == "rejected":
+            rejected += 1
+    return f"휴가 신청: 대기 {pending}건, 승인 {approved}건, 반려 {rejected}건"
+
+
+def _contains_any(text, keywords):
+    return any(k in text for k in keywords)
+
+
+def _agent_is_action_query(lower_message):
+    """
+    Operational intents are handled by deterministic tool/rule flow.
+    Everything else should go to free-form LLM chat first.
+    """
+    return _contains_any(
+        lower_message,
+        [
+            "내 정보", "내정보", "내 계정", "내계정", "프로필",
+            "리뷰 생성", "후기 생성", "리뷰 작성",
+            "구공이", "gugong", "강남", "gangnam",
+            "지금 페이지", "현재 페이지", "현재 화면",
+            "알림", "notifications", "메일", "mail", "메시지",
+            "근태", "출퇴근", "출근", "퇴근",
+            "휴가", "연차",
+            "요약", "브리핑", "한눈",
+            "이동", "열어줘", "열어 줘",
+        ],
+    )
+
+
+def _agent_emotion_hint(lower_message):
+    if _contains_any(lower_message, ["고마워", "감사", "좋아", "최고", "굿", "잘했"]):
+        return "사용자가 긍정적입니다. 밝고 짧게 화답하세요."
+    if _contains_any(lower_message, ["불안", "걱정", "힘들", "어려워", "막막"]):
+        return "사용자가 불안/걱정 상태입니다. 안정감을 주는 문장으로 시작하세요."
+    if _contains_any(lower_message, ["짜증", "화나", "열받", "빡쳐", "시발", "fuck"]):
+        return "사용자가 강한 불편/분노를 표현했습니다. 방어적 태도 없이 진정시키고 해결책을 제시하세요."
+    return "사용자 감정은 중립입니다. 친근하고 차분한 톤을 유지하세요."
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def agent_chat_api(request):
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        return JsonResponse({"error": "invalid json"}, status=400)
+
+    user = _resolve_request_user(request)
+    if not user:
+        return JsonResponse({"error": "unauthorized"}, status=401)
+
+    message = str(payload.get("message") or "").strip()
+    context = payload.get("context") or {}
+    history = payload.get("history") or []
+
+    if not message:
+        return JsonResponse({"error": "message required"}, status=400)
+
+    lower = message.lower()
+    context_summary = _agent_context_summary(context)
+
+    # Free chat-first mode:
+    # If this is not an operational/action intent, use LLM first so the agent
+    # feels conversational and emotionally responsive.
+    if not _agent_is_action_query(lower):
+        try:
+            model = "gpt-5-mini"
+            compact_history = []
+            for item in history[-10:]:
+                role = str(item.get("role") or "").strip().lower()
+                text = str(item.get("content") or "").strip()
+                if role in {"user", "assistant"} and text:
+                    compact_history.append({"role": role, "content": text})
+
+            history_text = "\n".join([f"{h['role']}: {h['content']}" for h in compact_history])
+            emotion_hint = _agent_emotion_hint(lower)
+
+            prompt = (
+                "당신은 사내 업무 앱의 AI 에이전트이자 대화형 업무 파트너입니다.\n"
+                "- 한국어로 대답\n"
+                "- 사용자의 감정을 먼저 짧게 공감하고, 바로 실행 가능한 답을 제시\n"
+                "- 말투는 친근하지만 과하지 않게 자연스럽게\n"
+                "- 사실이 불확실하면 추측하지 말고 확인 질문을 1개만 제시\n"
+                "- 메뉴 이동/데이터 조회가 필요하면 마지막에 짧게 제안\n\n"
+                f"[감정 가이드]\n{emotion_hint}\n\n"
+                f"[사용자]\n이름: {getattr(user, 'name', '') or user.username}\n"
+                f"직책: {getattr(user, 'position', '') or '-'}\n\n"
+                f"[현재 페이지]\n{context_summary}\n\n"
+                f"[최근 대화]\n{history_text or '(없음)'}\n\n"
+                f"[사용자 질문]\n{message}\n\n"
+                "답변:"
+            )
+            llm = generate_review_with_prompt(
+                prompt=prompt,
+                model=model,
+                max_tokens=600,
+                temperature=0.55,
+            )
+            answer = str(llm or "").strip()
+            if not answer:
+                raise ValueError("empty llm response")
+            return JsonResponse({
+                "ok": True,
+                "answer": answer,
+                "source": "llm_chat_first",
+                "model": model,
+                "suggestions": ["관련 화면으로 이동할까?", "지금 단계별로 정리해줘"],
+            })
+        except Exception:
+            return JsonResponse({
+                "ok": True,
+                "answer": (
+                    "지금 응답 엔진이 잠시 불안정해요. "
+                    "원하시면 질문을 조금 짧게 다시 보내주세요."
+                ),
+                "source": "llm_chat_fallback",
+                "suggestions": ["현재 페이지 기준으로 할 일 정리해줘", "한 문장으로 요약해줘"],
+            })
+
+    if any(k in lower for k in ["내 정보", "내정보", "내 계정", "내계정", "프로필"]):
+        position = getattr(user, "position", "") or "-"
+        return JsonResponse({
+            "ok": True,
+            "answer": (
+                f"현재 로그인 사용자 정보입니다.\n"
+                f"- 이름: {getattr(user, 'name', '') or user.username}\n"
+                f"- 아이디: {user.username}\n"
+                f"- 이메일: {getattr(user, 'email', '') or '-'}\n"
+                f"- 직책: {position}"
+            ),
+            "source": "local_profile",
+            "suggestions": ["내가 할 일 추천해줘", "지금 페이지에서 할 수 있는 작업 알려줘"],
+        })
+
+    if any(k in lower for k in ["리뷰 생성", "후기 생성", "리뷰 작성"]):
+        return JsonResponse({
+            "ok": True,
+            "answer": "리뷰 생성은 `AI 리뷰 생성` 또는 `구공이 리뷰 생성` 메뉴에서 바로 실행할 수 있습니다.",
+            "source": "local_navigation",
+            "actions": [{"type": "navigate", "page": "review"}],
+            "suggestions": ["구공이 페이지로 이동해줘", "강남언니 후기로 이동해줘"],
+        })
+
+    if any(k in lower for k in ["구공이", "gugong"]):
+        return JsonResponse({
+            "ok": True,
+            "answer": "구공이 리뷰 생성 페이지로 이동할 수 있습니다.",
+            "source": "local_navigation",
+            "actions": [{"type": "navigate", "page": "gugong_review"}],
+        })
+
+    if any(k in lower for k in ["강남", "gangnam"]):
+        return JsonResponse({
+            "ok": True,
+            "answer": "강남언니 후기 생성 페이지로 이동할 수 있습니다.",
+            "source": "local_navigation",
+            "actions": [{"type": "navigate", "page": "gangnam_review"}],
+        })
+
+    if any(k in lower for k in ["지금 페이지", "현재 페이지", "현재 화면"]):
+        return JsonResponse({
+            "ok": True,
+            "answer": (
+                f"현재 화면 컨텍스트: {context_summary}\n"
+                "원하시면 이 화면에서 자주 하는 작업 순서도 같이 안내해드릴게요."
+            ),
+            "source": "local_context",
+            "suggestions": ["이 화면 작업 순서 알려줘", "다음에 할 일 추천해줘"],
+        })
+
+    if any(k in lower for k in ["알림", "notifications"]):
+        noti = _agent_fetch_json(request, "/api/data/notifications/?limit=1")
+        unread = int((noti or {}).get("unread_count") or 0)
+        return JsonResponse({
+            "ok": True,
+            "answer": f"현재 미확인 알림은 {unread}건입니다.",
+            "source": "tool_notifications",
+            "actions": [{"type": "navigate", "page": "notifications_center"}],
+        })
+
+    if any(k in lower for k in ["메일", "mail", "메시지"]):
+        mail = _agent_fetch_json(request, "/api/data/messages/?box=inbox&limit=1")
+        unread = int((mail or {}).get("unread_count") or 0)
+        return JsonResponse({
+            "ok": True,
+            "answer": f"받은 메일 미확인은 {unread}건입니다.",
+            "source": "tool_messages",
+            "actions": [{"type": "navigate", "page": "mail_center"}],
+        })
+
+    if any(k in lower for k in ["근태", "출퇴근", "출근", "퇴근"]):
+        attendance = _agent_fetch_json(request, "/api/data/attendance/me/")
+        if isinstance(attendance, dict):
+            worked_days = attendance.get("worked_days")
+            late_count = attendance.get("late_count")
+            pending = attendance.get("pending_corrections")
+            parts = []
+            if worked_days is not None:
+                parts.append(f"근무일수 {worked_days}일")
+            if late_count is not None:
+                parts.append(f"지각 {late_count}회")
+            if pending is not None:
+                parts.append(f"정정대기 {pending}건")
+            text = ", ".join(parts) if parts else "근태 데이터는 조회되지만 요약 키를 찾지 못했습니다."
+        else:
+            text = "근태 데이터를 불러오지 못했습니다."
+        return JsonResponse({
+            "ok": True,
+            "answer": text,
+            "source": "tool_attendance",
+            "actions": [{"type": "navigate", "page": "attendance_requests"}],
+        })
+
+    if any(k in lower for k in ["휴가", "연차"]):
+        year = timezone.localtime().year
+        vacation = _agent_fetch_json(request, f"/api/data/vacations/me/?year={year}")
+        return JsonResponse({
+            "ok": True,
+            "answer": _agent_vacation_summary(vacation),
+            "source": "tool_vacation",
+            "actions": [{"type": "navigate", "page": "vacation"}],
+        })
+
+    if any(k in lower for k in ["요약", "브리핑", "한눈"]):
+        noti = _agent_fetch_json(request, "/api/data/notifications/?limit=1")
+        mail = _agent_fetch_json(request, "/api/data/messages/?box=inbox&limit=1")
+        year = timezone.localtime().year
+        vacation = _agent_fetch_json(request, f"/api/data/vacations/me/?year={year}")
+        lines = [
+            f"- 미확인 알림: {int((noti or {}).get('unread_count') or 0)}건",
+            f"- 미확인 메일: {int((mail or {}).get('unread_count') or 0)}건",
+            f"- {_agent_vacation_summary(vacation)}",
+        ]
+        return JsonResponse({
+            "ok": True,
+            "answer": "현재 업무 요약입니다.\n" + "\n".join(lines),
+            "source": "tool_summary",
+            "suggestions": ["알림센터 열어줘", "메일센터 열어줘", "휴가 페이지로 이동해줘"],
+        })
+
+    # LLM fallback: lightweight Q&A mode for app-wide assistant MVP.
+    try:
+        model = "gpt-5-mini"
+        compact_history = []
+        for item in history[-6:]:
+            role = str(item.get("role") or "").strip().lower()
+            text = str(item.get("content") or "").strip()
+            if role in {"user", "assistant"} and text:
+                compact_history.append({"role": role, "content": text})
+
+        history_text = "\n".join(
+            [f"{h['role']}: {h['content']}" for h in compact_history]
+        )
+        prompt = (
+            "당신은 사내 업무 앱의 AI 에이전트입니다.\n"
+            "- 한국어로 간결하게 답변\n"
+            "- 확실하지 않으면 추측하지 말고 확인이 필요하다고 말할 것\n"
+            "- 민감정보/권한이 필요한 작업은 사용자에게 확인 요청\n\n"
+            f"[현재 페이지]\n{context_summary}\n\n"
+            f"[최근 대화]\n{history_text or '(없음)'}\n\n"
+            f"[사용자 질문]\n{message}\n\n"
+            "답변:"
+        )
+        llm = generate_review_with_prompt(
+            prompt=prompt,
+            model=model,
+            max_tokens=500,
+            temperature=0.3,
+        )
+        answer = str(llm or "").strip()
+        if not answer:
+            raise ValueError("empty llm response")
+        return JsonResponse({
+            "ok": True,
+            "answer": answer,
+            "source": "llm",
+            "model": model,
+        })
+    except Exception:
+        return JsonResponse({
+            "ok": True,
+            "answer": (
+                "AI 응답 엔진이 아직 준비되지 않았습니다. "
+                "지금은 메뉴 이동/기본 안내 중심으로만 답변할 수 있습니다."
+            ),
+            "source": "fallback",
+            "suggestions": ["내 정보 보여줘", "리뷰 생성으로 이동해줘", "현재 페이지 설명해줘"],
+        })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def agent_chat_stream_api(request):
+    """
+    NDJSON streaming wrapper for agent chat.
+    - Reuses `agent_chat_api` logic for answer/actions.
+    - Streams token-like delta chunks to renderer.
+    """
+    base_resp = agent_chat_api(request)
+    status = getattr(base_resp, "status_code", 200)
+
+    try:
+        payload = json.loads((base_resp.content or b"{}").decode("utf-8"))
+    except Exception:
+        payload = {"ok": False, "answer": "응답 파싱 실패"}
+
+    if status >= 400:
+        return JsonResponse(payload, status=status)
+
+    answer = str(payload.get("answer") or "")
+    actions = payload.get("actions") if isinstance(payload.get("actions"), list) else []
+    source = payload.get("source")
+    model = payload.get("model")
+    suggestions = payload.get("suggestions") if isinstance(payload.get("suggestions"), list) else []
+
+    def gen():
+        yield json.dumps({"type": "start", "ok": bool(payload.get("ok", True))}, ensure_ascii=False) + "\n"
+        step = 3
+        for i in range(0, len(answer), step):
+            chunk = answer[i:i + step]
+            yield json.dumps({"type": "delta", "text": chunk}, ensure_ascii=False) + "\n"
+        done = {
+            "type": "done",
+            "ok": bool(payload.get("ok", True)),
+            "answer": answer,
+            "actions": actions,
+            "source": source,
+            "model": model,
+            "suggestions": suggestions,
+        }
+        yield json.dumps(done, ensure_ascii=False) + "\n"
+
+    resp = StreamingHttpResponse(gen(), content_type="application/x-ndjson; charset=utf-8")
+    resp["Cache-Control"] = "no-cache"
+    resp["X-Accel-Buffering"] = "no"
+    return resp
 
 @csrf_exempt
 def review_generate_api(request):

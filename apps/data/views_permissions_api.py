@@ -13,6 +13,7 @@ from apps.data.permissions import (
     normalize_user_role,
 )
 from apps.data.views_api import CsrfExemptSessionAuthentication, HeaderSessionAuthentication
+from apps.data.services.audit_logger import log_audit_event
 
 
 def _is_permission_admin(user) -> bool:
@@ -114,6 +115,7 @@ class SystemPermissionUserDetailView(APIView):
 
         valid_keys = dict(SystemPermission.KEY_CHOICES)
         updated = {}
+        before_permissions = _serialize_user_permissions(target)
         for key, value in permissions.items():
             if key not in valid_keys:
                 continue
@@ -129,6 +131,22 @@ class SystemPermissionUserDetailView(APIView):
                 row.save(update_fields=["is_enabled", "updated_by", "updated_at"])
             updated[key] = enabled
 
+        after_permissions = _serialize_user_permissions(target)
+        if updated:
+            log_audit_event(
+                actor=request.user,
+                event_type="permission.update",
+                target_type="user",
+                target_id=target.id,
+                before={k: before_permissions.get(k) for k in updated.keys()},
+                after={k: after_permissions.get(k) for k in updated.keys()},
+                metadata={
+                    "target_username": target.username,
+                    "changed_keys": list(updated.keys()),
+                    "source": "system_permissions_api",
+                },
+            )
+
         return Response(
             {
                 "ok": True,
@@ -138,4 +156,3 @@ class SystemPermissionUserDetailView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-

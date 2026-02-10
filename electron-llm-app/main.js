@@ -15,6 +15,12 @@ const path = require("path");
 let win;
 let sessionKey = null;
 
+const WINDOWS_CHROME_CANDIDATES = [
+  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+  path.join(process.env.LOCALAPPDATA || "", "Google", "Chrome", "Application", "chrome.exe"),
+];
+
 function execFileAsync(command, args) {
   return new Promise((resolve, reject) => {
     execFile(command, args, (err, stdout, stderr) => {
@@ -25,6 +31,33 @@ function execFileAsync(command, args) {
       resolve({ stdout, stderr });
     });
   });
+}
+
+async function openUrlInChrome(url) {
+  if (typeof url !== "string" || !/^https?:\/\//i.test(url)) {
+    await shell.openExternal(url);
+    return;
+  }
+
+  if (process.platform === "win32") {
+    for (const chromePath of WINDOWS_CHROME_CANDIDATES) {
+      if (!chromePath || !fs.existsSync(chromePath)) continue;
+      try {
+        await execFileAsync(chromePath, [url]);
+        return;
+      } catch (_e) {
+        // try next candidate
+      }
+    }
+    try {
+      await execFileAsync("cmd", ["/c", "start", "", "chrome", url]);
+      return;
+    } catch (_e) {
+      // fallback below
+    }
+  }
+
+  await shell.openExternal(url);
 }
 
 function getApiBase() {
@@ -86,6 +119,22 @@ function createWindow() {
   });
 
   win.loadFile("renderer/login.html");
+
+  // Always open http/https links in external Chrome window instead of Electron.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) {
+      openUrlInChrome(url).catch(() => {});
+      return { action: "deny" };
+    }
+    return { action: "allow" };
+  });
+
+  win.webContents.on("will-navigate", (event, url) => {
+    if (/^https?:\/\//i.test(url)) {
+      event.preventDefault();
+      openUrlInChrome(url).catch(() => {});
+    }
+  });
 
   globalShortcut.register("CommandOrControl+R", () => win?.reload());
   globalShortcut.register("F5", () => win?.reload());
@@ -181,7 +230,11 @@ ipcMain.handle("open-external", async (e, url) => {
   ) {
     throw new Error("invalid external url");
   }
-  await shell.openExternal(url);
+  if (/^https?:\/\//i.test(url)) {
+    await openUrlInChrome(url);
+  } else {
+    await shell.openExternal(url);
+  }
   return true;
 });
 

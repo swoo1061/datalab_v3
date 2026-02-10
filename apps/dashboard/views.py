@@ -2925,7 +2925,7 @@ def api_access_logs(request):
             "path": log.path,
             "method": log.method,
             "user_agent": log.user_agent[:100] if log.user_agent else "",
-            "created_at": log.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            "created_at": timezone.localtime(log.created_at).strftime('%Y-%m-%d %H:%M:%S'),
         }
         for log in logs
     ]

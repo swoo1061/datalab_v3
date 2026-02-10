@@ -1,5 +1,3 @@
-window.API_BASE = window.API_BASE || window?.config?.apiBase || "http://127.0.0.1:8000";
-
 const state = {
   rows: [],
   search: "",
@@ -10,13 +8,6 @@ const KEY_WEB_DASHBOARD = "web_dashboard_access";
 const KEY_VACATION_ADMIN = "vacation_admin_access";
 const KEY_EMPLOYEE_MANAGEMENT = "employee_management_access";
 const KEY_SYSTEM_MONITOR = "system_monitor_access";
-
-async function buildHeaders() {
-  const headers = {};
-  const key = await window.session?.getKey?.();
-  if (key) headers["X-Sessionid"] = key;
-  return headers;
-}
 
 function escapeHtml(text) {
   return String(text || "")
@@ -38,14 +29,7 @@ function roleLabel(role) {
 }
 
 async function fetchRows() {
-  const headers = await buildHeaders();
-  const q = state.search ? `?q=${encodeURIComponent(state.search)}` : "";
-  const res = await fetch(`${window.API_BASE}/api/data/system-permissions/users/${q}`, {
-    credentials: "include",
-    headers,
-  });
-  if (!res.ok) throw new Error("permission_fetch_failed");
-  const data = await res.json();
+  const data = await window.api?.getSystemPermissionUsers?.(state.search || "");
   state.rows = data.results || [];
 }
 
@@ -81,15 +65,7 @@ function renderRows() {
 }
 
 async function updatePermission(userId, key, enabled) {
-  const headers = await buildHeaders();
-  const res = await fetch(`${window.API_BASE}/api/data/system-permissions/users/${userId}/`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify({ permissions: { [key]: enabled } }),
-  });
-  if (!res.ok) throw new Error("permission_update_failed");
-  return res.json();
+  return window.api?.updateSystemPermissionUser?.(userId, { [key]: enabled });
 }
 
 function bindEvents() {

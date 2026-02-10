@@ -1248,6 +1248,42 @@ class SystemPermission(models.Model):
     def __str__(self):
         return f"{self.user_id}:{self.key}={'on' if self.is_enabled else 'off'}"
 
+
+class AuditEvent(models.Model):
+    """관리자/시스템 작업 감사 로그"""
+
+    EVENT_TYPE_CHOICES = [
+        ("permission.update", "권한 변경"),
+        ("system.logs.clear", "시스템 로그 삭제"),
+        ("auth.login", "로그인"),
+        ("auth.logout", "로그아웃"),
+        ("other", "기타"),
+    ]
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="audit_events",
+    )
+    event_type = models.CharField(max_length=64, choices=EVENT_TYPE_CHOICES, db_index=True)
+    target_type = models.CharField(max_length=64, blank=True, default="")
+    target_id = models.CharField(max_length=64, blank=True, default="")
+    before_json = JSONField(default=dict, blank=True)
+    after_json = JSONField(default=dict, blank=True)
+    metadata_json = JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "감사 로그"
+        verbose_name_plural = "감사 로그"
+
+    def __str__(self):
+        actor_label = self.actor.username if self.actor else "system"
+        return f"{self.event_type} by {actor_label} at {self.created_at:%Y-%m-%d %H:%M:%S}"
+
 from .models_worklog import DailyWorkLog
 from .models_attendance import AttendanceRecord, AttendanceCorrectionRequest
 from .models_message import InternalMessage, InternalMessageAttachment

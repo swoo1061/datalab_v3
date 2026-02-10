@@ -9,6 +9,11 @@
   align-items: flex-start;
 }
 
+.logs-head-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
 .logs-shell {
   padding: 12px;
 }
@@ -56,6 +61,72 @@
   width: 140px;
 }
 
+.logs-range-select {
+  min-width: 130px;
+}
+
+.logs-date {
+  width: 150px;
+}
+
+.logs-anomalies {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.logs-alert {
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+}
+
+.logs-alert.info {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.logs-insights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.logs-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+
+.logs-panel-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.logs-kv-list {
+  display: grid;
+  gap: 6px;
+}
+
+.logs-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.logs-kv code {
+  overflow-wrap: anywhere;
+}
+
 .logs-table-wrap {
   overflow: auto;
 }
@@ -72,6 +143,14 @@
 
 .logs-ua {
   color: #475569;
+}
+
+.logs-row-clickable {
+  cursor: pointer;
+}
+
+.logs-row-clickable:hover {
+  background: #f8fafc;
 }
 
 .logs-method {
@@ -100,9 +179,88 @@
   color: #991b1b;
 }
 
+.logs-pagination {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.logs-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 999;
+}
+
+.logs-modal.open {
+  display: block;
+}
+
+.logs-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.logs-modal-card {
+  position: relative;
+  width: min(760px, calc(100% - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  margin: 12px auto;
+  border-radius: 14px;
+  border: 1px solid #dbe2ef;
+  background: #ffffff;
+}
+
+.logs-modal-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.logs-modal-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.logs-detail-body {
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.logs-detail-row {
+  display: grid;
+  gap: 4px;
+}
+
+.logs-detail-row .k {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.logs-detail-row .v {
+  font-size: 13px;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 1000px) {
   .logs-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .logs-insights {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -123,5 +281,17 @@
 
   .logs-toolbar .select {
     width: 100%;
+  }
+
+  .logs-date {
+    width: 100%;
+  }
+
+  .logs-head-actions {
+    width: 100%;
+  }
+
+  .logs-head-actions .btn {
+    flex: 1;
   }
 }
