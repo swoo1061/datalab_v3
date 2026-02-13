@@ -7,6 +7,9 @@ from .views_api import (
     ClinicAssigneeListView,
     CalendarMemoListCreateView,
     CalendarMemoDetailView,
+    ReviewScheduleListView,
+    ReviewScheduleGenerateView,
+    ReviewScheduleDetailView,
     NotificationListView,
 )
 from apps.data.views_worklog_api import ClinicDailyWorkLogViewSet 
@@ -70,6 +73,9 @@ urlpatterns = [
     path("clinics/<int:clinic_id>/assignees/", ClinicAssigneeListView.as_view()),
     path("calendar-memos/", CalendarMemoListCreateView.as_view()),
     path("calendar-memos/<int:memo_id>/", CalendarMemoDetailView.as_view()),
+    path("review-schedules/", ReviewScheduleListView.as_view()),
+    path("review-schedules/generate/", ReviewScheduleGenerateView.as_view()),
+    path("review-schedules/<int:schedule_id>/", ReviewScheduleDetailView.as_view()),
     path("notifications/", NotificationListView.as_view()),
     path("attendance/me/", MyAttendanceMonthView.as_view()),
     path("attendance/admin/records/", AttendanceAdminListView.as_view()),

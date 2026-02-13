@@ -17,16 +17,13 @@ const AGENT_MESSAGE_STORAGE_LIMIT = 80;
 const AGENT_HISTORY_STORAGE_PREFIX = "agentHistory:";
 const AGENT_CHATS_STORAGE_PREFIX = "agentChats:";
 const AGENT_ACTIVE_CHAT_STORAGE_PREFIX = "agentActiveChat:";
-const AGENT_STYLE_STORAGE_PREFIX = "agentStyle:";
 const AGENT_PREFS_STORAGE_PREFIX = "agentPrefs:";
 let agentChats = [];
 let activeAgentChatId = "";
 let agentChatsStorageKey = "";
 let agentActiveChatStorageKey = "";
 let agentLegacyHistoryStorageKey = "";
-let agentStyleStorageKey = "";
 let agentPrefsStorageKey = "";
-let agentToneStyle = "friendly";
 let agentResponseLength = "balanced";
 let agentEnterToSend = true;
 let agentAutoScroll = true;
@@ -75,7 +72,7 @@ async function loadHeader(pageTitle = "") {
   // 헤더 HTML 로드
   // ----------------
   {
-    const res = await fetch(`./components/header.html?v=cat_hotfix_68`, { cache: "no-store" });
+    const res = await fetch(`./components/header.html?v=cat_hotfix_69`, { cache: "no-store" });
     if (!res.ok) {
       console.error("header.html fetch failed");
       return;
@@ -113,10 +110,8 @@ async function loadHeader(pageTitle = "") {
   agentChatsStorageKey = `${AGENT_CHATS_STORAGE_PREFIX}${userKey}`;
   agentActiveChatStorageKey = `${AGENT_ACTIVE_CHAT_STORAGE_PREFIX}${userKey}`;
   agentLegacyHistoryStorageKey = `${AGENT_HISTORY_STORAGE_PREFIX}${userKey}`;
-  agentStyleStorageKey = `${AGENT_STYLE_STORAGE_PREFIX}${userKey}`;
   agentPrefsStorageKey = `${AGENT_PREFS_STORAGE_PREFIX}${userKey}`;
   loadAgentChats();
-  loadAgentToneStyle();
   loadAgentPrefs();
 
   const name = me?.name || me?.username || "사용자";
@@ -473,8 +468,9 @@ function bindHeaderModeAndAgent() {
   const sendBtn = document.getElementById("agentSend");
   const inputEl = document.getElementById("agentInput");
   const newChatBtn = document.getElementById("agentNewChat");
-  const chatSelectEl = document.getElementById("agentChatSelect");
-  const toneSelectEl = document.getElementById("agentToneSelect");
+  const chatPickerEl = document.getElementById("agentChatPicker");
+  const chatSelectTriggerEl = document.getElementById("agentChatSelectTrigger");
+  const chatSelectMenuEl = document.getElementById("agentChatSelectMenu");
   const responseLengthEl = document.getElementById("agentResponseLength");
   const enterToSendEl = document.getElementById("agentEnterToSend");
   const autoScrollEl = document.getElementById("agentAutoScroll");
@@ -516,25 +512,37 @@ function bindHeaderModeAndAgent() {
     const isOpen = settingsPanelEl && !settingsPanelEl.classList.contains("hidden");
     openAgentSettings(!isOpen);
   });
+  const closeAgentChatMenu = () => {
+    if (!chatSelectMenuEl || !chatSelectTriggerEl) return;
+    chatSelectMenuEl.classList.add("hidden");
+    chatSelectTriggerEl.setAttribute("aria-expanded", "false");
+  };
+  const toggleAgentChatMenu = () => {
+    if (!chatSelectMenuEl || !chatSelectTriggerEl) return;
+    const nextOpen = chatSelectMenuEl.classList.contains("hidden");
+    chatSelectMenuEl.classList.toggle("hidden", !nextOpen);
+    chatSelectTriggerEl.setAttribute("aria-expanded", nextOpen ? "true" : "false");
+  };
+  chatSelectTriggerEl?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleAgentChatMenu();
+  });
+  document.addEventListener("click", (e) => {
+    if (!chatPickerEl) return;
+    if (chatPickerEl.contains(e.target)) return;
+    closeAgentChatMenu();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAgentChatMenu();
+  });
   sendBtn?.addEventListener("click", () => handleAgentSend());
   newChatBtn?.addEventListener("click", () => {
     createNewAgentChat();
     renderAgentChatSelector();
     renderAgentMessages();
     ensureAgentInitGreeting();
-  });
-  chatSelectEl?.addEventListener("change", () => {
-    const chatId = chatSelectEl.value || "";
-    if (!chatId) return;
-    setActiveAgentChat(chatId);
-    renderAgentMessages();
-    ensureAgentInitGreeting();
-  });
-  toneSelectEl?.addEventListener("change", () => {
-    const next = String(toneSelectEl.value || "friendly");
-    if (!["calm", "friendly", "coach", "cute"].includes(next)) return;
-    agentToneStyle = next;
-    saveAgentToneStyle();
+    closeAgentChatMenu();
   });
   responseLengthEl?.addEventListener("change", () => {
     const next = String(responseLengthEl.value || "balanced");
@@ -563,7 +571,6 @@ function bindHeaderModeAndAgent() {
     applyAgentFontSize();
     saveAgentPrefs();
   });
-  if (toneSelectEl) toneSelectEl.value = agentToneStyle;
   if (responseLengthEl) responseLengthEl.value = agentResponseLength;
   if (enterToSendEl) enterToSendEl.checked = !!agentEnterToSend;
   if (autoScrollEl) autoScrollEl.checked = !!agentAutoScroll;
@@ -580,33 +587,11 @@ function bindHeaderModeAndAgent() {
   }, true);
 }
 
-function loadAgentToneStyle() {
-  agentToneStyle = "friendly";
-  if (!agentStyleStorageKey) return;
-  try {
-    const raw = localStorage.getItem(agentStyleStorageKey) || "friendly";
-    if (["calm", "friendly", "coach", "cute"].includes(raw)) {
-      agentToneStyle = raw;
-    }
-  } catch (_e) {
-    agentToneStyle = "friendly";
-  }
-}
-
-function saveAgentToneStyle() {
-  if (!agentStyleStorageKey) return;
-  try {
-    localStorage.setItem(agentStyleStorageKey, agentToneStyle || "friendly");
-  } catch (_e) {
-    // ignore storage errors
-  }
-}
-
 function loadAgentPrefs() {
   agentResponseLength = "balanced";
   agentEnterToSend = true;
   agentAutoScroll = true;
-  agentStreamSpeed = "normal";
+  agentStreamSpeed = "fast";
   agentFontSize = "normal";
   if (!agentPrefsStorageKey) return;
   try {
@@ -916,6 +901,29 @@ function createNewAgentChat() {
   return chat;
 }
 
+function deleteAgentChat(chatId) {
+  const targetId = String(chatId || "");
+  if (!targetId) return;
+  const beforeCount = agentChats.length;
+  if (!beforeCount) return;
+
+  agentChats = agentChats.filter((chat) => chat.id !== targetId);
+  if (agentChats.length === beforeCount) return;
+
+  if (!agentChats.length) {
+    createNewAgentChat();
+    return;
+  }
+
+  if (activeAgentChatId === targetId || !getActiveAgentChat()) {
+    const sorted = [...agentChats].sort(
+      (a, b) => new Date(b.updated_at).valueOf() - new Date(a.updated_at).valueOf()
+    );
+    activeAgentChatId = sorted[0]?.id || agentChats[0]?.id || "";
+  }
+  saveAgentChats();
+}
+
 function loadAgentChats() {
   let loadedChats = [];
   try {
@@ -972,14 +980,99 @@ function saveAgentChats() {
   }
 }
 
+function formatAgentChatUpdatedAgo(updatedAt) {
+  const t = new Date(updatedAt);
+  if (Number.isNaN(t.valueOf())) return "방금";
+  const now = new Date();
+  const diffMs = now.valueOf() - t.valueOf();
+  if (diffMs < 60 * 1000) return "방금";
+  if (diffMs < 60 * 60 * 1000) return `${Math.max(1, Math.floor(diffMs / (60 * 1000)))}분 전`;
+  if (diffMs < 24 * 60 * 60 * 1000) return `${Math.max(1, Math.floor(diffMs / (60 * 60 * 1000)))}시간 전`;
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const startNow = new Date(now.getFullYear(), now.getMonth(), now.getDate()).valueOf();
+  const startThen = new Date(t.getFullYear(), t.getMonth(), t.getDate()).valueOf();
+  const days = Math.floor((startNow - startThen) / dayMs);
+  if (days <= 0) return "오늘";
+  if (days === 1) return "어제";
+  if (days <= 30) return `${days}일 전`;
+  return `${t.getMonth() + 1}/${t.getDate()}`;
+}
+
 function renderAgentChatSelector() {
-  const selectEl = document.getElementById("agentChatSelect");
-  if (!selectEl) return;
-  const options = [...agentChats]
-    .sort((a, b) => new Date(b.updated_at).valueOf() - new Date(a.updated_at).valueOf())
-    .map((chat) => `<option value="${chat.id}">${chat.title}</option>`);
-  selectEl.innerHTML = options.join("");
-  if (activeAgentChatId) selectEl.value = activeAgentChatId;
+  const titleEl = document.getElementById("agentChatSelectTitle");
+  const agoEl = document.getElementById("agentChatSelectAgo");
+  const menuEl = document.getElementById("agentChatSelectMenu");
+  const triggerEl = document.getElementById("agentChatSelectTrigger");
+  if (!menuEl) return;
+  const sorted = [...agentChats].sort(
+    (a, b) => new Date(b.updated_at).valueOf() - new Date(a.updated_at).valueOf()
+  );
+
+  const active = sorted.find((chat) => chat.id === activeAgentChatId) || sorted[0] || null;
+  if (titleEl) titleEl.textContent = active?.title || "새 채팅";
+  if (agoEl) agoEl.textContent = formatAgentChatUpdatedAgo(active?.updated_at);
+
+  menuEl.innerHTML = "";
+  sorted.forEach((chat) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "agent-chat-option";
+    const isActive = chat.id === active?.id;
+    if (isActive) item.classList.add("active");
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", isActive ? "true" : "false");
+
+    const title = document.createElement("span");
+    title.className = "agent-chat-option-title";
+    title.textContent = chat.title || "새 채팅";
+
+    const meta = document.createElement("span");
+    meta.className = "agent-chat-option-meta";
+
+    const agoEl = document.createElement("span");
+    agoEl.className = "agent-chat-option-ago";
+    const agoText = formatAgentChatUpdatedAgo(chat.updated_at);
+    agoEl.textContent = agoText;
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "agent-chat-option-delete";
+    delBtn.setAttribute("aria-label", "채팅 삭제");
+    delBtn.title = "채팅 삭제";
+    delBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9z"></path>
+      </svg>
+    `;
+    delBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const ok = typeof window.appConfirm === "function"
+        ? await window.appConfirm("이 채팅을 삭제할까요?")
+        : window.confirm("이 채팅을 삭제할까요?");
+      if (!ok) return;
+      deleteAgentChat(chat.id);
+      renderAgentChatSelector();
+      renderAgentMessages();
+      ensureAgentInitGreeting();
+    });
+
+    meta.appendChild(agoEl);
+    meta.appendChild(delBtn);
+
+    item.appendChild(title);
+    item.appendChild(meta);
+    item.addEventListener("click", () => {
+      setActiveAgentChat(chat.id);
+      renderAgentChatSelector();
+      renderAgentMessages();
+      ensureAgentInitGreeting();
+      menuEl.classList.add("hidden");
+      triggerEl?.setAttribute("aria-expanded", "false");
+    });
+    menuEl.appendChild(item);
+  });
 }
 
 function renderAgentMessages() {
@@ -1000,6 +1093,13 @@ function renderAgentMessages() {
   messages.forEach((item) => {
     appendAgentMessage(item.role, item.content, item.actions || []);
   });
+  scrollAgentMessagesToBottom();
+}
+
+function scrollAgentMessagesToBottom() {
+  const container = document.getElementById("agentMessages");
+  if (!container) return;
+  container.scrollTop = container.scrollHeight;
 }
 
 function pushAgentMessage(role, content, actions = []) {
@@ -1054,6 +1154,7 @@ function setHeaderMode(mode) {
   if (nextOpen) {
     inputEl?.focus();
     ensureAgentInitGreeting();
+    setTimeout(() => scrollAgentMessagesToBottom(), 0);
   }
 }
 
@@ -1096,26 +1197,105 @@ function appendAgentActionButtons(wrap, actions = []) {
   const actionsEl = document.createElement("div");
   actionsEl.className = "agent-actions";
   actions.forEach((action) => {
-    if (action?.type !== "navigate" || !action?.page) return;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "agent-action-btn";
-    const label = AGENT_ACTION_LABEL[action.page] || action.page;
-    btn.innerText = `${label} 이동`;
-    btn.addEventListener("click", () => window.nav?.go?.(action.page));
-    actionsEl.appendChild(btn);
+    if (action?.type === "navigate" && action?.page) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "agent-action-btn";
+      const label = AGENT_ACTION_LABEL[action.page] || action.page;
+      btn.innerText = `${label} 이동`;
+      btn.addEventListener("click", () => window.nav?.go?.(action.page));
+      actionsEl.appendChild(btn);
+      return;
+    }
+    if (action?.type === "open_review_plan_form") {
+      const formEl = createAgentReviewPlanInlineForm(action);
+      actionsEl.appendChild(formEl);
+    }
   });
   if (actionsEl.childElementCount > 0) wrap.appendChild(actionsEl);
 }
 
-async function streamAgentAssistantMessage(text, actions = []) {
-  const created = appendAgentMessage("assistant", "");
-  if (!created) return;
+function setAgentTypingIndicator(content) {
+  if (!content) return;
+  content.classList.add("typing");
+  content.innerHTML = `
+    <span class="agent-typing-label">작성 중</span>
+    <span class="agent-typing-dots" aria-hidden="true">
+      <i></i><i></i><i></i>
+    </span>
+  `;
+}
 
-  const { wrap, content } = created;
+function clearAgentTypingIndicator(content) {
+  if (!content) return;
+  content.classList.remove("typing");
+  content.innerHTML = "";
+}
+
+function createAgentTypingBubble() {
+  const created = appendAgentMessage("assistant", "");
+  if (!created) return null;
+  setAgentTypingIndicator(created.content);
+  return created;
+}
+
+async function waitNextFrame() {
+  await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+async function ensureAgentTypingMinVisible(startMs, minMs = 320) {
+  const elapsed = Date.now() - Number(startMs || 0);
+  if (elapsed >= minMs) return;
+  await new Promise((resolve) => setTimeout(resolve, minMs - elapsed));
+}
+
+function goAgentActionPage(page) {
+  const target = String(page || "").trim();
+  if (!target) return;
+  if (typeof window.navigate === "function") {
+    window.navigate(target);
+    return;
+  }
+  if (window.nav?.go) {
+    window.nav.go(target);
+    return;
+  }
+  window.location.href = `${target}.html`;
+}
+
+function runAgentAutoNavigate(actions = []) {
+  if (!Array.isArray(actions) || !actions.length) return false;
+  const navActions = actions.filter((a) => a?.type === "navigate" && a?.page);
+  if (navActions.length !== 1) return false;
+  const target = String(navActions[0].page || "").trim();
+  if (!target) return false;
+  const current = String(document.body?.dataset?.nav || "").trim();
+  if (current && current === target) return false;
+  setTimeout(() => goAgentActionPage(target), 220);
+  return true;
+}
+
+function runAgentAutoActions(actions = []) {
+  if (!Array.isArray(actions) || !actions.length) return false;
+  return false;
+}
+
+async function streamAgentAssistantMessage(text, actions = [], created = null) {
+  const target = created || appendAgentMessage("assistant", "");
+  if (!target) return;
+
+  const { wrap, content } = target;
+  if (!content.classList.contains("typing")) {
+    setAgentTypingIndicator(content);
+  }
+  await waitNextFrame();
+  const typingStartedAt = Date.now();
+  await ensureAgentTypingMinVisible(typingStartedAt, 320);
+
   const fullText = String(text || "");
   const totalLen = fullText.length;
   if (!totalLen) return;
+  clearAgentTypingIndicator(content);
 
   const perCharMs = getAgentStreamCharMs();
   const chunkMin = 1;
@@ -1137,7 +1317,14 @@ async function streamAgentAssistantMessage(text, actions = []) {
   appendAgentActionButtons(wrap, actions);
 }
 
-async function streamAgentResponse(payload) {
+async function streamAgentResponse(payload, created = null) {
+  const target = created || createAgentTypingBubble();
+  if (!target) throw new Error("assistant bubble create failed");
+  const { wrap, content } = target;
+  const typingStartedAt = Date.now();
+  if (!content.classList.contains("typing")) setAgentTypingIndicator(content);
+  await waitNextFrame();
+
   const headers = await buildAuthHeaders();
   const response = await fetch(`${window.API_BASE}/api/ml/agent/chat/stream/`, {
     method: "POST",
@@ -1153,10 +1340,6 @@ async function streamAgentResponse(payload) {
     throw new Error(`stream http ${response.status}`);
   }
 
-  const created = appendAgentMessage("assistant", "");
-  if (!created) throw new Error("assistant bubble create failed");
-  const { wrap, content } = created;
-
   const reader = response.body.getReader();
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
@@ -1165,6 +1348,7 @@ async function streamAgentResponse(payload) {
   let source = "";
   let model = "";
   let suggestions = [];
+  let started = false;
 
   while (true) {
     const { value, done } = await reader.read();
@@ -1186,6 +1370,11 @@ async function streamAgentResponse(payload) {
       if (msg.type === "delta") {
         const chunk = String(msg.text || "");
         if (!chunk) continue;
+        if (!started) {
+          await ensureAgentTypingMinVisible(typingStartedAt, 320);
+          clearAgentTypingIndicator(content);
+          started = true;
+        }
         answer += chunk;
         content.innerText = answer;
         const container = document.getElementById("agentMessages");
@@ -1200,19 +1389,41 @@ async function streamAgentResponse(payload) {
     }
   }
 
+  if (!started) {
+    await ensureAgentTypingMinVisible(typingStartedAt, 320);
+    clearAgentTypingIndicator(content);
+  }
   content.innerText = answer || "응답을 받지 못했습니다.";
   appendAgentActionButtons(wrap, actions);
   return { answer: content.innerText, actions, source, model, suggestions };
 }
 
+
 function getAgentContextPayload() {
-  const navKey = document.body?.dataset?.nav || "";
+  const path = String(window.location.pathname || "");
+  const pathBase = path.split("/").pop() || "";
+  const pathKey = pathBase.split("?")[0].replace(".html", "").trim().toLowerCase();
+  const navKey = String(document.body?.dataset?.nav || pathKey || "").trim();
   const title = document.getElementById("pageTitle")?.innerText || "";
+  const domHints = {
+    clinicGrid: !!document.getElementById("clinicGrid"),
+    myReviewScheduleList: !!document.getElementById("myReviewScheduleList"),
+    keywordInput: !!document.getElementById("keywordInput"),
+    clinicSelect: !!document.getElementById("clinicSelect"),
+    hospitalName: !!document.getElementById("hospitalName"),
+    notifyMailList: !!document.getElementById("notifyMailList"),
+    vacationForm: !!document.getElementById("vacationForm"),
+    vacationAdminBody: !!document.getElementById("vacationAdminBody"),
+    permTableBody: !!document.getElementById("permTableBody"),
+    logsTableBody: !!document.getElementById("logsTableBody"),
+    auditTableBody: !!document.getElementById("auditTableBody"),
+  };
   return {
+    page: navKey,
     nav: navKey,
     title,
-    url: window.location.pathname || "",
-    agent_style: agentToneStyle || "friendly",
+    url: path,
+    dom_hints: domHints,
     response_length: agentResponseLength || "balanced",
   };
 }
@@ -1244,24 +1455,32 @@ async function handleAgentSend() {
     })),
   };
 
+  let typingCreated = createAgentTypingBubble();
   try {
     let answer = "";
     let actions = [];
     try {
-      const streamed = await streamAgentResponse(payload);
+      const streamed = await streamAgentResponse(payload, typingCreated);
       answer = streamed.answer || "응답을 받지 못했습니다.";
       actions = Array.isArray(streamed.actions) ? streamed.actions : [];
     } catch (_streamErr) {
       const res = await window.api?.agentChat?.(payload);
       answer = res?.answer || "응답을 받지 못했습니다.";
       actions = Array.isArray(res?.actions) ? res.actions : [];
-      await streamAgentAssistantMessage(answer, actions);
+      await streamAgentAssistantMessage(answer, actions, typingCreated);
     }
     pushAgentMessage("assistant", answer, actions);
     renderAgentChatSelector();
+    runAgentAutoActions(actions);
+    runAgentAutoNavigate(actions);
   } catch (e) {
     const errorText = "요청 처리 중 오류가 발생했습니다.";
-    appendAgentMessage("assistant", errorText);
+    if (typingCreated?.content) {
+      clearAgentTypingIndicator(typingCreated.content);
+      typingCreated.content.innerText = errorText;
+    } else {
+      appendAgentMessage("assistant", errorText);
+    }
     pushAgentMessage("assistant", errorText);
     renderAgentChatSelector();
   } finally {
@@ -1279,11 +1498,191 @@ async function buildAuthHeaders() {
   return headers;
 }
 
+async function submitAgentReviewPlanPayload(payload) {
+  const typingCreated = createAgentTypingBubble();
+  try {
+    const headers = await buildAuthHeaders();
+    const response = await fetch(`${window.API_BASE}/api/ml/agent/review-plan-generate/`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...headers,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(String(data?.error || `http ${response.status}`));
+    }
+
+    const answer = String(data?.answer || "설계안 생성이 완료되었습니다.");
+    const actions = Array.isArray(data?.actions) ? data.actions : [];
+    try {
+      window.dispatchEvent(new CustomEvent("review-schedules-updated", { detail: { source: "agent" } }));
+    } catch (_) {
+      // no-op
+    }
+    await streamAgentAssistantMessage(answer, actions, typingCreated);
+    pushAgentMessage("assistant", answer, actions);
+    renderAgentChatSelector();
+    runAgentAutoNavigate(actions);
+  } catch (e) {
+    const errorText = `설계안 생성 중 오류가 발생했습니다: ${String(e?.message || e)}`;
+    if (typingCreated?.content) {
+      clearAgentTypingIndicator(typingCreated.content);
+      typingCreated.content.innerText = errorText;
+    } else {
+      appendAgentMessage("assistant", errorText);
+    }
+    pushAgentMessage("assistant", errorText);
+    renderAgentChatSelector();
+  }
+}
+
+function createAgentReviewPlanInlineForm(action = {}) {
+  const form = document.createElement("form");
+  form.className = "agent-review-plan-form";
+
+  form.innerHTML = `
+    <div class="agent-review-plan-head">
+      <strong>설계안 작성 폼</strong>
+      <span>필수 항목 입력 후 작성 항목을 선택하세요.</span>
+    </div>
+    <div class="agent-review-plan-grid">
+      <label class="agent-field full">
+        <span>설계안 제목 <em>*</em></span>
+        <input name="plan_title" type="text" placeholder="예: 강남12의원 리프팅 6개월 설계안" required />
+      </label>
+      <label class="agent-field full">
+        <span>키워드</span>
+        <textarea name="keywords"></textarea>
+      </label>
+      <div class="agent-field full agent-cred-row">
+        <span>플랫폼 ID / PW</span>
+        <div class="agent-cred-inline">
+          <input name="platform_account" type="text" placeholder="플랫폼 ID" />
+          <input name="platform_password" type="text" placeholder="플랫폼 PW" />
+        </div>
+      </div>
+    </div>
+    <div class="agent-stage-pick" data-role="stage-pick" aria-label="항목 선택">
+      <span class="stage-label">작성 항목</span>
+      <div class="stage-buttons">
+        <button type="button" class="stage-chip is-active" data-group="concern">고민</button>
+        <button type="button" class="stage-chip is-active" data-group="research">손품/발품</button>
+        <button type="button" class="stage-chip is-active" data-group="consult">상담후기</button>
+        <button type="button" class="stage-chip is-active" data-group="week1">1주차</button>
+        <button type="button" class="stage-chip is-active" data-group="week2">2주차</button>
+        <button type="button" class="stage-chip is-active" data-group="week3">3주차</button>
+        <button type="button" class="stage-chip is-active" data-group="month1">1개월</button>
+        <button type="button" class="stage-chip is-active" data-group="month2">2개월</button>
+        <button type="button" class="stage-chip is-active" data-group="month3">3개월</button>
+        <button type="button" class="stage-chip is-active" data-group="month4">4개월</button>
+        <button type="button" class="stage-chip is-active" data-group="month5">5개월</button>
+        <button type="button" class="stage-chip is-active" data-group="month6">6개월</button>
+      </div>
+    </div>
+    <div class="agent-review-plan-submit">
+      <button type="submit" class="agent-action-btn">설계안 생성</button>
+    </div>
+  `;
+
+  form.querySelectorAll('.stage-chip').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('is-active');
+    });
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const planTitle = String(fd.get("plan_title") || "").trim();
+    if (!planTitle) {
+      appendAgentMessage("assistant", "설계안 제목은 필수입니다.");
+      pushAgentMessage("assistant", "설계안 제목은 필수입니다.");
+      renderAgentChatSelector();
+      return;
+    }
+    const selectedGroups = Array.from(form.querySelectorAll('.stage-chip.is-active'))
+      .map((el) => String(el.dataset.group || '').trim())
+      .filter((v) => !!v);
+    const payload = {
+      plan_title: planTitle,
+      keywords: String(fd.get("keywords") || "").trim(),
+      platform_account: String(fd.get("platform_account") || "").trim(),
+      platform_password: String(fd.get("platform_password") || "").trim(),
+      plan_groups: selectedGroups,
+      model: String(action?.model || "ft:gpt-4.1-2025-04-14:personal::D3gDuLBk"),
+    };
+    await submitAgentReviewPlanPayload(payload);
+  });
+
+  return form;
+}
+
+async function openAgentReviewPlanForm(action = {}) {
+  const planTitle = window.prompt("설계안 제목(필수)", "");
+  if (planTitle === null) return;
+  const keywords = window.prompt("페르소나 키워드(선택, 쉼표로 구분)", "");
+  if (keywords === null) return;
+  const platformAccount = window.prompt("플랫폼 ID(선택)", "");
+  if (platformAccount === null) return;
+  const platformPassword = window.prompt("플랫폼 PW(선택)", "");
+  if (platformPassword === null) return;
+  const payload = {
+    plan_title: String(planTitle || "").trim(),
+    keywords: String(keywords || "").trim(),
+    platform_account: String(platformAccount || "").trim(),
+    platform_password: String(platformPassword || "").trim(),
+    model: String(action?.model || "ft:gpt-4.1-2025-04-14:personal::D3gDuLBk"),
+  };
+  if (!payload.plan_title) {
+    appendAgentMessage("assistant", "설계안 제목은 필수입니다.");
+    pushAgentMessage("assistant", "설계안 제목은 필수입니다.");
+    renderAgentChatSelector();
+    return;
+  }
+  await submitAgentReviewPlanPayload(payload);
+}
+
+
 let notifyPollTimer = null;
 let notifyItemsById = new Map();
 let notifyItems = [];
+let notifyHiddenKeys = new Set();
 const ATTENDANCE_MEMO_PLATFORM = "__attendance_correction__";
 const VACATION_MEMO_PLATFORM = "__vacation__";
+const REVIEW_SCHEDULE_PLATFORM = "__review_schedule__";
+
+function getNotifyHiddenStorageKey() {
+  let userKey = "guest";
+  try {
+    userKey = localStorage.getItem("currentUserKey") || "guest";
+  } catch (e) {
+    userKey = "guest";
+  }
+  return `notifyHiddenKeys:${userKey}`;
+}
+
+function loadNotifyHiddenKeys() {
+  try {
+    const raw = localStorage.getItem(getNotifyHiddenStorageKey());
+    const parsed = raw ? JSON.parse(raw) : [];
+    notifyHiddenKeys = new Set(Array.isArray(parsed) ? parsed.map((v) => String(v)) : []);
+  } catch (e) {
+    notifyHiddenKeys = new Set();
+  }
+}
+
+function saveNotifyHiddenKeys() {
+  try {
+    localStorage.setItem(getNotifyHiddenStorageKey(), JSON.stringify(Array.from(notifyHiddenKeys)));
+  } catch (e) {
+    // ignore storage errors
+  }
+}
 
 function getNotifyItemTime(item) {
   const raw = item?.created_at || item?.updated_at;
@@ -1295,6 +1694,7 @@ function classifyHeaderAlert(item) {
   const platform = String(item?.platform || "").toLowerCase();
   if (platform === ATTENDANCE_MEMO_PLATFORM) return "attendance";
   if (platform === VACATION_MEMO_PLATFORM) return "vacation";
+  if (platform === REVIEW_SCHEDULE_PLATFORM) return "schedule";
   return "memo";
 }
 
@@ -1348,6 +1748,7 @@ function bindNotifications() {
   });
 
   if (notifyPollTimer) clearInterval(notifyPollTimer);
+  loadNotifyHiddenKeys();
   notifyPollTimer = setInterval(refreshNotifications, 30000);
   refreshNotifications();
 }
@@ -1400,11 +1801,20 @@ async function refreshNotifications() {
       _kind: "mail",
       _key: `mail:${item.id}`,
     }));
-    const items = [...memoItems, ...inboxItems]
+    const allItems = [...memoItems, ...inboxItems]
       .sort((a, b) => getNotifyItemTime(b) - getNotifyItemTime(a))
       .slice(0, 30);
+    const items = allItems.filter((item) => {
+      const key = String(item._key || item.id);
+      const platform = String(item?.platform || "").toLowerCase();
+      if (!notifyHiddenKeys.has(key)) return true;
+      // Attendance/Vacation alerts should stay hidden once dismissed.
+      if (platform === ATTENDANCE_MEMO_PLATFORM || platform === VACATION_MEMO_PLATFORM) return false;
+      // For normal memo/mail alerts, only keep hidden when already read.
+      return !item.is_read;
+    });
 
-    const unreadCount = unreadNotify + unreadMail;
+    const unreadCount = items.filter((i) => !i.is_read).length;
     renderNotifications(items);
 
     if (unreadCount > 0) {
@@ -1443,7 +1853,11 @@ function renderNotifications(items) {
     .map((item) => {
       const alertType = item._kind === "mail" ? "mail" : classifyHeaderAlert(item);
       const kindLabel =
-        alertType === "mail" ? "메일" : alertType === "attendance" ? "근태" : alertType === "vacation" ? "휴가" : "메모";
+        alertType === "mail" ? "메일"
+          : alertType === "attendance" ? "근태"
+            : alertType === "vacation" ? "휴가"
+              : alertType === "schedule" ? "리뷰 스케줄"
+                : "메모";
       const title = item._kind === "mail"
         ? (item.subject || "").trim() || "제목 없음"
         : (item.content || "").trim() || "메모";
@@ -1479,6 +1893,8 @@ function updateHeaderBadgeFromItems() {
 function removeNotifyItemByKey(itemKey) {
   const key = String(itemKey || "");
   if (!key) return;
+  notifyHiddenKeys.add(key);
+  saveNotifyHiddenKeys();
   notifyItems = notifyItems.filter((item) => String(item._key || item.id) !== key);
   notifyItemsById = new Map(notifyItems.map((item) => [String(item._key || item.id), item]));
   renderNotifications(notifyItems);
@@ -1499,10 +1915,19 @@ async function markMailRead(messageId) {
   }
 }
 
-async function markNotificationRead(memoId) {
+async function markNotificationRead(item) {
   try {
+    const itemId = item?.id;
+    const platform = String(item?.platform || "").toLowerCase();
+    if (!itemId) return;
+    if (platform === ATTENDANCE_MEMO_PLATFORM || platform === VACATION_MEMO_PLATFORM) {
+      return;
+    }
+    const endpoint = platform === REVIEW_SCHEDULE_PLATFORM
+      ? `${window.API_BASE}/api/data/review-schedules/${itemId}/`
+      : `${window.API_BASE}/api/data/calendar-memos/${itemId}/`;
     const headers = await buildAuthHeaders();
-    await fetch(`${window.API_BASE}/api/data/calendar-memos/${memoId}/`, {
+    await fetch(endpoint, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json", ...headers },
@@ -1525,6 +1950,7 @@ function openNotifyCenterByType(type, item) {
     type === "mail" ? "mail_center"
       : type === "attendance" ? "attendance_admin"
         : type === "vacation" ? "vacation_admin"
+          : type === "schedule" ? "my_dashboard"
           : "notifications_center";
   if (typeof window.navigate === "function") {
     window.navigate(page);
@@ -1563,7 +1989,7 @@ function openNotificationDetail(itemKey) {
     if (!item.is_read) {
       markMailRead(item.id);
     }
-    deleteBtn.textContent = "알림에서 삭제";
+    deleteBtn.textContent = "알림에서 숨김";
     deleteBtn.onclick = (e) => {
       e.stopPropagation();
       removeNotifyItemByKey(item._key || item.id);
@@ -1597,6 +2023,14 @@ function openNotificationDetail(itemKey) {
         ${password ? `<div class="meta-row"><span>PW</span><span>${password}</span></div>` : ""}
         <div class="meta-row"><span>담당자</span><span>${author}</span></div>
       `;
+    } else if (alertType === "schedule") {
+      const clinic = item.clinic_name || "전체";
+      if (titleEl) titleEl.innerText = `${dateLabel} 리뷰 스케줄`;
+      metaEl.innerHTML = `
+        <div class="meta-row"><span>유형</span><span>리뷰 스케줄</span></div>
+        <div class="meta-row"><span>병원</span><span>${clinic}</span></div>
+        <div class="meta-row"><span>알림</span><span>${dateLabel} ${timeLabel}</span></div>
+      `;
     } else {
       if (titleEl) {
         titleEl.innerText =
@@ -1612,10 +2046,10 @@ function openNotificationDetail(itemKey) {
     contentEl.innerText = item.content || "";
 
     if (!item.is_read) {
-      markNotificationRead(item.id);
+      markNotificationRead(item);
     }
 
-    deleteBtn.textContent = "알림에서 삭제";
+    deleteBtn.textContent = "알림에서 숨김";
     deleteBtn.onclick = (e) => {
       e.stopPropagation();
       removeNotifyItemByKey(item._key || item.id);
@@ -1624,11 +2058,13 @@ function openNotificationDetail(itemKey) {
     openBtn.textContent =
       alertType === "attendance" ? "근태 관리 열기"
         : alertType === "vacation" ? "휴가 관리 열기"
-          : "메모함 열기";
+          : alertType === "schedule" ? "리뷰 스케줄 열기"
+            : "메모함 열기";
     openBtn.onclick = (e) => {
       e.stopPropagation();
       if (alertType === "attendance") openNotifyCenterByType("attendance", item);
       else if (alertType === "vacation") openNotifyCenterByType("vacation", item);
+      else if (alertType === "schedule") openNotifyCenterByType("schedule", item);
       else openNotifyCenterByType("memo", item);
     };
   }
@@ -1682,3 +2118,4 @@ window.addEventListener("beforeunload", () => {
   aiCatRoamRaf = null;
   aiCatRoamState = null;
 });
+

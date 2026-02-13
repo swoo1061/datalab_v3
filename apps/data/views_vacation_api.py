@@ -11,10 +11,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.data.models import VacationRequest, CalendarMemo, SystemPermission
+from apps.data.models import VacationRequest
 from apps.data.serializers_vacation import VacationRequestSerializer
-from apps.data.views_api import CsrfExemptSessionAuthentication, HeaderSessionAuthentication, VACATION_MEMO_PLATFORM
-from apps.data.permissions import normalize_user_role, get_user_permission
+from apps.data.views_api import CsrfExemptSessionAuthentication, HeaderSessionAuthentication
+from apps.data.permissions import normalize_user_role
 
 
 ANNUAL_TOTAL_DAYS = Decimal("15.0")
@@ -50,69 +50,14 @@ def _get_user_stats(user_ids, year: int):
     return stats
 
 
-def _requester_label(user):
-    profile = getattr(user, "profile", None)
-    return getattr(profile, "name", None) or user.get_full_name() or user.username
-
-
 def _notify_admins_on_request(req: VacationRequest):
-    User = get_user_model()
-    candidates = (
-        User.objects
-        .filter(is_active=True)
-        .select_related("profile")
-        .prefetch_related("groups")
-        .distinct()
-    )
-    notify_users = [
-        user for user in candidates
-        if normalize_user_role(user) in {"admin", "ceo", "leader"}
-    ]
-    if not notify_users:
-        notify_users = list(User.objects.filter(is_active=True, is_superuser=True).distinct())
-
-    requester = _requester_label(req.user)
-    period = req.start_date if req.start_date == req.end_date else f"{req.start_date} ~ {req.end_date}"
-    content = (
-        f"[휴가 신청] {requester}\n"
-        f"기간: {period}\n"
-        f"유형: {req.get_type_display()} / {req.days}일\n"
-        f"사유: {req.reason or '-'}"
-    )
-    now = timezone.now()
-    today = timezone.localdate()
-    for admin in notify_users:
-        CalendarMemo.objects.create(
-            user=admin,
-            clinic=None,
-            date=today,
-            content=content,
-            platform=VACATION_MEMO_PLATFORM,
-            remind_at=now,
-            is_read=False,
-        )
+    # Vacation notifications are now derived directly from VacationRequest.
+    return
 
 
 def _notify_requester_on_review(req: VacationRequest):
-    result = "승인" if req.status == "approved" else "반려"
-    period = req.start_date if req.start_date == req.end_date else f"{req.start_date} ~ {req.end_date}"
-    content = (
-        f"[휴가 {result}] {req.get_type_display()}\n"
-        f"기간: {period}\n"
-        f"사용일수: {req.days}일\n"
-        f"비고: {req.review_note or '-'}"
-    )
-    now = timezone.now()
-    today = timezone.localdate()
-    CalendarMemo.objects.create(
-        user=req.user,
-        clinic=None,
-        date=today,
-        content=content,
-        platform=VACATION_MEMO_PLATFORM,
-        remind_at=now,
-        is_read=False,
-    )
+    # Vacation notifications are now derived directly from VacationRequest.
+    return
 
 
 class MyVacationListCreateView(APIView):

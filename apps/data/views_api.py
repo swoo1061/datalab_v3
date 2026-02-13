@@ -5,15 +5,28 @@ from django.views.decorators.http import require_GET
 from django.utils import timezone
 from django.db.models import Q
 from django.utils.dateparse import parse_date, parse_datetime
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
 import json
 import re
+import uuid
 
 from apps.ml.services.llm.registry import LLM_MODELS
 from apps.ml.services.llm_service import generate_review_with_prompt
-from apps.data.models import ClinicGuide, ClinicDoctor, ClinicPrice, ClinicPost, ClinicPostPhoto, CalendarMemo
+from apps.data.models import (
+    ClinicGuide,
+    ClinicDoctor,
+    ClinicPrice,
+    ClinicPost,
+    ClinicPostPhoto,
+    CalendarMemo,
+    ReviewSchedule,
+    AttendanceCorrectionRequest,
+    VacationRequest,
+    SystemPermission,
+)
+from apps.data.permissions import get_user_permission, normalize_user_role
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -22,10 +35,78 @@ from rest_framework import status
 from rest_framework.authentication import SessionAuthentication, BaseAuthentication
 
 from .models import FavoriteClinic, ClinicAssignee
-from .serializers import FavoriteClinicSerializer, ClinicPostSerializer, CalendarMemoSerializer
+from .serializers import FavoriteClinicSerializer, ClinicPostSerializer, CalendarMemoSerializer, ReviewScheduleSerializer
 
 ATTENDANCE_MEMO_PLATFORM = "__attendance_correction__"
 VACATION_MEMO_PLATFORM = "__vacation__"
+REVIEW_SCHEDULE_PLATFORM = "__review_schedule__"
+_REVIEW_SCHEDULE_NEW_RE = re.compile(
+    r"^\[리뷰설계\/([^\/\]]+)\/([^\]]+)\]\s*([\s\S]*?)(?:\n(?:리뷰|초안):\s*([\s\S]*))?$"
+)
+_REVIEW_SCHEDULE_OLD_RE = re.compile(
+    r"^\[리뷰설계\/([^\]]+)\]\s*([\s\S]*?)(?:\n(?:리뷰|초안):\s*([\s\S]*))?$"
+)
+
+
+def _split_plan_title_from_detail(raw_detail):
+    detail = str(raw_detail or "").strip()
+    plan_title = ""
+    lines = detail.splitlines()
+    kept = []
+    for ln in lines:
+        s = str(ln or "").strip()
+        if s.startswith("설계안 제목:"):
+            plan_title = s.split(":", 1)[1].strip()
+            continue
+        kept.append(ln)
+    cleaned = "\n".join(kept).strip()
+    return plan_title, cleaned
+
+
+def _parse_review_schedule_content(raw_content):
+    raw = (raw_content or "").strip()
+    m_new = _REVIEW_SCHEDULE_NEW_RE.match(raw)
+    if m_new:
+        plan_title, cleaned_detail = _split_plan_title_from_detail(m_new.group(3))
+        return {
+            "plan_id": (m_new.group(1) or "").strip(),
+            "label": (m_new.group(2) or "").strip(),
+            "detail": cleaned_detail,
+            "draft": (m_new.group(4) or "").strip(),
+            "plan_title": plan_title,
+        }
+    m_old = _REVIEW_SCHEDULE_OLD_RE.match(raw)
+    if m_old:
+        plan_title, cleaned_detail = _split_plan_title_from_detail(m_old.group(2))
+        return {
+            "plan_id": "",
+            "label": (m_old.group(1) or "").strip(),
+            "detail": cleaned_detail,
+            "draft": (m_old.group(3) or "").strip(),
+            "plan_title": plan_title,
+        }
+    plan_title, cleaned_detail = _split_plan_title_from_detail(raw)
+    return {
+        "plan_id": "",
+        "label": "",
+        "detail": cleaned_detail,
+        "draft": "",
+        "plan_title": plan_title,
+    }
+
+
+def _build_review_schedule_content(*, plan_id, label, detail, draft, plan_title=""):
+    pid = str(plan_id or "").strip()
+    l = str(label or "").strip()
+    d = str(detail or "").strip()
+    dr = str(draft or "").strip()
+    pt = str(plan_title or "").strip()
+    content = f"[리뷰설계/{pid}/{l}] {d}" if pid else f"[리뷰설계/{l}] {d}"
+    if pt:
+        content += f"\n설계안 제목: {pt}"
+    if dr:
+        content += f"\n초안: {dr}"
+    return content
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
@@ -667,6 +748,7 @@ class CalendarMemoListCreateView(APIView):
             .filter(user=request.user)
             .exclude(platform=ATTENDANCE_MEMO_PLATFORM)
             .exclude(platform=VACATION_MEMO_PLATFORM)
+            .exclude(platform=REVIEW_SCHEDULE_PLATFORM)
         )
 
         clinic_id = request.GET.get("clinic_id")
@@ -758,8 +840,13 @@ class CalendarMemoDetailView(APIView):
 
         if "remind_at" in payload:
             remind_raw = payload.get("remind_at")
-            memo.remind_at = _parse_datetime_value(remind_raw) if remind_raw else None
+            parsed_remind = _parse_datetime_value(remind_raw) if remind_raw else None
+            memo.remind_at = parsed_remind
             updated_fields.append("remind_at")
+            # Re-scheduling a reminder should surface it again as unread.
+            if parsed_remind is not None:
+                memo.is_read = False
+                updated_fields.append("is_read")
 
         if "platform" in payload:
             memo.platform = (payload.get("platform") or "").strip()
@@ -788,6 +875,264 @@ class CalendarMemoDetailView(APIView):
         return Response({"ok": True}, status=status.HTTP_200_OK)
 
 
+class ReviewScheduleListView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = ReviewSchedule.objects.filter(user=request.user)
+
+        clinic_id = request.GET.get("clinic_id")
+        if clinic_id:
+            qs = qs.filter(clinic_id=clinic_id)
+
+        date_str = request.GET.get("date")
+        month_str = request.GET.get("month")
+        if date_str:
+            parsed = parse_date(date_str)
+            if parsed:
+                qs = qs.filter(date=parsed)
+        elif month_str:
+            try:
+                year, m = map(int, month_str.split("-"))
+                qs = qs.filter(date__year=year, date__month=m)
+            except ValueError:
+                pass
+
+        unread_only = _parse_bool(request.GET.get("unread"))
+        if unread_only:
+            qs = qs.filter(is_read=False)
+
+        data = ReviewScheduleSerializer(qs, many=True).data
+        return Response({"count": qs.count(), "results": data}, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        payload = request.data or {}
+        date_str = payload.get("date")
+        parsed_date = parse_date(date_str) if date_str else None
+        if not parsed_date:
+            return Response({"message": "date required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        label = (payload.get("label") or "").strip()
+        detail = (payload.get("detail") or "").strip()
+        draft = (payload.get("draft") or "").strip()
+        content = (payload.get("content") or "").strip()
+        plan_id = (payload.get("plan_id") or "").strip()
+        plan_title = (payload.get("plan_title") or "").strip()
+
+        if content:
+            parsed = _parse_review_schedule_content(content)
+            if not label:
+                label = parsed.get("label", "")
+            if not detail:
+                detail = parsed.get("detail", "")
+            if not draft:
+                draft = parsed.get("draft", "")
+            if not plan_id:
+                plan_id = parsed.get("plan_id", "")
+            if not plan_title:
+                plan_title = parsed.get("plan_title", "")
+
+        if not label:
+            return Response({"message": "label required"}, status=status.HTTP_400_BAD_REQUEST)
+        if not detail:
+            return Response({"message": "detail required"}, status=status.HTTP_400_BAD_REQUEST)
+        if not plan_id:
+            plan_id = uuid.uuid4().hex[:10]
+
+        if not content:
+            content = _build_review_schedule_content(
+                plan_id=plan_id,
+                label=label,
+                detail=detail,
+                draft=draft,
+                plan_title=plan_title,
+            )
+        else:
+            content = _build_review_schedule_content(
+                plan_id=plan_id,
+                label=label,
+                detail=detail,
+                draft=draft,
+                plan_title=plan_title,
+            )
+
+        clinic = None
+        clinic_id = payload.get("clinic_id")
+        if clinic_id:
+            clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+
+        remind_at = _parse_datetime_value(payload.get("remind_at"))
+
+        memo = ReviewSchedule.objects.create(
+            user=request.user,
+            clinic=clinic,
+            date=parsed_date,
+            plan_id=plan_id,
+            plan_title=plan_title,
+            label=label,
+            detail=detail,
+            draft=draft,
+            account=((payload.get("account") or payload.get("platform_account")) or "").strip(),
+            account_password=((payload.get("account_password") or payload.get("platform_password")) or "").strip(),
+            remind_at=remind_at,
+            is_read=False,
+        )
+        return Response(ReviewScheduleSerializer(memo).data, status=status.HTTP_201_CREATED)
+
+
+class ReviewScheduleGenerateView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        payload = request.data or {}
+        start_date_raw = payload.get("start_date")
+        start_date = parse_date(start_date_raw) if start_date_raw else timezone.localdate()
+        if not start_date:
+            return Response({"message": "start_date invalid"}, status=status.HTTP_400_BAD_REQUEST)
+
+        def _next_business_day(d):
+            cur = d
+            while cur.weekday() >= 5:  # 5: Saturday, 6: Sunday
+                cur = cur + timedelta(days=1)
+            return cur
+
+        weeks_raw = payload.get("weeks", 4)
+        try:
+            weeks = int(weeks_raw)
+        except (TypeError, ValueError):
+            weeks = 4
+        weeks = max(1, min(12, weeks))
+
+        clinic = None
+        clinic_id = payload.get("clinic_id")
+        if clinic_id:
+            clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+
+        replace_existing = _parse_bool(payload.get("replace_existing"))
+        if payload.get("replace_existing") is None:
+            replace_existing = True
+
+        start_date = _next_business_day(start_date)
+        plan_id = str(payload.get("plan_id") or "").strip() or uuid.uuid4().hex[:10]
+
+        if replace_existing:
+            delete_qs = ReviewSchedule.objects.filter(user=request.user, date__gte=start_date)
+            if clinic:
+                delete_qs = delete_qs.filter(clinic=clinic)
+            delete_qs.delete()
+
+        fixed_plan = [
+            (0, "여론 리뷰 작성", "여론/관심사 키워드 정리, 주제 선정"),
+            (2, "발품/손품", "검색/커뮤니티 탐색 포인트 정리"),
+            (4, "상담 후기", "상담 핵심 포인트 + Q&A 후기 작성"),
+        ]
+        weekly_plan = [(7 * i, "주단위 후기", f"{i}주차 후기 업로드/점검") for i in range(1, weeks + 1)]
+        monthly_plan = [(30, "달단위 후기", "월간 성과 요약 + 다음달 개선안")]
+        plan_rows = [*fixed_plan, *weekly_plan, *monthly_plan]
+
+        created = []
+        for offset_days, label, detail in plan_rows:
+            target_date = _next_business_day(start_date + timedelta(days=offset_days))
+            remind_at = timezone.make_aware(datetime.combine(target_date, time(hour=10, minute=0)))
+            memo = ReviewSchedule.objects.create(
+                user=request.user,
+                clinic=clinic,
+                date=target_date,
+                plan_id=plan_id,
+                plan_title=(payload.get("plan_title") or "").strip(),
+                label=label,
+                detail=detail,
+                draft="",
+                account=((payload.get("account") or payload.get("platform_account")) or "").strip(),
+                account_password=((payload.get("account_password") or payload.get("platform_password")) or "").strip(),
+                remind_at=remind_at,
+                is_read=False,
+            )
+            created.append(memo)
+
+        data = ReviewScheduleSerializer(created, many=True).data
+        return Response({"count": len(data), "results": data}, status=status.HTTP_201_CREATED)
+
+
+class ReviewScheduleDetailView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, schedule_id):
+        memo = get_object_or_404(ReviewSchedule, id=schedule_id, user=request.user)
+        payload = request.data or {}
+        updated_fields = []
+
+        if "date" in payload:
+            parsed = parse_date(payload.get("date") or "")
+            if parsed:
+                memo.date = parsed
+                updated_fields.append("date")
+
+        next_plan_id = (payload.get("plan_id") or "").strip() or memo.plan_id or uuid.uuid4().hex[:10]
+        next_label = (payload.get("label") or "").strip() or memo.label or ""
+        next_detail = (payload.get("detail") or "").strip() or memo.detail or ""
+        next_plan_title = (payload.get("plan_title") or "").strip() or memo.plan_title or ""
+        next_draft = (payload.get("draft") or "").strip() or memo.draft or ""
+
+        if "content" in payload:
+            raw_content = (payload.get("content") or "").strip()
+            parsed_content = _parse_review_schedule_content(raw_content)
+            if parsed_content.get("label"):
+                next_label = parsed_content.get("label") or next_label
+            if parsed_content.get("detail"):
+                next_detail = parsed_content.get("detail") or next_detail
+            if parsed_content.get("draft"):
+                next_draft = parsed_content.get("draft") or next_draft
+            if parsed_content.get("plan_id"):
+                next_plan_id = parsed_content.get("plan_id") or next_plan_id
+            if parsed_content.get("plan_title"):
+                next_plan_title = parsed_content.get("plan_title") or next_plan_title
+
+        if "account" in payload:
+            memo.account = (payload.get("account") or "").strip()
+            updated_fields.append("account")
+
+        if "account_password" in payload:
+            memo.account_password = (payload.get("account_password") or "").strip()
+            updated_fields.append("account_password")
+
+        if (
+            "content" in payload
+            or "label" in payload
+            or "detail" in payload
+            or "draft" in payload
+            or "plan_id" in payload
+            or "plan_title" in payload
+        ) and next_label and next_detail:
+            memo.plan_id = next_plan_id
+            memo.label = next_label
+            memo.detail = next_detail
+            memo.draft = next_draft
+            memo.plan_title = next_plan_title
+            updated_fields.extend(["plan_id", "label", "detail", "draft", "plan_title"])
+
+        if "remind_at" in payload:
+            remind_raw = payload.get("remind_at")
+            memo.remind_at = _parse_datetime_value(remind_raw) if remind_raw else None
+            updated_fields.append("remind_at")
+
+        if "is_read" in payload:
+            memo.is_read = _parse_bool(payload.get("is_read"))
+            updated_fields.append("is_read")
+
+        if updated_fields:
+            memo.save(update_fields=[*set(updated_fields), "updated_at"])
+        return Response(ReviewScheduleSerializer(memo).data, status=status.HTTP_200_OK)
+
+    def delete(self, request, schedule_id):
+        memo = get_object_or_404(ReviewSchedule, id=schedule_id, user=request.user)
+        memo.delete()
+        return Response({"ok": True}, status=status.HTTP_200_OK)
+
+
 class NotificationListView(APIView):
     authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
     permission_classes = [IsAuthenticated]
@@ -800,25 +1145,139 @@ class NotificationListView(APIView):
             limit = 20
 
         now = timezone.now()
-        qs = (
+        user_role = normalize_user_role(request.user)
+        is_attendance_admin = bool(
+            request.user.is_superuser
+            or user_role in {"admin", "ceo", "leader"}
+            or get_user_permission(request.user, SystemPermission.KEY_ATTENDANCE_REQUESTS)
+        )
+        is_vacation_admin = bool(request.user.is_superuser or user_role in {"admin", "ceo", "leader"})
+        memo_qs = (
             CalendarMemo.objects
             .filter(user=request.user, remind_at__isnull=False, remind_at__lte=now)
             .order_by("-remind_at")
         )
+        schedule_qs = (
+            ReviewSchedule.objects
+            .filter(user=request.user, remind_at__isnull=False, remind_at__lte=now)
+            .order_by("-remind_at")
+        )
+        attendance_qs = AttendanceCorrectionRequest.objects.none()
+        if is_attendance_admin:
+            attendance_qs = AttendanceCorrectionRequest.objects.filter(status="pending").select_related("user", "user__profile").order_by("-created_at")
+        vacation_q = Q(user=request.user, status__in=["approved", "rejected"])
+        if is_vacation_admin:
+            vacation_q |= Q(status="pending")
+        vacation_qs = VacationRequest.objects.filter(vacation_q).select_related("user", "user__profile").order_by("-updated_at", "-created_at")
+
+        def _attendance_rows(qs):
+            rows = []
+            tz = timezone.get_current_timezone()
+            for req in qs[:limit]:
+                profile = getattr(req.user, "profile", None)
+                requester = getattr(profile, "name", None) or req.user.get_full_name() or req.user.username
+                in_txt = req.requested_check_in_at.astimezone(tz).strftime("%Y-%m-%d %H:%M") if req.requested_check_in_at else "-"
+                out_txt = req.requested_check_out_at.astimezone(tz).strftime("%Y-%m-%d %H:%M") if req.requested_check_out_at else "-"
+                rows.append(
+                    {
+                        "id": req.id,
+                        "date": req.work_date.isoformat(),
+                        "content": (
+                            f"[근태 정정요청] {requester}\n"
+                            f"대상일: {req.work_date}\n"
+                            f"요청 출근: {in_txt} / 요청 퇴근: {out_txt}\n"
+                            f"사유: {req.reason}"
+                        ),
+                        "platform": ATTENDANCE_MEMO_PLATFORM,
+                        "platform_label": "근태 정정요청",
+                        "remind_at": req.created_at,
+                        "is_read": False,
+                        "created_at": req.created_at,
+                        "updated_at": req.updated_at,
+                    }
+                )
+            return rows
+
+        def _vacation_rows(qs):
+            rows = []
+            for req in qs[:limit]:
+                profile = getattr(req.user, "profile", None)
+                requester = getattr(profile, "name", None) or req.user.get_full_name() or req.user.username
+                period = req.start_date if req.start_date == req.end_date else f"{req.start_date} ~ {req.end_date}"
+                if req.status == "pending":
+                    content = (
+                        f"[휴가 신청] {requester}\n"
+                        f"기간: {period}\n"
+                        f"유형: {req.get_type_display()} / {req.days}일\n"
+                        f"사유: {req.reason or '-'}"
+                    )
+                else:
+                    result = "승인" if req.status == "approved" else "반려"
+                    content = (
+                        f"[휴가 {result}] {req.get_type_display()}\n"
+                        f"기간: {period}\n"
+                        f"사용일수: {req.days}일\n"
+                        f"비고: {req.review_note or '-'}"
+                    )
+                rows.append(
+                    {
+                        "id": req.id,
+                        "date": req.start_date.isoformat(),
+                        "content": content,
+                        "platform": VACATION_MEMO_PLATFORM,
+                        "platform_label": "휴가 신청",
+                        "remind_at": req.updated_at or req.created_at,
+                        "is_read": req.status != "pending",
+                        "created_at": req.created_at,
+                        "updated_at": req.updated_at,
+                    }
+                )
+            return rows
 
         center = (request.GET.get("center") or "").strip().lower()
         if center == "attendance":
-            qs = qs.filter(platform=ATTENDANCE_MEMO_PLATFORM)
+            data = _attendance_rows(attendance_qs)
+            unread_count = sum(1 for row in data if not bool(row.get("is_read")))
+            return Response({"count": attendance_qs.count(), "unread_count": unread_count, "results": data}, status=status.HTTP_200_OK)
         elif center == "vacation":
-            qs = qs.filter(platform=VACATION_MEMO_PLATFORM)
+            data = _vacation_rows(vacation_qs)
+            unread_count = sum(1 for row in data if not bool(row.get("is_read")))
+            return Response({"count": vacation_qs.count(), "unread_count": unread_count, "results": data}, status=status.HTTP_200_OK)
+        elif center == "schedule":
+            qs = schedule_qs
+            unread_count = qs.filter(is_read=False).count()
+            data = ReviewScheduleSerializer(qs[:limit], many=True).data
+            return Response({"count": qs.count(), "unread_count": unread_count, "results": data}, status=status.HTTP_200_OK)
         elif center == "system":
-            qs = qs.filter(platform__in=[ATTENDANCE_MEMO_PLATFORM, VACATION_MEMO_PLATFORM])
+            attendance_rows = _attendance_rows(attendance_qs)
+            vacation_rows = _vacation_rows(vacation_qs)
+            data = [*attendance_rows, *vacation_rows]
+            data.sort(key=lambda x: str(x.get("remind_at") or x.get("created_at") or ""), reverse=True)
+            data = data[:limit]
+            unread_count = sum(1 for row in data if not bool(row.get("is_read")))
+            return Response({"count": len(data), "unread_count": unread_count, "results": data}, status=status.HTTP_200_OK)
         elif center == "memo":
-            qs = qs.exclude(platform=ATTENDANCE_MEMO_PLATFORM).exclude(platform=VACATION_MEMO_PLATFORM)
+            qs = (
+                memo_qs.exclude(platform=ATTENDANCE_MEMO_PLATFORM)
+                .exclude(platform=VACATION_MEMO_PLATFORM)
+                .exclude(platform=REVIEW_SCHEDULE_PLATFORM)
+            )
+            unread_count = qs.filter(is_read=False).count()
+            data = CalendarMemoSerializer(qs[:limit], many=True).data
+            return Response({"count": qs.count(), "unread_count": unread_count, "results": data}, status=status.HTTP_200_OK)
 
-        unread_count = qs.filter(is_read=False).count()
-        data = CalendarMemoSerializer(qs[:limit], many=True).data
+        memo_rows = CalendarMemoSerializer(
+            memo_qs.exclude(platform=REVIEW_SCHEDULE_PLATFORM)[:limit],
+            many=True,
+        ).data
+        attendance_rows = _attendance_rows(attendance_qs)
+        vacation_rows = _vacation_rows(vacation_qs)
+        schedule_rows = ReviewScheduleSerializer(schedule_qs[:limit], many=True).data
+        all_rows = [*memo_rows, *attendance_rows, *vacation_rows, *schedule_rows]
+        all_rows.sort(key=lambda x: str(x.get("remind_at") or x.get("created_at") or ""), reverse=True)
+        all_rows = all_rows[:limit]
+        unread_count = sum(1 for row in all_rows if not bool(row.get("is_read")))
         return Response(
-            {"count": qs.count(), "unread_count": unread_count, "results": data},
+            {"count": len(all_rows), "unread_count": unread_count, "results": all_rows},
             status=status.HTTP_200_OK,
         )

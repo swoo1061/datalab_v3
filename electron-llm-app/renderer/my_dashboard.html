@@ -10,12 +10,13 @@
   <link rel="stylesheet" href="css/header.css" />
   <link rel="stylesheet" href="css/dashboard.css" />
   <link rel="stylesheet" href="vendor/flatpickr/flatpickr.min.css" />
-  <link rel="stylesheet" href="css/my_dashboard.css" />
+  <link rel="stylesheet" href="css/my_dashboard.css?v=20260213-22" />
+  <link rel="stylesheet" href="css/notifications_center.css?v=20260212-12" />
   <link rel="stylesheet" href="css/schedule.css" />
   <link rel="stylesheet" href="css/calendar_dashboard.css" />
   <link rel="stylesheet" href="css/business_mode.css" />
 </head>
-<body class="theme-vivid tone-sidebar">
+<body class="theme-vivid tone-sidebar" data-nav="my_dashboard" data-notify-mode="mail">
 
 <div class="app-root">
   <!-- 사이드바 -->
@@ -40,18 +41,37 @@
                 <button type="button" class="my-section-nav-btn active" data-section-key="attendance">
                   <span class="nav-step">01</span>
                   <span class="nav-label">출퇴근</span>
+                  <span class="nav-drag-handle" aria-label="메뉴 이동">⠿</span>
                 </button>
                 <button type="button" class="my-section-nav-btn" data-section-key="clinic">
                   <span class="nav-step">02</span>
                   <span class="nav-label">담당 병원</span>
+                  <span class="nav-drag-handle" aria-label="메뉴 이동">⠿</span>
                 </button>
                 <button type="button" class="my-section-nav-btn" data-section-key="week">
                   <span class="nav-step">03</span>
                   <span class="nav-label">월간 작업</span>
+                  <span class="nav-drag-handle" aria-label="메뉴 이동">⠿</span>
+                </button>
+                <button type="button" class="my-section-nav-btn" data-section-key="schedule_calendar">
+                  <span class="nav-step">04</span>
+                  <span class="nav-label">리뷰 설계 일정 캘린더</span>
+                  <span class="nav-drag-handle" aria-label="메뉴 이동">⠿</span>
+                </button>
+                <button type="button" class="my-section-nav-btn" data-section-key="review_design">
+                  <span class="nav-step">05</span>
+                  <span class="nav-label">리뷰 설계 보드</span>
+                  <span class="nav-drag-handle" aria-label="메뉴 이동">⠿</span>
                 </button>
                 <button type="button" class="my-section-nav-btn" data-section-key="memo">
-                  <span class="nav-step">04</span>
+                  <span class="nav-step">06</span>
                   <span class="nav-label">메모장</span>
+                  <span class="nav-drag-handle" aria-label="메뉴 이동">⠿</span>
+                </button>
+                <button type="button" class="my-section-nav-btn" data-section-key="mail_center">
+                  <span class="nav-step">07</span>
+                  <span class="nav-label">메일</span>
+                  <span class="nav-drag-handle" aria-label="메뉴 이동">⠿</span>
                 </button>
               </aside>
 
@@ -114,23 +134,149 @@
                   </div>
                 </div>
               </section>
+              <section class="section-block memo-panel card" data-section-key="schedule_calendar" draggable="false">
+                <button type="button" class="section-toggle" data-target="myReviewScheduleCalendarSection" aria-expanded="true">
+                  <span class="section-title">리뷰 설계 일정 캘린더</span>
+                  <span class="section-drag-handle" aria-label="섹션 이동">⠿</span>
+                </button>
+                <div id="myReviewScheduleCalendarSection" class="section-body open">
+                  <div class="review-schedule-head">
+                    <strong>리뷰 설계 일정 캘린더</strong>
+                    <div class="review-schedule-month-nav" id="myReviewScheduleMonthNav">
+                      <button class="month-btn" id="reviewSchedulePrevBtn" type="button">◀</button>
+                      <div id="reviewScheduleMonthLabel" class="month-label">-</div>
+                      <button class="month-btn" id="reviewScheduleNextBtn" type="button">▶</button>
+                    </div>
+                  </div>
+                  <div id="myReviewScheduleCalendar" class="review-schedule-calendar-grid"></div>
+                </div>
+              </section>
+              <section class="section-block memo-panel card" data-section-key="review_design" draggable="false">
+                <button type="button" class="section-toggle" data-target="myReviewDesignSection" aria-expanded="true">
+                  <span class="section-title">리뷰 설계 보드</span>
+                  <span class="section-drag-handle" aria-label="섹션 이동">⠿</span>
+                </button>
+                <div id="myReviewDesignSection" class="section-body open">
+                  <div class="review-plan-toolbar">
+                    <div class="review-plan-toolbar-main">
+                      <strong id="myReviewScheduleSelectedDate">설계표 전체</strong>
+                      <p class="muted">설계안별로 버튼을 눌러 리뷰 결과 상세를 확인하세요.</p>
+                    </div>
+                    <div class="review-plan-toolbar-actions">
+                      <button type="button" class="btn" id="myReviewScheduleAdd">항목 추가</button>
+                      <button type="button" class="btn primary" id="myReviewScheduleGenerate">설계안 생성</button>
+                    </div>
+                  </div>
+                  <div id="myReviewScheduleList" class="memo-list plan-board"></div>
+                </div>
+              </section>
               <section class="section-block memo-panel card" data-section-key="memo" draggable="false">
                 <button type="button" class="section-toggle" data-target="myMemoSection" aria-expanded="true">
                   <span class="section-title">메모장</span>
                   <span class="section-drag-handle" aria-label="섹션 이동">⠿</span>
                 </button>
                 <div id="myMemoSection" class="section-body open">
-                  <div class="calendar-memo-panel" id="myMemoPanel">
-                    <div class="memo-list-panel">
-                      <div class="memo-list-head">
-                        <div class="memo-title">
-                          <strong>메모 리스트</strong>
+                  <div class="review-plan-toolbar my-memo-toolbar">
+                    <div class="review-plan-toolbar-main">
+                      <strong>메모</strong>
+                    </div>
+                    <div class="review-plan-toolbar-actions">
+                      <button type="button" class="btn" id="myMemoCreate">새 메모 작성하기</button>
+                      <button type="button" class="btn danger" id="myMemoDelete">삭제</button>
+                    </div>
+                  </div>
+                  <div class="my-memo-layout">
+                    <div class="my-memo-list" id="myMemoList"></div>
+                    <div class="my-memo-editor">
+                      <div class="modal-grid memo-grid" style="margin-top:0;">
+                        <div class="ai-field">
+                          <label>제목</label>
+                          <input id="myMemoTitle" class="input" type="text" placeholder="메모 제목" />
                         </div>
-                        <div class="memo-actions">
-                          <button class="btn primary" id="myMemoOpen">메모 작성</button>
+                        <div class="ai-field">
+                          <label>알림 시각</label>
+                          <input id="myMemoRemind" class="input" type="datetime-local" />
+                        </div>
+                        <div class="ai-field span-2">
+                          <label>메모 내용</label>
+                          <textarea id="myMemoContent" class="input" placeholder="메모를 입력하세요."></textarea>
                         </div>
                       </div>
-                      <div id="myMemoList" class="memo-list"></div>
+                      <div id="myMemoStatus" class="muted hidden" style="margin-top:8px;"></div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+              <section class="section-block memo-panel card" data-section-key="mail_center" draggable="false">
+                <button type="button" class="section-toggle" data-target="myMailCenterSection" aria-expanded="true">
+                  <span class="section-title">메일함</span>
+                  <span class="section-drag-handle" aria-label="섹션 이동">⠿</span>
+                </button>
+                <div id="myMailCenterSection" class="section-body open">
+                  <section class="notify-shell card my-dashboard-mail-shell">
+                    <aside class="notify-folder-col" id="notifyFolders"></aside>
+                    <section class="notify-list-col">
+                      <div class="notify-toolbar">
+                        <input id="notifySearchInput" class="input" type="text" placeholder="검색" />
+                        <button class="btn primary" id="notifyComposeBtn" type="button">메일 쓰기</button>
+                      </div>
+                      <div class="mail-command-bar">
+                        <button class="mail-cmd danger" id="mailDeleteBtn" type="button">삭제</button>
+                        <label class="mail-sort-wrap" for="mailSortSelect">필터</label>
+                        <select id="mailSortSelect" class="mail-sort-select">
+                          <option value="latest">최신순</option>
+                          <option value="oldest">오래된 순</option>
+                        </select>
+                      </div>
+                      <div class="notify-mail-list" id="notifyMailList"></div>
+                    </section>
+                    <section class="notify-detail-col">
+                      <div class="notify-detail-empty" id="notifyDetailEmpty">메일을 선택하면 상세가 열립니다.</div>
+                      <div class="notify-detail hidden" id="notifyDetailPane">
+                        <div class="notify-detail-head">
+                          <h3 id="notifyDetailTitle">메일</h3>
+                          <div class="notify-detail-actions"></div>
+                        </div>
+                        <div class="notify-detail-meta" id="notifyDetailMeta"></div>
+                        <div class="notify-detail-body" id="notifyDetailBody"></div>
+                      </div>
+                    </section>
+                  </section>
+                  <div id="mailComposeModal" class="modal modal-lock hidden">
+                    <div class="modal-backdrop"></div>
+                    <div class="modal-card">
+                      <div class="modal-head">
+                        <div>
+                          <div class="modal-title">새 메일</div>
+                          <div class="modal-sub">보낼 사람을 이름으로 선택해 전송합니다. (첨부 최대 10개)</div>
+                        </div>
+                        <button class="modal-close" data-close="true">닫기</button>
+                      </div>
+                      <div class="modal-body">
+                        <div class="modal-grid">
+                          <div class="ai-field">
+                            <label>받는 사람</label>
+                            <select id="mailRecipientSelect" class="select"></select>
+                          </div>
+                          <div class="ai-field span-2">
+                            <label>제목</label>
+                            <input id="mailSubjectInput" class="input" type="text" />
+                          </div>
+                          <div class="ai-field span-2">
+                            <label>본문</label>
+                            <input id="mailContentInput" class="input" rows="7" />
+                          </div>
+                          <div class="ai-field span-2">
+                            <label>첨부파일</label>
+                            <input id="mailAttachmentInput" class="input" type="file" multiple />
+                            <div id="mailAttachmentList" class="mail-attachment-list"></div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="modal-actions">
+                        <button class="btn" data-close="true">취소</button>
+                        <button class="btn primary" id="mailSendBtn">보내기</button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -142,6 +288,7 @@
         </main>
   </div>
 </div>
+
 
 <div id="attCorrectionModal" class="modal modal-lock hidden">
   <div class="modal-backdrop"></div>
@@ -194,6 +341,117 @@
   </div>
 </div>
 
+<div id="reviewScheduleGenerateModal" class="modal modal-lock hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">리뷰 설계안 생성</div>
+        <div class="modal-sub">에이전트 설계안 생성 폼과 동일 기준으로 생성합니다.</div>
+      </div>
+      <button class="modal-close" data-close="true">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid memo-grid">
+        <div class="ai-field">
+          <label>설계안 제목</label>
+          <input id="reviewSchedulePlanTitle" class="input" type="text" placeholder="예: 강남12의원 실리프팅 받기" />
+        </div>
+        <div class="ai-field span-2">
+          <label>키워드</label>
+          <textarea id="reviewSchedulePersonaKeywords" class="input"></textarea>
+        </div>
+        <div class="ai-field span-2">
+          <label>플랫폼 ID / PW</label>
+          <div class="review-plan-cred-inline">
+            <input id="reviewSchedulePlatformAccount" class="input" type="text" placeholder="플랫폼 ID" />
+            <input id="reviewSchedulePlatformPassword" class="input" type="text" placeholder="플랫폼 PW" />
+          </div>
+        </div>
+        <div class="ai-field span-2">
+          <label>단계 선택(필수)</label>
+          <div id="reviewSchedulePlanGroups" class="review-plan-group-chips">
+            <button type="button" class="stage-chip is-active" data-group="concern">고민</button>
+            <button type="button" class="stage-chip is-active" data-group="research">손품/발품</button>
+            <button type="button" class="stage-chip is-active" data-group="consult">상담후기</button>
+            <button type="button" class="stage-chip is-active" data-group="week1">1주차</button>
+            <button type="button" class="stage-chip is-active" data-group="week2">2주차</button>
+            <button type="button" class="stage-chip is-active" data-group="week3">3주차</button>
+            <button type="button" class="stage-chip is-active" data-group="month1">1개월</button>
+            <button type="button" class="stage-chip is-active" data-group="month2">2개월</button>
+            <button type="button" class="stage-chip is-active" data-group="month3">3개월</button>
+            <button type="button" class="stage-chip is-active" data-group="month4">4개월</button>
+            <button type="button" class="stage-chip is-active" data-group="month5">5개월</button>
+            <button type="button" class="stage-chip is-active" data-group="month6">6개월</button>
+          </div>
+          <div class="muted" style="margin-top:6px;">클릭해서 포함할 단계를 선택하세요.</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-close="true">취소</button>
+      <button class="btn primary" id="reviewScheduleGenerateConfirm" type="button">생성</button>
+    </div>
+  </div>
+</div>
+
+<div id="reviewScheduleItemModal" class="modal modal-lock hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="reviewScheduleItemModalTitle">리뷰 스케줄 추가</div>
+        <div class="modal-sub">항목을 입력해 설계표를 정리합니다.</div>
+      </div>
+      <button class="modal-close" data-close="true">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-grid memo-grid">
+        <div class="ai-field">
+          <label>날짜</label>
+          <input id="reviewScheduleItemDate" class="input" type="date" />
+        </div>
+        <div class="ai-field">
+          <label>알림 시각</label>
+          <input id="reviewScheduleItemRemind" class="input" type="text" data-flatpickr="datetime" placeholder="날짜/시간 선택" />
+        </div>
+        <div class="ai-field span-2">
+          <label>단계명</label>
+          <input id="reviewScheduleItemLabel" class="input" type="text" placeholder="예: 1주차 후기 / 2개월차 경과" />
+        </div>
+        <div class="ai-field span-2">
+          <label>설계 포인트</label>
+          <textarea id="reviewScheduleItemDetail" class="input" placeholder="핵심 기획 내용을 입력하세요."></textarea>
+        </div>
+        <div class="ai-field span-2">
+          <label>리뷰 결과</label>
+          <textarea id="reviewScheduleItemDraft" class="input" placeholder="생성된 리뷰 결과를 입력하세요."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-close="true">취소</button>
+      <button class="btn primary" id="reviewScheduleItemSave" type="button">저장</button>
+    </div>
+  </div>
+</div>
+
+<div id="planDetailModal" class="modal modal-lock hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="planDetailModalTitle">리뷰 상세</div>
+        <div class="modal-sub">선택한 버튼의 상세/리뷰를 표시합니다.</div>
+      </div>
+      <button class="modal-close" data-close="true">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div id="planDetailModalBody" class="plan-detail-modal-body"></div>
+    </div>
+  </div>
+</div>
+
 <div id="photoPreviewModal" class="photo-preview-modal hidden">
   <div class="photo-preview-backdrop" data-close="true"></div>
   <div class="photo-preview-card">
@@ -202,43 +460,15 @@
   </div>
 </div>
 
-<div id="myMemoModal" class="modal modal-lock hidden">
-  <div class="modal-backdrop"></div>
-  <div class="modal-card">
-    <div class="modal-head">
-      <div>
-        <div class="modal-title">메모 작성</div>
-        <div class="modal-sub">선택한 날짜에 메모를 추가합니다.</div>
-      </div>
-      <button class="modal-close" data-close="true">닫기</button>
-    </div>
-    <div class="modal-body">
-      <div class="modal-grid">
-        <div class="ai-field">
-          <label>알림 시간</label>
-          <input id="myMemoRemind" class="input" type="text" data-flatpickr="datetime" placeholder="날짜/시간 선택" />
-        </div>
-        <div class="ai-field span-2">
-          <label>내용</label>
-          <textarea id="myMemoContent" class="input" placeholder="메모를 입력하세요"></textarea>
-        </div>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn" data-close="true">취소</button>
-      <button class="btn primary" id="myMemoSave">저장</button>
-    </div>
-  </div>
-</div>
-
 <script src="js/app.js"></script>
 <script src="js/sidebar.js"></script>
-<script src="js/header.js"></script>
+<script src="js/header.js?v=20260213-4"></script>
 <script src="js/clinic_data.js"></script>
 <script src="js/clinic_cards.js"></script>
 <script src="vendor/flatpickr/flatpickr.min.js"></script>
 <script src="vendor/flatpickr/l10n/ko.js"></script>
-<script src="js/my_dashboard.js"></script>
+<script src="js/my_dashboard.js?v=20260213-23"></script>
+<script src="js/notifications_center.js?v=20260204-3"></script>
 <script>
   (async () => {
     await loadLayout();
@@ -247,3 +477,14 @@
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+

@@ -2,6 +2,8 @@
 Django Admin 설정 - presetss.txt 기반 144개 항목 반영
 """
 from django.contrib import admin
+import re
+from urllib.parse import urlsplit, urlunsplit
 from .models import (
     AccessLog,
     AuditEvent,
@@ -10,6 +12,7 @@ from .models import (
     VacationRequest,
     Campaign,
     CalendarMemo,
+    ReviewSchedule,
     CafeProfile,
     ClinicAssignee,
     ClinicDoctor,
@@ -30,6 +33,50 @@ from .models import (
     Review,
     SystemPermission,
 )
+
+REVIEW_SCHEDULE_PLATFORM = "__review_schedule__"
+_REVIEW_NEW_RE = re.compile(r"^\[리뷰설계\/([^\/\]]+)\/([^\]]+)\]\s*([\s\S]*?)(?:\n(?:리뷰|초안):\s*([\s\S]*))?$")
+_REVIEW_OLD_RE = re.compile(r"^\[리뷰설계\/([^\]]+)\]\s*([\s\S]*?)(?:\n(?:리뷰|초안):\s*([\s\S]*))?$")
+
+
+class ReviewScheduleMemo(CalendarMemo):
+    class Meta:
+        proxy = True
+        verbose_name = "리뷰 설계안"
+        verbose_name_plural = "리뷰 설계안"
+
+
+def _split_plan_title(raw_detail):
+    detail = str(raw_detail or "").strip()
+    plan_title = ""
+    kept = []
+    for ln in detail.splitlines():
+        s = str(ln or "").strip()
+        if s.startswith("설계안 제목:"):
+            plan_title = s.split(":", 1)[1].strip()
+            continue
+        kept.append(ln)
+    return plan_title, "\n".join(kept).strip()
+
+
+def _parse_review_content(raw):
+    text = (raw or "").strip()
+    m_new = _REVIEW_NEW_RE.match(text)
+    if m_new:
+        plan_title, cleaned_detail = _split_plan_title(m_new.group(3))
+        return (
+            (m_new.group(1) or "").strip(),
+            (m_new.group(2) or "").strip(),
+            cleaned_detail,
+            (m_new.group(4) or "").strip(),
+            plan_title,
+        )
+    m_old = _REVIEW_OLD_RE.match(text)
+    if m_old:
+        plan_title, cleaned_detail = _split_plan_title(m_old.group(2))
+        return "", (m_old.group(1) or "").strip(), cleaned_detail, (m_old.group(3) or "").strip(), plan_title
+    plan_title, cleaned_detail = _split_plan_title(text)
+    return "", "", cleaned_detail, "", plan_title
 
 
 @admin.register(Campaign)
@@ -169,11 +216,78 @@ class ClinicPostPhotoInline(admin.TabularInline):
 
 @admin.register(ClinicPost)
 class ClinicPostAdmin(admin.ModelAdmin):
-    list_display = ["id", "clinic", "type", "platform", "opinion_subtype", "review_subtype", "title", "views", "comments", "message_count", "updated_at"]
+    list_display = ["id", "clinic", "type", "platform", "opinion_subtype", "review_subtype", "title", "views", "comments", "message_count", "post_written_at"]
     list_filter = ["type", "platform", "clinic", "status", "opinion_subtype", "review_subtype"]
     search_fields = ["title", "url"]
     readonly_fields = ["created_at", "updated_at"]
     inlines = [ClinicPostPhotoInline]
+    actions = ["fill_crawled_body_from_crawled_content"]
+
+    @admin.display(description="게시글 작성일")
+    def post_written_at(self, obj):
+        return obj.published_at or obj.created_at
+
+    @admin.action(description="선택 게시글 URL 기준으로 크롤링 본문 채우기")
+    def fill_crawled_body_from_crawled_content(self, request, queryset):
+        def _normalize_url(raw):
+            s = str(raw or "").strip()
+            if not s:
+                return ""
+            try:
+                p = urlsplit(s)
+                path = (p.path or "").rstrip("/") or "/"
+                return urlunsplit((p.scheme.lower(), p.netloc.lower(), path, p.query, ""))
+            except Exception:
+                return s.rstrip("/")
+
+        posts = list(queryset)
+        if not posts:
+            self.message_user(request, "선택된 게시글이 없습니다.")
+            return
+
+        url_map = {}
+        for post in posts:
+            nurl = _normalize_url(post.url)
+            if nurl:
+                url_map.setdefault(nurl, []).append(post)
+
+        if not url_map:
+            self.message_user(request, "선택 게시글에 유효한 URL이 없습니다.")
+            return
+
+        crawled_qs = (
+            CrawledPostContent.objects
+            .filter(status="success")
+            .exclude(content="")
+            .order_by("-fetched_at")
+        )
+
+        latest_by_url = {}
+        for row in crawled_qs:
+            nurl = _normalize_url(row.url)
+            if not nurl or nurl in latest_by_url:
+                continue
+            if nurl in url_map:
+                latest_by_url[nurl] = row
+            if len(latest_by_url) >= len(url_map):
+                break
+
+        updated = 0
+        missing = 0
+        for nurl, post_list in url_map.items():
+            row = latest_by_url.get(nurl)
+            if not row:
+                missing += len(post_list)
+                continue
+            for post in post_list:
+                post.crawled_body = row.content or ""
+                post.save(update_fields=["crawled_body"])
+                updated += 1
+
+        self.message_user(
+            request,
+            f"본문 채움 완료: {updated}건, 미매칭: {missing}건",
+        )
 
 @admin.register(ClinicPostPhoto)
 class ClinicPostPhotoAdmin(admin.ModelAdmin):
@@ -350,6 +464,14 @@ class CalendarMemoAdmin(admin.ModelAdmin):
     search_fields = ["content", "user__username", "clinic__name", "account"]
     readonly_fields = ["created_at", "updated_at"]
 
+
+@admin.register(ReviewSchedule)
+class ReviewScheduleAdmin(admin.ModelAdmin):
+    list_display = ["id", "plan_id", "plan_title", "label", "user", "clinic", "date", "is_read", "created_at"]
+    list_filter = ["is_read", "date", "created_at", "user"]
+    search_fields = ["plan_id", "plan_title", "label", "detail", "draft", "user__username", "clinic__name", "account"]
+    readonly_fields = ["created_at", "updated_at"]
+
 @admin.register(ClinicAssignee)
 class ClinicAssigneeAdmin(admin.ModelAdmin):
     list_display = ["id", "clinic", "user", "is_active", "created_at"]
@@ -512,6 +634,8 @@ _MODEL_CATEGORY = {
     "ClinicPostPhoto": "게시글/콘텐츠",
     "CrawledPostContent": "게시글/콘텐츠",
     "CalendarMemo": "게시글/콘텐츠",
+    "ReviewScheduleMemo": "게시글/콘텐츠",
+    "ReviewSchedule": "게시글/콘텐츠",
     "ContentTypeProfile": "게시글/콘텐츠",
     "PromptTemplate": "게시글/콘텐츠",
     "PromptTemplateVersion": "게시글/콘텐츠",
@@ -542,6 +666,8 @@ _MODEL_KO_NAME = {
     "ClinicPostPhoto": "게시글 사진",
     "CrawledPostContent": "크롤링 본문",
     "CalendarMemo": "캘린더 메모",
+    "ReviewScheduleMemo": "스케줄 설계",
+    "ReviewSchedule": "스케줄 설계",
     "ContentTypeProfile": "컨텐츠 유형",
     "PromptTemplate": "프롬프트 템플릿",
     "PromptTemplateVersion": "프롬프트 버전",

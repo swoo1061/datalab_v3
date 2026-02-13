@@ -5,6 +5,7 @@ from .views_api import (
     api_generate_gangnam_review,
     agent_chat_api,
     agent_chat_stream_api,
+    agent_review_plan_generate_api,
 )
 
 urlpatterns = [
@@ -13,4 +14,5 @@ urlpatterns = [
     path("gangnam_review/", api_generate_gangnam_review),
     path("agent/chat/", agent_chat_api),
     path("agent/chat/stream/", agent_chat_stream_api),
+    path("agent/review-plan-generate/", agent_review_plan_generate_api),
 ]

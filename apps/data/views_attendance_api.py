@@ -11,7 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.data.models import AttendanceRecord, AttendanceCorrectionRequest, CalendarMemo
+from apps.data.models import AttendanceRecord, AttendanceCorrectionRequest
 from apps.data.models_vacation import VacationRequest
 from apps.data.serializers_attendance import (
     AttendanceRecordSerializer,
@@ -20,10 +20,7 @@ from apps.data.serializers_attendance import (
 from apps.data.views_api import (
     CsrfExemptSessionAuthentication,
     HeaderSessionAuthentication,
-    ATTENDANCE_MEMO_PLATFORM,
 )
-from apps.data.permissions import get_user_permission
-from apps.data.models import SystemPermission
 from apps.data.permissions import normalize_user_role
 
 
@@ -71,51 +68,9 @@ def _parse_datetime_value(raw):
     return parsed
 
 
-def _make_requester_label(user):
-    profile = getattr(user, "profile", None)
-    if profile and getattr(profile, "name", None):
-        return profile.name
-    return user.get_full_name() or user.username
-
-
 def _notify_ceo_for_correction(req: AttendanceCorrectionRequest):
-    User = get_user_model()
-    candidates = (
-        User.objects
-        .filter(is_active=True)
-        .select_related("profile")
-        .prefetch_related("groups")
-        .distinct()
-    )
-    notify_users = [
-        user for user in candidates
-        if get_user_permission(user, SystemPermission.KEY_ATTENDANCE_REQUESTS)
-    ]
-    if not notify_users:
-        notify_users = list(User.objects.filter(is_active=True, is_superuser=True).distinct())
-
-    requester = _make_requester_label(req.user)
-    check_in_text = req.requested_check_in_at.astimezone(timezone.get_current_timezone()).strftime("%Y-%m-%d %H:%M") if req.requested_check_in_at else "-"
-    check_out_text = req.requested_check_out_at.astimezone(timezone.get_current_timezone()).strftime("%Y-%m-%d %H:%M") if req.requested_check_out_at else "-"
-    content = (
-        f"[근태 정정요청] {requester}\n"
-        f"대상일: {req.work_date}\n"
-        f"요청 출근: {check_in_text} / 요청 퇴근: {check_out_text}\n"
-        f"사유: {req.reason}"
-    )
-
-    now = timezone.now()
-    today = timezone.localdate()
-    for ceo in notify_users:
-        CalendarMemo.objects.create(
-            user=ceo,
-            clinic=None,
-            date=today,
-            content=content,
-            platform=ATTENDANCE_MEMO_PLATFORM,
-            remind_at=now,
-            is_read=False,
-        )
+    # Attendance notifications are now derived directly from AttendanceCorrectionRequest.
+    return
 
 
 def _is_attendance_admin(user) -> bool:

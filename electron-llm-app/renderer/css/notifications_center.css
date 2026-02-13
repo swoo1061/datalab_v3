@@ -65,7 +65,7 @@
 
 .notify-shell {
   display: grid;
-  grid-template-columns: 220px minmax(360px, 1fr) minmax(360px, 1fr);
+  grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr);
   gap: 12px;
   padding: 10px;
   min-height: calc(100vh - 180px);
@@ -143,6 +143,21 @@ body[data-notify-mode="mail"] .notify-detail-col {
   display: grid;
   align-content: start;
   gap: 6px;
+}
+
+/* My dashboard mail: center folder button group with moderate spacing */
+.my-dashboard-mail-shell .notify-folder-col {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  padding: 10px 0;
+  gap: 8px;
+}
+
+.my-dashboard-mail-shell .notify-folder-btn {
+  width: calc(100% - 24px);
+  max-width: 132px;
+  margin: 0;
 }
 
 .notify-folder-btn {
@@ -843,3 +858,75 @@ body[data-notify-mode="mail"] .notify-mail-body {
   padding: 10px 14px 14px;
   border-top: 1px solid #eef2f7;
 }
+
+/* Dashboard mail hard-fix: borders + centered folder buttons */
+.my-dashboard-mail-shell.notify-shell {
+  display: grid !important;
+  grid-template-columns: 152px minmax(320px, 0.95fr) minmax(0, 1.05fr) !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  border: 1px solid #dbe2ef !important;
+  border-radius: 10px !important;
+  overflow: hidden !important;
+  background: #fff !important;
+}
+
+.my-dashboard-mail-shell.notify-shell .notify-folder-col,
+.my-dashboard-mail-shell.notify-shell .notify-list-col,
+.my-dashboard-mail-shell.notify-shell .notify-detail-col {
+  border: 0 !important;
+  border-right: 1px solid #e5e7eb !important;
+  border-radius: 0 !important;
+  background: #fff !important;
+}
+
+.my-dashboard-mail-shell.notify-shell .notify-detail-col {
+  border-right: 0 !important;
+}
+
+.my-dashboard-mail-shell .notify-folder-col {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 12px 0 !important;
+  gap: 10px !important;
+  min-width: 152px !important;
+}
+
+.my-dashboard-mail-shell .notify-folder-btn {
+  width: 124px !important;
+  min-width: 124px !important;
+  max-width: 124px !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 9px 10px !important;
+  box-sizing: border-box !important;
+}
+
+.my-dashboard-mail-shell .notify-folder-label,
+.my-dashboard-mail-shell .notify-folder-label span,
+.my-dashboard-mail-shell .notify-folder-btn > span:last-child {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+}
+
+.my-dashboard-mail-shell .notify-folder-label {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+
+.my-dashboard-mail-shell .notify-folder-btn > span:last-child {
+  flex: 0 0 auto !important;
+  min-width: 12px !important;
+  text-align: right !important;
+}
+
+

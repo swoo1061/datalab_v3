@@ -1063,6 +1063,7 @@ class ClinicPost(models.Model):
 
     title = models.CharField(max_length=255)
     url = models.URLField(max_length=1000)
+    crawled_body = models.TextField(blank=True, default="")
 
     account = models.CharField(max_length=100, blank=True, default="")
     account_password = models.CharField(max_length=100, blank=True, default="")
@@ -1182,6 +1183,45 @@ class CalendarMemo(models.Model):
     def __str__(self):
         clinic_name = self.clinic.name if self.clinic else "전체"
         return f"{clinic_name} {self.date} memo"
+
+
+class ReviewSchedule(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="review_schedules",
+    )
+    clinic = models.ForeignKey(
+        "ClinicGuide",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="review_schedules",
+    )
+    date = models.DateField()
+    plan_id = models.CharField(max_length=40, db_index=True, blank=True, default="")
+    plan_title = models.CharField(max_length=200, blank=True, default="")
+    label = models.CharField(max_length=100, blank=True, default="")
+    detail = models.TextField(blank=True, default="")
+    draft = models.TextField(blank=True, default="")
+    account = models.CharField(max_length=100, blank=True, default="")
+    account_password = models.CharField(max_length=100, blank=True, default="")
+    remind_at = models.DateTimeField(null=True, blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "date"]),
+            models.Index(fields=["user", "is_read"]),
+            models.Index(fields=["plan_id"]),
+        ]
+
+    def __str__(self):
+        clinic_name = self.clinic.name if self.clinic else "전체"
+        return f"{clinic_name} {self.date} schedule"
 
 class ClinicAssignee(models.Model):
     clinic = models.ForeignKey(

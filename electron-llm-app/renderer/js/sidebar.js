@@ -141,67 +141,70 @@ function openNotionShortcut() {
    Sidebar Shortcut Click (이벤트 위임)
 ================================ */
 // Sidebar는 동적 로드(loadLayout)라서 이벤트 위임으로 클릭을 안정적으로 처리.
-document.addEventListener("click", async (e) => {
-  const kakaoBtn = e.target?.closest?.("#kakaoWorkShortcut");
-  if (kakaoBtn) {
-    e.preventDefault();
-    openKakaoWorkShortcut();
-    return;
-  }
+if (!window.__sidebarDelegatedClickBound) {
+  window.__sidebarDelegatedClickBound = true;
+  document.addEventListener("click", async (e) => {
+    const kakaoBtn = e.target?.closest?.("#kakaoWorkShortcut");
+    if (kakaoBtn) {
+      e.preventDefault();
+      openKakaoWorkShortcut();
+      return;
+    }
 
-  const notionBtn = e.target?.closest?.("#notionShortcut");
-  if (notionBtn) {
-    e.preventDefault();
-    openNotionShortcut();
-    return;
-  }
+    const notionBtn = e.target?.closest?.("#notionShortcut");
+    if (notionBtn) {
+      e.preventDefault();
+      openNotionShortcut();
+      return;
+    }
 
-  const restrictedLink = e.target?.closest?.(".nav-sub a[data-role-only]");
-  if (restrictedLink) {
-    const allow = String(restrictedLink.dataset.roleOnly || "")
-      .split(",")
-      .map((x) => x.trim().toLowerCase())
-      .filter(Boolean);
+    const restrictedLink = e.target?.closest?.(".nav-sub a[data-role-only]");
+    if (restrictedLink) {
+      const allow = String(restrictedLink.dataset.roleOnly || "")
+        .split(",")
+        .map((x) => x.trim().toLowerCase())
+        .filter(Boolean);
 
-    let role = sidebarCurrentRole;
-    if (!role) {
-      try {
-        const me = await window.api?.getMe?.();
-        role = normalizeRole(me);
-        sidebarCurrentRole = role;
-      } catch (err) {
-        role = "";
+      let role = sidebarCurrentRole;
+      if (!role) {
+        try {
+          const me = await window.api?.getMe?.();
+          role = normalizeRole(me);
+          sidebarCurrentRole = role;
+        } catch (err) {
+          role = "";
+        }
+      }
+
+      const key = String(restrictedLink.dataset.permission || "").trim();
+      let permissionAllowed = false;
+      if (key) {
+        permissionAllowed = await fetchSidebarPermission(key);
+      }
+
+      // 역할 기반 차단 대신 role OR permission 규칙 적용
+      if (role && !allow.includes(role) && !permissionAllowed) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window.showAccessDenied === "function") window.showAccessDenied();
+        else window.showAlert?.("접근 불가");
       }
     }
 
-    const key = String(restrictedLink.dataset.permission || "").trim();
-    let permissionAllowed = false;
-    if (key) {
-      permissionAllowed = await fetchSidebarPermission(key);
+    const permissionLink = e.target?.closest?.(".nav-sub a[data-permission]");
+    if (permissionLink) {
+      const key = String(permissionLink.dataset.permission || "").trim();
+      if (!key) return;
+      const enabled = await fetchSidebarPermission(key);
+      if (!enabled) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window.showAccessDenied === "function") window.showAccessDenied();
+        else window.showAlert?.("접근 불가");
+      }
     }
-
-    // 역할 기반 차단 대신 role OR permission 규칙 적용
-    if (role && !allow.includes(role) && !permissionAllowed) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (typeof window.showAccessDenied === "function") window.showAccessDenied();
-      else window.showAlert?.("접근 불가");
-    }
-  }
-
-  const permissionLink = e.target?.closest?.(".nav-sub a[data-permission]");
-  if (permissionLink) {
-    const key = String(permissionLink.dataset.permission || "").trim();
-    if (!key) return;
-    const enabled = await fetchSidebarPermission(key);
-    if (!enabled) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (typeof window.showAccessDenied === "function") window.showAccessDenied();
-      else window.showAlert?.("접근 불가");
-    }
-  }
-});
+  });
+}
 
 
 /* ================================
@@ -263,14 +266,18 @@ function initSidebarNotifyBadge() {
   if (badge) badge.classList.add("hidden");
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    applySidebarRoleAccess();
-    applySidebarActiveState();
-    initSidebarNotifyBadge();
-  });
-} else {
-  applySidebarRoleAccess();
+async function initSidebarOnce() {
+  if (window.__sidebarInitialized) return;
+  window.__sidebarInitialized = true;
+  await applySidebarRoleAccess();
   applySidebarActiveState();
   initSidebarNotifyBadge();
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    initSidebarOnce();
+  }, { once: true });
+} else {
+  initSidebarOnce();
 }

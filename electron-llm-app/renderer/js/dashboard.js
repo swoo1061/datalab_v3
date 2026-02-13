@@ -66,10 +66,12 @@ async function drawDashboard() {
   renderClinics(viewData, "clinicGrid");
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
-  await loadFavorites();   // ⭐ 서버 즐겨찾기 먼저
-  drawDashboard();         // ⭐ 그 다음 렌더링
-});
+async function initDashboardPage() {
+  if (window.__dashboardPageInitialized) return;
+  window.__dashboardPageInitialized = true;
+  await loadFavorites();
+  drawDashboard();
+}
 
 // ================================
 // (기존) 로컬 즐겨찾기 - 유지하되 실제로는 안 씀
@@ -111,13 +113,13 @@ const globalSearchIndex = {
   ],
 };
 
-// ================================
-// 초기 실행
-// ================================
-document.addEventListener("DOMContentLoaded", async () => {
-  await loadFavorites();
-  renderClinics(clinics);
-});
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    initDashboardPage();
+  }, { once: true });
+} else {
+  initDashboardPage();
+}
 
 // ================================
 // 전역 바인딩

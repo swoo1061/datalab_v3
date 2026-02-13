@@ -5,6 +5,7 @@ from apps.data.models import (
     FavoriteClinic,
     ClinicPost,
     CalendarMemo,
+    ReviewSchedule,
     InternalMessage,
     InternalMessageAttachment,
 )
@@ -134,6 +135,73 @@ class CalendarMemoSerializer(serializers.ModelSerializer):
             "dadamo": "대다모",
         }
         return label_map.get(obj.platform, obj.platform)
+
+    def get_user_name(self, obj):
+        profile = getattr(obj.user, "profile", None)
+        if profile and getattr(profile, "name", None):
+            position = getattr(profile, "position", None)
+            position_label_map = {
+                "admin": "계정",
+                "manager": "매니저",
+                "leader": "팀장",
+                "ceo": "대표이사",
+            }
+            label = position_label_map.get(position, position)
+            return f"{profile.name} {label}".strip() if label else profile.name
+        return obj.user.get_full_name() or obj.user.username
+
+
+class ReviewScheduleSerializer(serializers.ModelSerializer):
+    clinic_id = serializers.IntegerField(source="clinic.id", read_only=True)
+    clinic_name = serializers.CharField(source="clinic.name", read_only=True)
+    user_name = serializers.SerializerMethodField()
+    platform = serializers.SerializerMethodField()
+    platform_label = serializers.SerializerMethodField()
+    content = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ReviewSchedule
+        fields = [
+            "id",
+            "date",
+            "content",
+            "platform",
+            "platform_label",
+            "account",
+            "account_password",
+            "remind_at",
+            "is_read",
+            "clinic_id",
+            "clinic_name",
+            "user_name",
+            "created_at",
+            "updated_at",
+            "plan_id",
+            "plan_title",
+            "label",
+            "detail",
+            "draft",
+        ]
+
+    def get_platform(self, _obj):
+        return "__review_schedule__"
+
+    def get_platform_label(self, _obj):
+        return "리뷰 스케줄"
+
+    def get_content(self, obj):
+        parts = []
+        if obj.plan_id and obj.label:
+            parts.append(f"[리뷰설계/{obj.plan_id}/{obj.label}] {obj.detail}")
+        elif obj.label:
+            parts.append(f"[리뷰설계/{obj.label}] {obj.detail}")
+        else:
+            parts.append(obj.detail or "")
+        if obj.plan_title:
+            parts.append(f"설계안 제목: {obj.plan_title}")
+        if obj.draft:
+            parts.append(f"리뷰: {obj.draft}")
+        return "\n".join([p for p in parts if p]).strip()
 
     def get_user_name(self, obj):
         profile = getattr(obj.user, "profile", None)

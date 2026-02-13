@@ -48,26 +48,30 @@
 
 <aside id="agentPanel" class="agent-panel hidden" aria-hidden="true">
   <div class="agent-panel-head">
-    <strong>AI 에이전트</strong>
+    <strong>AI고양이 비서</strong>
     <div class="agent-head-actions">
       <button id="agentSettingsToggle" class="agent-settings-btn" type="button" aria-label="설정">설정</button>
       <button id="agentPanelClose" class="agent-close-btn" type="button" aria-label="닫기">닫기</button>
     </div>
   </div>
   <div class="agent-chat-tools">
-    <select id="agentChatSelect" aria-label="이전 채팅"></select>
+    <div id="agentChatPicker" class="agent-chat-picker">
+      <button
+        id="agentChatSelectTrigger"
+        class="agent-chat-select-trigger"
+        type="button"
+        aria-label="이전 채팅"
+        aria-haspopup="listbox"
+        aria-expanded="false"
+      >
+        <span id="agentChatSelectTitle" class="agent-chat-select-title">새 채팅</span>
+        <span id="agentChatSelectAgo" class="agent-chat-select-ago">방금</span>
+      </button>
+      <div id="agentChatSelectMenu" class="agent-chat-select-menu hidden" role="listbox" aria-label="이전 채팅 목록"></div>
+    </div>
     <button id="agentNewChat" type="button">새 채팅</button>
   </div>
   <div id="agentSettingsPanel" class="agent-settings-panel hidden" aria-hidden="true">
-    <div class="agent-setting-row">
-      <label for="agentToneSelect">대화 톤</label>
-      <select id="agentToneSelect" aria-label="대화 톤">
-        <option value="calm">차분</option>
-        <option value="friendly" selected>친근</option>
-        <option value="coach">코치형</option>
-        <option value="cute">귀여운</option>
-      </select>
-    </div>
     <div class="agent-setting-row">
       <label for="agentResponseLength">답변 길이</label>
       <select id="agentResponseLength" aria-label="답변 길이">
@@ -105,7 +109,7 @@
     <div class="agent-empty">자유롭게 대화하세요. 감정/상황까지 반영해서 도와드릴게요.</div>
   </div>
   <div class="agent-input-row">
-    <input id="agentInput" type="text" placeholder="예: 오늘 일정 너무 꼬였는데 우선순위부터 잡아줘" />
+    <input id="agentInput" type="text" placeholder="예: 현재 페이지 설명해줘" />
     <button id="agentSend" type="button">전송</button>
   </div>
 </aside>
@@ -196,6 +200,4 @@
     <strong id="infoBirth">-</strong>
   </div>
 </div>
-
-
 

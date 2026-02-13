@@ -115,13 +115,21 @@ function titleOf(item) {
   if (state.mode === "mail") return (item?.subject || "").trim() || "제목 없음";
   const content = (item?.content || "").trim();
   if (!content) return "메모";
-  const first = content.split("\n")[0].trim();
+  const lines = content.split("\n");
+  const first = (lines[0] || "").trim();
+  const m = first.match(/^제목\s*:\s*(.+)$/i);
+  if (m) return (m[1] || "").trim() || "메모";
   return first || "메모";
 }
 
 function previewOf(item) {
   const raw = (item?.content || "").trim();
-  return raw.length > 80 ? `${raw.slice(0, 80)}...` : raw;
+  if (!raw) return "";
+  const lines = raw.split("\n");
+  const first = (lines[0] || "").trim();
+  const hasTitlePrefix = /^제목\s*:/i.test(first);
+  const body = hasTitlePrefix ? lines.slice(1).join("\n").trim() : raw;
+  return body.length > 80 ? `${body.slice(0, 80)}...` : body;
 }
 
 function timeLabel(item) {
@@ -168,6 +176,16 @@ function formatSize(bytes) {
 
 function attachmentCount(item) {
   return Array.isArray(item?.attachments) ? item.attachments.length : 0;
+}
+
+function folderIconSvg(key) {
+  const icons = {
+    inbox: '<svg class="notify-folder-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 3H4.99C3.89 3 3 3.9 3 5l.01 14c0 1.1.89 2 1.99 2H19c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 12h-4c0 1.1-.9 2-2 2s-2-.9-2-2H7v-2h4c0-1.1.9-2 2-2s2 .9 2 2h4v2z"></path></svg>',
+    unread: '<svg class="notify-folder-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"></path></svg>',
+    sent: '<svg class="notify-folder-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21l21-9L2 3v7l15 2-15 2z"></path></svg>',
+    trash: '<svg class="notify-folder-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2h4v2H4V6h4l1-2z"></path></svg>',
+  };
+  return icons[key] || "";
 }
 
 function buildMailDetailBody(item) {
@@ -316,15 +334,19 @@ function renderFolders() {
       ...(state.mail.counts || { inbox: 0, unread: 0, sent: 0, trash: 0 }),
       trash: Number(state.mail.trashItems.length || 0),
     };
-    root.innerHTML = [
+    const inMyDashboard = Boolean(document.getElementById("myMailCenterSection"));
+    const folders = [
       { key: "inbox", label: "받은메일" },
-      { key: "unread", label: "안읽은메일" },
       { key: "sent", label: "보낸메일" },
       { key: "trash", label: "휴지통" },
-    ]
+    ];
+    if (!inMyDashboard) {
+      folders.splice(1, 0, { key: "unread", label: "안읽은메일" });
+    }
+    root.innerHTML = folders
       .map((f) => `
         <button class="notify-folder-btn ${state.mail.folder === f.key ? "active" : ""}" data-folder="${f.key}" type="button">
-          <span>${f.label}</span><span>${counts[f.key] || 0}</span>
+          <span class="notify-folder-label">${folderIconSvg(f.key)}<span>${f.label}</span></span><span>${counts[f.key] || 0}</span>
         </button>
       `)
       .join("");
@@ -383,10 +405,8 @@ function renderList() {
       }
       return `
         <div class="notify-mail-row ${rowStateClass}" data-id="${item.id}">
-          <input class="notify-check" type="checkbox" data-id="${item.id}" ${state.checked.has(item.id) ? "checked" : ""} />
           <div class="notify-mail-main">
             <div class="notify-mail-title">${titleOf(item)}</div>
-            <div class="notify-mail-preview">${previewOf(item)}</div>
           </div>
           <div class="notify-mail-time">${timeLabel(item)}</div>
         </div>
@@ -484,7 +504,12 @@ function renderDetail() {
   }
 
   if (state.mode !== "mail") {
-    bodyEl.textContent = item.content || "";
+    const raw = String(item.content || "").trim();
+    const lines = raw.split("\n");
+    const first = (lines[0] || "").trim();
+    const hasTitlePrefix = /^제목\s*:/i.test(first);
+    const bodyOnly = hasTitlePrefix ? lines.slice(1).join("\n").trim() : raw;
+    bodyEl.textContent = bodyOnly || "-";
   }
 
   readBtn.onclick = async () => {
