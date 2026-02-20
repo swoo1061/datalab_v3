@@ -32,6 +32,13 @@ def normalize_name(value):
     base = re.sub(r"\s*(병원|의원)\s*$", "", base).strip()
     return base.lower()
 
+def infer_clinic_name_from_filename(filename):
+    name = os.path.splitext(os.path.basename(filename or ""))[0]
+    name = re.sub(r"\s*DB\s*$", "", name, flags=re.IGNORECASE)
+    name = re.sub(r"\s*(여론|후기)\s*$", "", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    return name
+
 
 def normalize_assignee(value):
     if not value:
@@ -172,6 +179,7 @@ class Command(BaseCommand):
         for filename in filenames:
             file_path = os.path.join(csv_dir, filename)
             inferred_type = "review" if "후기" in filename else "opinion"
+            inferred_clinic_name = infer_clinic_name_from_filename(filename)
 
             with open(file_path, "r", encoding="utf-8-sig", newline="") as csvfile:
                 reader = csv.DictReader(csvfile)
@@ -185,8 +193,9 @@ class Command(BaseCommand):
                         missing_date += 1
                         continue
                     if not clinic_raw:
-                        clinic_raw = "미지정"
-                        missing_clinic += 1
+                        clinic_raw = inferred_clinic_name or "미지정"
+                        if not inferred_clinic_name:
+                            missing_clinic += 1
 
                     if not title and url:
                         title = url

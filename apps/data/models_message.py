@@ -27,6 +27,8 @@ class InternalMessage(models.Model):
             models.Index(fields=["recipient", "is_read", "-created_at"]),
             models.Index(fields=["sender", "-created_at"]),
         ]
+        verbose_name = "메일"
+        verbose_name_plural = "메일"
 
     def __str__(self):
         return f"{self.sender} -> {self.recipient}: {self.subject}"
@@ -53,6 +55,8 @@ class InternalMessageAttachment(models.Model):
 
     class Meta:
         ordering = ["id"]
+        verbose_name = "메일 첨부"
+        verbose_name_plural = "메일 첨부"
 
     def __str__(self):
         return self.original_name or self.file.name

@@ -1,9 +1,9 @@
 {
   "name": "llm-staff-app",
-  "version": "0.10.6",
+  "version": "0.10.8",
   "main": "main.js",
   "scripts": {
-    "dev": "electron .",
+    "dev": "cmd /c copy /Y .env.local .env && electron .",
     "dev:local": "cmd /c copy /Y .env.local .env && electron .",
     "dev:office": "cmd /c copy /Y .env.office .env && electron .",
     "build": "electron-builder --win",
@@ -37,7 +37,7 @@
     "publish": [
       {
         "provider": "generic",
-        "url": "http://192.168.35.248:8000/updates/"
+        "url": "http://192.168.35.131:8000/updates/"
       }
     ],
     "nsis": {

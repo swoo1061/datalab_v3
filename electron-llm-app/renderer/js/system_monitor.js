@@ -143,6 +143,38 @@ function renderSummary() {
   `;
 }
 
+function getCheckCategory(item) {
+  const key = String(item?.key || "");
+  if (key === "llm_key_openai" || key === "llm_key_anthropic") return "llm_key";
+  if (key.startsWith("accounts_")) return "account";
+  if (key.startsWith("clinic_")) return "clinic_dynamic";
+  if (key.startsWith("ml_") || key === "llm_models" || key === "monitor_llm") return "ml";
+  return "data";
+}
+
+function categoryMeta(categoryKey) {
+  const map = {
+    llm_key: { title: "LLM 키 상태", order: 1 },
+    account: { title: "인증/계정 API", order: 2 },
+    data: { title: "데이터 API", order: 3 },
+    ml: { title: "ML API", order: 4 },
+    clinic_dynamic: { title: "병원 상세 API (동적)", order: 5 },
+  };
+  return map[categoryKey] || { title: "기타", order: 99 };
+}
+
+function groupChecksByCategory(checks) {
+  const groups = new Map();
+  checks.forEach((item) => {
+    const categoryKey = getCheckCategory(item);
+    if (!groups.has(categoryKey)) groups.set(categoryKey, []);
+    groups.get(categoryKey).push(item);
+  });
+  return Array.from(groups.entries())
+    .sort((a, b) => categoryMeta(a[0]).order - categoryMeta(b[0]).order)
+    .map(([categoryKey, items]) => ({ categoryKey, items }));
+}
+
 function renderChecks() {
   const root = document.getElementById("monitorApiChecks");
   if (!root) return;
@@ -150,6 +182,7 @@ function renderChecks() {
     const configured = Boolean(row?.configured);
     const connected = Boolean(row?.connected);
     return {
+      key: row?.provider === "openai" ? "llm_key_openai" : "llm_key_anthropic",
       label: row?.provider === "openai" ? "OPENAI_API_KEY" : "ANTHROPIC_API_KEY",
       ok: configured && connected,
       status: configured ? (connected ? 200 : 503) : 400,
@@ -163,16 +196,35 @@ function renderChecks() {
     root.innerHTML = `<div class="muted">체크 결과가 없습니다.</div>`;
     return;
   }
-  root.innerHTML = merged
-    .map((item) => `
-      <div class="monitor-item">
-        <div class="top">
-          <span class="name">${item.label}</span>
-          <span class="status-pill ${statusClass(item)}">${statusText(item)}</span>
+
+  const grouped = groupChecksByCategory(merged);
+  root.innerHTML = grouped
+    .map(({ categoryKey, items }) => {
+      const meta = categoryMeta(categoryKey);
+      const okCount = items.filter((x) => x.ok).length;
+      const total = items.length;
+      return `
+      <section class="monitor-group">
+        <header class="monitor-group-head">
+          <h4 class="monitor-group-title">${meta.title}</h4>
+          <span class="monitor-group-count">${okCount}/${total}</span>
+        </header>
+        <div class="monitor-group-list">
+          ${items
+            .map((item) => `
+            <div class="monitor-item">
+              <div class="top">
+                <span class="name">${item.label}</span>
+                <span class="status-pill ${statusClass(item)}">${statusText(item)}</span>
+              </div>
+              <div class="meta">${item.note ? item.note : `HTTP ${item.status || "-"} · ${item.latency}ms`}</div>
+            </div>
+          `)
+            .join("")}
         </div>
-        <div class="meta">${item.note ? item.note : `HTTP ${item.status || "-"} · ${item.latency}ms`}</div>
-      </div>
-    `)
+      </section>
+      `;
+    })
     .join("");
 }
 

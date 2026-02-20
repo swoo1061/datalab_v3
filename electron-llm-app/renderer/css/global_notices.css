@@ -1,0 +1,55 @@
+.global-notice-page {
+  height: 100%;
+}
+
+.global-notice-page .page-canvas {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.global-notice-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.global-notice-section .section-head {
+  padding: 14px 18px 0;
+}
+
+.global-notice-section .section-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.global-notice-section .clinic-notice-wrap {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+}
+
+.global-notice-section .clinic-notice-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.global-notice-section .clinic-notice-list .card-bd {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.global-notice-section .clinic-notice-empty {
+  min-height: 260px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}

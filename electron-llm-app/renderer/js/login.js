@@ -26,7 +26,11 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (storedSession && window.api?.setSessionKey) {
       await window.api.setSessionKey(storedSession);
     }
-    await window.api.getMe();
+    const me = await window.api.getMe();
+    if (me?.force_password_change) {
+      const changed = await forceChangePasswordFlow("");
+      if (!changed) return;
+    }
     window.nav.go("my_dashboard");
   } catch {}
 });
@@ -102,6 +106,10 @@ async function login() {
       localStorage.removeItem(KEY_SESSION);
     }
 
+    if (data?.require_password_change) {
+      const changed = await forceChangePasswordFlow(password);
+      if (!changed) return;
+    }
     window.nav.go("my_dashboard");
 
   } catch (e) {
@@ -116,6 +124,49 @@ async function login() {
   } finally {
     setLoading(false);
     isSubmitting = false;
+  }
+}
+
+async function forceChangePasswordFlow(currentPassword) {
+  while (true) {
+    const next = window.prompt("임시 비밀번호입니다. 새 비밀번호를 입력하세요.");
+    if (next === null) {
+      showMessage("비밀번호 변경 후 이용 가능합니다.");
+      try {
+        await window.api.logout();
+      } catch (_e) {}
+      return false;
+    }
+    const newPassword = String(next || "").trim();
+    if (!newPassword) {
+      showMessage("새 비밀번호를 입력하세요.");
+      continue;
+    }
+    if (currentPassword && newPassword === currentPassword) {
+      showMessage("기존 비밀번호와 다른 값으로 입력하세요.");
+      continue;
+    }
+    const confirmValue = window.prompt("새 비밀번호를 다시 입력하세요.");
+    if (confirmValue === null) {
+      showMessage("비밀번호 변경 후 이용 가능합니다.");
+      try {
+        await window.api.logout();
+      } catch (_e) {}
+      return false;
+    }
+    if (newPassword !== String(confirmValue || "").trim()) {
+      showMessage("비밀번호 확인이 일치하지 않습니다.");
+      continue;
+    }
+    try {
+      const changed = await window.api.changePassword(currentPassword || "", newPassword);
+      if (changed?.session_key) localStorage.setItem(KEY_SESSION, changed.session_key);
+      showMessage("비밀번호가 변경되었습니다.", false);
+      return true;
+    } catch (e) {
+      console.error("password change failed", e);
+      showMessage("비밀번호 변경에 실패했습니다. 다시 시도해 주세요.");
+    }
   }
 }
 

@@ -1,0 +1,10 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+  <li>
+    <a href="{% url 'admin:data_clinicguide_create_owner_account' %}" class="addlink">
+      병원 원장 계정 생성
+    </a>
+  </li>
+  {{ block.super }}
+{% endblock %}

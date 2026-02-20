@@ -17,6 +17,8 @@ from .models import (
     ClinicAssignee,
     ClinicDoctor,
     ClinicGuide,
+    ClinicCommentBundle,
+    ClinicMessageLog,
     ClinicPost,
     ClinicPostPhoto,
     ClinicPrice,
@@ -221,7 +223,7 @@ class ClinicPostAdmin(admin.ModelAdmin):
     search_fields = ["title", "url"]
     readonly_fields = ["created_at", "updated_at"]
     inlines = [ClinicPostPhotoInline]
-    actions = ["fill_crawled_body_from_crawled_content"]
+    actions = ["fill_crawled_body_from_crawled_content", "delete_all_posts"]
 
     @admin.display(description="게시글 작성일")
     def post_written_at(self, obj):
@@ -289,12 +291,34 @@ class ClinicPostAdmin(admin.ModelAdmin):
             f"본문 채움 완료: {updated}건, 미매칭: {missing}건",
         )
 
+    @admin.action(description="전체 게시글 삭제 (주의)")
+    def delete_all_posts(self, request, queryset):
+        del queryset  # 선택 여부와 무관하게 전체 삭제
+        deleted_count, _ = ClinicPost.objects.all().delete()
+        self.message_user(request, f"전체 게시글 삭제 완료: {deleted_count}건")
+
 @admin.register(ClinicPostPhoto)
 class ClinicPostPhotoAdmin(admin.ModelAdmin):
     list_display = ["id", "post", "image", "created_at"]
     list_filter = ["created_at"]
     search_fields = ["post__title"]
     readonly_fields = ["created_at"]
+
+
+@admin.register(ClinicCommentBundle)
+class ClinicCommentBundleAdmin(admin.ModelAdmin):
+    list_display = ["id", "clinic", "url", "created_by", "created_at"]
+    list_filter = ["clinic", "created_at"]
+    search_fields = ["url", "clinic__name", "created_by__username"]
+    readonly_fields = ["created_at", "updated_at"]
+
+
+@admin.register(ClinicMessageLog)
+class ClinicMessageLogAdmin(admin.ModelAdmin):
+    list_display = ["id", "clinic", "message_type", "message_count", "platform", "url", "created_by", "created_at"]
+    list_filter = ["clinic", "message_type", "platform", "created_at"]
+    search_fields = ["url", "clinic__name", "created_by__username"]
+    readonly_fields = ["created_at", "updated_at"]
 
 
 @admin.register(CrawledPostContent)
@@ -639,6 +663,8 @@ _MODEL_CATEGORY = {
     "ContentTypeProfile": "게시글/콘텐츠",
     "PromptTemplate": "게시글/콘텐츠",
     "PromptTemplateVersion": "게시글/콘텐츠",
+    "ClinicCommentBundle": "게시글/콘텐츠",
+    "ClinicMessageLog": "게시글/콘텐츠",
     "ClinicGuide": "병원/가이드",
     "ClinicDoctor": "병원/가이드",
     "ClinicPrice": "병원/가이드",
@@ -671,6 +697,8 @@ _MODEL_KO_NAME = {
     "ContentTypeProfile": "컨텐츠 유형",
     "PromptTemplate": "프롬프트 템플릿",
     "PromptTemplateVersion": "프롬프트 버전",
+    "ClinicCommentBundle": "댓글",
+    "ClinicMessageLog": "쪽지",
     "ClinicGuide": "병원 가이드",
     "ClinicDoctor": "의료진",
     "ClinicPrice": "수가표",
@@ -683,8 +711,8 @@ _MODEL_KO_NAME = {
     "Persona": "페르소나",
     "CafeProfile": "카페 프로필",
     "ImageAsset": "이미지 자산",
-    "InternalMessage": "쪽지",
-    "InternalMessageAttachment": "쪽지 첨부파일",
+    "InternalMessage": "메일",
+    "InternalMessageAttachment": "메일 첨부파일",
 }
 
 _original_get_app_list = admin.site.get_app_list

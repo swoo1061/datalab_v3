@@ -29,7 +29,7 @@ from django.db.models.functions import TruncDate, TruncMonth, Coalesce
 from apps.data.models import (
     Review, Campaign, ImageAsset,
     Persona, CafeProfile, ClinicGuide, GeneratedReview, ContentTypeProfile, LLMUsageLog, ClinicDoctor, ClinicPrice, AccessLog,
-    ClinicPost, CrawledPostContent
+    ClinicPost, CrawledPostContent, ClinicAssignee
 )
 from apps.data.models_worklog import DailyWorkLog
 from accounts.models import UserProfile
@@ -72,6 +72,11 @@ def _get_model_display(model_id: str) -> str:
 
 
 def _is_internal_user(user):
+    profile = getattr(user, "profile", None)
+    if profile and getattr(profile, "is_hospital_account", False):
+        return False
+    if ClinicAssignee.objects.filter(user=user, is_active=True).exists():
+        return False
     return can_access_web_dashboard(user)
 
 @dashboard_required
@@ -1380,7 +1385,6 @@ def api_generated_bulk_delete(request):
         })
     except Exception as e:
         return JsonResponse({"error": f"삭제 실패: {str(e)}"}, status=500)
-
 
 # =====================================================
 # 병원 가이드 관리

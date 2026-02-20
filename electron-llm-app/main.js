@@ -64,8 +64,14 @@ function getApiBase() {
   return (process.env.DATALAB_API_BASE || process.env.API_BASE || "http://127.0.0.1:8000").replace(/\/$/, "");
 }
 
+function normalizeApiBase(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  return withProtocol.replace(/\/$/, "");
+}
+
 function loadApiBaseFromEnvFile() {
-  if (process.env.DATALAB_API_BASE || process.env.API_BASE) return;
   const candidates = [
     path.join(__dirname, ".env"),
     path.join(__dirname, "..", ".env"),
@@ -87,9 +93,20 @@ function loadApiBaseFromEnvFile() {
       ) {
         value = value.slice(1, -1);
       }
-      if (value) process.env.DATALAB_API_BASE = value;
-      return;
+      const normalized = normalizeApiBase(value);
+      if (normalized) {
+        // Prefer local .env to avoid stale process-level API base leaking in.
+        process.env.DATALAB_API_BASE = normalized;
+        process.env.API_BASE = normalized;
+        return;
+      }
     }
+  }
+
+  const fallback = normalizeApiBase(process.env.DATALAB_API_BASE || process.env.API_BASE);
+  if (fallback) {
+    process.env.DATALAB_API_BASE = fallback;
+    process.env.API_BASE = fallback;
   }
 }
 

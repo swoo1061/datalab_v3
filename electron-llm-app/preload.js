@@ -142,13 +142,20 @@ function getSystemMonitorStaticChecks() {
   return [
     { key: "accounts_me", label: "계정 인증 API", path: "/api/accounts/me/" },
     { key: "accounts_users", label: "유저 목록 API", path: "/api/accounts/users/" },
+    { key: "accounts_login", label: "로그인 API", path: "/api/accounts/login/", method: "OPTIONS", expectedStatuses: [200, 204, 401, 403, 405] },
+    { key: "accounts_logout", label: "로그아웃 API", path: "/api/accounts/logout/", method: "OPTIONS", expectedStatuses: [200, 204, 401, 403, 405] },
+    { key: "accounts_signup", label: "회원가입 API", path: "/api/accounts/signup/", method: "OPTIONS", expectedStatuses: [200, 204, 401, 403, 405] },
     { key: "clinics_list", label: "병원 목록 API", path: "/api/data/clinics/?limit=1" },
     { key: "llm_models", label: "LLM 모델 목록 API", path: "/api/data/llm/models/" },
     { key: "my_clinics", label: "내 병원 API", path: "/api/data/my-clinics/?months=1" },
     { key: "favorites", label: "즐겨찾기 API", path: "/api/data/favorites/" },
     { key: "calendar_memos", label: "캘린더 메모 API", path: "/api/data/calendar-memos/?limit=1" },
+    { key: "review_schedules", label: "리뷰 스케줄 API", path: "/api/data/review-schedules/?limit=1" },
+    { key: "review_schedules_generate", label: "리뷰 스케줄 생성 API", path: "/api/data/review-schedules/generate/", method: "OPTIONS", expectedStatuses: [200, 204, 401, 403, 405] },
     { key: "notifications", label: "알림 API", path: "/api/data/notifications/?limit=1" },
     { key: "attendance_me", label: "출퇴근 API", path: "/api/data/attendance/me/" },
+    { key: "attendance_check_in", label: "출근 체크 API", path: "/api/data/attendance/me/check-in/", method: "OPTIONS", expectedStatuses: [200, 204, 401, 403, 405] },
+    { key: "attendance_check_out", label: "퇴근 체크 API", path: "/api/data/attendance/me/check-out/", method: "OPTIONS", expectedStatuses: [200, 204, 401, 403, 405] },
     { key: "attendance_corrections", label: "정정요청 목록 API", path: "/api/data/attendance/me/corrections/?limit=1" },
     { key: "attendance_admin_records", label: "출퇴근 관리 API", path: `/api/data/attendance/admin/records/?month=${monthKey}&status=all` },
     { key: "attendance_admin_corrections", label: "정정요청 관리 API", path: `/api/data/attendance/admin/corrections/?month=${monthKey}&status=pending` },
@@ -157,8 +164,15 @@ function getSystemMonitorStaticChecks() {
     { key: "employee_summary", label: "직원 관리 API", path: `/api/data/vacations/admin/summary/?year=${yearKey}` },
     { key: "permissions_me", label: "내 권한 API", path: "/api/data/system-permissions/me/?key=web_dashboard_access" },
     { key: "permissions_users", label: "권한 유저목록 API", path: "/api/data/system-permissions/users/" },
+    { key: "audit_events", label: "감사 로그 API", path: "/api/data/audit-events/?limit=1" },
     { key: "messages", label: "메일 API", path: "/api/data/messages/?box=inbox&limit=1" },
     { key: "monitor_llm", label: "LLM 키 점검 API", path: "/api/data/system-monitor/llm-status/?connectivity=1" },
+    { key: "ml_review", label: "리뷰 생성 API", path: "/api/ml/review/", method: "OPTIONS", expectedStatuses: [200, 204, 401, 403, 405] },
+    { key: "ml_review_edit", label: "리뷰 수정 API", path: "/api/ml/review/edit/", method: "OPTIONS", expectedStatuses: [200, 204, 401, 403, 405] },
+    { key: "ml_gangnam_review", label: "강남 리뷰 생성 API", path: "/api/ml/gangnam_review/", method: "OPTIONS", expectedStatuses: [200, 204, 401, 403, 405] },
+    { key: "ml_agent_chat", label: "에이전트 채팅 API", path: "/api/ml/agent/chat/", method: "OPTIONS", expectedStatuses: [200, 204, 401, 403, 405] },
+    { key: "ml_agent_chat_stream", label: "에이전트 스트림 API", path: "/api/ml/agent/chat/stream/", method: "OPTIONS", expectedStatuses: [200, 204, 401, 403, 405] },
+    { key: "ml_agent_review_plan", label: "리뷰 플랜 생성 API", path: "/api/ml/agent/review-plan-generate/", method: "OPTIONS", expectedStatuses: [200, 204, 401, 403, 405] },
     { key: "clinics_legacy", label: "병원 목록 API(legacy)", path: "/api/data/clinics/" },
   ];
 }
@@ -166,13 +180,20 @@ function getSystemMonitorStaticChecks() {
 async function runSystemMonitorCheck(def) {
   const started = performance.now();
   try {
-    const res = await requestWithStatus(def.path, { method: "GET" });
+    const method = String(def.method || "GET").toUpperCase();
+    const res = await requestWithStatus(def.path, { method });
+    const expectedStatuses = Array.isArray(def.expectedStatuses) ? def.expectedStatuses : [];
+    const expectedStatusMatched = expectedStatuses.includes(Number(res.status));
+    const reachable = res.ok || expectedStatusMatched;
     return {
       key: def.key,
       label: def.label,
-      ok: res.ok,
+      ok: reachable,
       status: res.status,
       latency: Math.round(performance.now() - started),
+      note: expectedStatusMatched && !res.ok
+        ? `${method} 허용/인증 응답 (${res.status})`
+        : undefined,
     };
   } catch {
     return {
@@ -278,6 +299,15 @@ contextBridge.exposeInMainWorld("api", {
   getMe: () =>
     requestJson("/api/accounts/me/", {
       method: "GET",
+    }),
+
+  changePassword: (currentPassword, newPassword) =>
+    requestJson("/api/accounts/me/password/", {
+      method: "POST",
+      body: JSON.stringify({
+        current_password: currentPassword || "",
+        new_password: newPassword || "",
+      }),
     }),
 
   /* =========================

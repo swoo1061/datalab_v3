@@ -222,20 +222,31 @@ function renderScheduleCalendar({
       ? `<span class="metric-chip">조회 ${item.views}</span>`
       : "";
     const comments = Number.isFinite(item.comments)
-      ? `<span class="metric-chip">댓글 ${item.comments}</span>`
+      ? `<span class="metric-chip">댓글수 ${item.comments}</span>`
       : "";
     const messages = Number.isFinite(item.message_count)
-      ? `<span class="metric-chip">쪽지 ${item.message_count}</span>`
+      ? `
+        <button
+          type="button"
+          class="metric-chip schedule-message-work-btn"
+          data-url="${item.url || ""}"
+        >
+          쪽지 ${item.message_count}
+        </button>
+      `
       : "";
-    const messageInput = item.post_id && item.clinicId
-      ? `<label class="message-chip">쪽지 <input class="message-input" type="number" min="0" value="${item.message_count ?? 0}" data-post-id="${item.post_id}" data-clinic-id="${item.clinicId}" /></label>`
-      : "";
-    const editButton = item.post_id && item.clinicId
-      ? `<button class="schedule-edit" data-post-id="${item.post_id}" data-clinic-id="${item.clinicId}">수정</button>`
-      : "";
-    const actions = editButton || messageInput
-      ? `<div class="schedule-actions">${editButton}${messageInput}</div>`
-      : "";
+    const commentCount = Number.isFinite(Number(item.comment_work_count)) ? Number(item.comment_work_count) : 0;
+    const actions = `
+      <div class="schedule-actions">
+        <button
+          type="button"
+          class="metric-chip schedule-comment-work-btn"
+          data-url="${item.url || ""}"
+        >
+          댓글건수 ${commentCount}
+        </button>
+      </div>
+    `;
     const doctorValue = item.doctor_name || item.doctor || item.doctor_label || "-";
     const metaCells = [
       { label: "날짜", value: item.date || "-" },
@@ -377,6 +388,8 @@ function renderScheduleCalendar({
 
     bindMessageInputs(list);
     bindEditButtons(list);
+    bindCommentWorkButtons(list);
+    bindMessageWorkButtons(list);
     bindPhotoPreviews(list);
   };
 
@@ -434,6 +447,48 @@ function bindEditButtons(listEl) {
       if (!postId || !clinicId) return;
       if (typeof window.openPostEditor === "function") {
         window.openPostEditor({ postId, clinicId });
+      }
+    });
+  });
+}
+
+function bindCommentWorkButtons(listEl) {
+  const buttons = listEl.querySelectorAll(".schedule-comment-work-btn");
+  if (!buttons.length) return;
+
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const now = Date.now();
+      const prev = Number(btn.dataset.lastClickTs || 0);
+      if (now - prev < 300) return;
+      btn.dataset.lastClickTs = String(now);
+      const url = String(btn.dataset.url || "").trim();
+      if (!url) return;
+      if (typeof window.openCommentBundleModalByUrl === "function") {
+        window.openCommentBundleModalByUrl(url);
+      }
+    });
+  });
+}
+
+function bindMessageWorkButtons(listEl) {
+  const buttons = listEl.querySelectorAll(".schedule-message-work-btn");
+  if (!buttons.length) return;
+
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const now = Date.now();
+      const prev = Number(btn.dataset.lastClickTs || 0);
+      if (now - prev < 300) return;
+      btn.dataset.lastClickTs = String(now);
+      const url = String(btn.dataset.url || "").trim();
+      if (!url) return;
+      if (typeof window.openMessageLogModalByUrl === "function") {
+        window.openMessageLogModalByUrl(url);
       }
     });
   });

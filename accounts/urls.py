@@ -8,4 +8,5 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('signup/', views.signup_view, name='signup'),  # 추가된 회원가입 경로 
     path('report/', views.doctor_report_view, name='doctor_report'),
+    path('password-change-required/', views.password_change_required_view, name='password_change_required'),
 ]

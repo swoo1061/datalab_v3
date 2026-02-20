@@ -8,9 +8,10 @@
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/sidebar.css" />
   <link rel="stylesheet" href="css/header.css" />
-  <link rel="stylesheet" href="css/clinic_page.css" />
+  <link rel="stylesheet" href="css/clinic_guide.css" />
   <link rel="stylesheet" href="css/schedule.css" />
   <link rel="stylesheet" href="css/business_mode.css" />
+  <link rel="stylesheet" href="css/clinic_page.css?v=notice_ui_20260220_2" />
 </head>
 <body class="theme-vivid tone-sidebar" data-nav="clinic_page">
 
@@ -37,12 +38,24 @@
           <span class="nav-label">데일리 업무</span>
         </button>
         <button type="button" class="clinic-section-nav-btn" data-section-key="posts">
-          <span class="nav-step">02</span>
+          <span class="nav-step">04</span>
           <span class="nav-label">게시글 리스트</span>
         </button>
         <button type="button" class="clinic-section-nav-btn" data-section-key="calendar">
-          <span class="nav-step">03</span>
+          <span class="nav-step">05</span>
           <span class="nav-label">캘린더</span>
+        </button>
+        <button type="button" class="clinic-section-nav-btn" data-section-key="comment-list">
+          <span class="nav-step">06</span>
+          <span class="nav-label">카페 댓글/쪽지</span>
+        </button>
+        <button type="button" class="clinic-section-nav-btn" data-section-key="notices">
+          <span class="nav-step">03</span>
+          <span class="nav-label">공지사항</span>
+        </button>
+        <button type="button" class="clinic-section-nav-btn" data-section-key="guide">
+          <span class="nav-step">02</span>
+          <span class="nav-label">병원 가이드</span>
         </button>
       </aside>
       <section class="result-panel">
@@ -68,10 +81,12 @@
                         <div class="seg-tabs ai-type-pills" id="aiIntakeTypePills">
                           <button class="seg-tab active" data-type="opinion">여론</button>
                           <button class="seg-tab" data-type="review">후기</button>
+                          <button class="seg-tab comment-toggle" id="aiCommentToggleBtn" type="button">댓글</button>
+                          <button class="seg-tab comment-toggle" id="aiMessageToggleBtn" type="button">쪽지</button>
                         </div>
                       </div>
                     </div>
-                    <div class="ai-intake-section">
+                    <div class="ai-intake-section" id="aiIntakeContentSection">
                       <div class="section-title">콘텐츠</div>
                       <div class="ai-intake-content">
                         <div class="content-left">
@@ -98,7 +113,7 @@
                         </div>
                       </div>
                     </div>
-                    <div class="ai-intake-section">
+                    <div class="ai-intake-section" id="aiIntakeAccountSection">
                       <div class="section-title">계정 · 담당</div>
                       <div class="ai-intake-grid account-grid">
                         <div class="ai-field">
@@ -115,7 +130,53 @@
                         </div>
                       </div>
                     </div>
-                    <div class="ai-intake-section">
+                    <div class="ai-intake-section comment-workspace hidden" id="aiCommentWorkspace">
+                      <div class="section-title">댓글 묶음 작성</div>
+                      <div class="comment-workspace-grid">
+                        <div class="comment-editor">
+                          <div class="ai-field">
+                            <label>댓글 URL</label>
+                            <input id="aiCommentUrl" class="input comment-url-input" placeholder="https://..." />
+                          </div>
+                          <div class="ai-field">
+                            <label>댓글 이미지</label>
+                            <div class="file-input">
+                              <input id="aiCommentImage" class="file-native" type="file" accept="image/*" />
+                              <label class="file-btn" for="aiCommentImage">이미지 선택</label>
+                              <div class="file-name" id="aiCommentImageHint">선택된 파일 없음</div>
+                            </div>
+                          </div>
+                          <div class="comment-editor-actions">
+                            <button id="aiCommentAddBtn" class="btn" type="button">묶음 추가</button>
+                            <span class="muted" id="aiCommentAddedCount">0개 추가됨</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="ai-intake-section comment-workspace message-workspace hidden" id="aiMessageWorkspace">
+                      <div class="section-title">쪽지 작성</div>
+                      <div class="message-form">
+                        <div class="ai-field message-row message-row-url">
+                          <label>URL</label>
+                          <input id="aiMessageUrl" class="input" placeholder="https://..." />
+                        </div>
+                        <div class="message-row message-row-inline">
+                          <div class="ai-field">
+                            <label>쪽지구분</label>
+                            <select id="aiMessageType" class="select">
+                              <option value="">선택</option>
+                              <option value="prev_opinion">지난여론쪽지</option>
+                              <option value="comment_work">댓글작업쪽지</option>
+                            </select>
+                          </div>
+                          <div class="ai-field">
+                            <label>쪽지수량</label>
+                            <input id="aiMessageQty" class="input" type="number" min="1" value="1" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="ai-intake-section" id="aiIntakeAttachSection">
                       <div class="section-title">첨부</div>
                       <div class="ai-intake-grid attach-grid">
                         <div class="ai-field span-3">
@@ -131,21 +192,85 @@
 
                     <div class="ai-intake-actions">
                       <button id="aiIntakeSubmit" class="btn primary">저장하기</button>
-                      <div class="ai-review-dropdown">
-                        <button id="aiIntakeReviewBtn" class="btn">리뷰 작성</button>
-                        <div class="ai-review-menu">
-                          <button class="menu-item theme-ai" data-type="ai">AI 리뷰작성</button>
-                          <button class="menu-item theme-gangnam" data-type="gangnam">강남언니</button>
-                          <button class="menu-item theme-babytok" data-type="babytok">바비톡</button>
-                          <button class="menu-item theme-todaktok" data-type="todaktok">토닥톡</button>
-                          <button class="menu-item theme-yeoshin" data-type="yeoshin">여신티켓</button>
-                        </div>
-                      </div>
                       <span id="aiIntakeStatus" class="worklog-status"></span>
                     </div>
                     <!-- <p class="ai-intake-hint">댓글/조회수는 크롤링 연동 시 자동 반영됩니다.</p> -->
                   </div>
                 </div>
+              </div>
+            </section>
+
+            <section class="section-block card" data-section-key="guide">
+              <button type="button" class="section-toggle" data-target="clinicGuideSection" aria-expanded="true">
+                <span class="section-title">병원 가이드</span>
+                <span class="section-toggle-icon" aria-hidden="true">▾</span>
+              </button>
+              <div id="clinicGuideSection" class="section-body open">
+                <section class="clinic-guide-main">
+                  <section class="guide-summary">
+                    <div class="summary-item">
+                      <div class="label muted">병원명</div>
+                      <div class="value" id="clinicName">-</div>
+                    </div>
+                    <div class="summary-item">
+                      <div class="label muted">위치</div>
+                      <div class="meta-value" id="clinicLocation">-</div>
+                    </div>
+                    <div class="summary-item">
+                      <div class="label muted">운영시간</div>
+                      <div class="meta-value" id="clinicHours">-</div>
+                    </div>
+                    <div class="summary-item">
+                      <div class="label muted">주차</div>
+                      <div class="meta-value" id="clinicParking">-</div>
+                    </div>
+                    <div class="summary-item summary-wide">
+                      <div class="label muted">상담 프로세스</div>
+                      <div class="meta-value" id="clinicProcess">-</div>
+                    </div>
+                  </section>
+
+                  <section class="guide-main" id="guideMainDefault">
+                    <div class="doctor-panel card">
+                      <div class="panel-hd">의료진</div>
+                      <div class="nav-list" id="doctorTabs"></div>
+                    </div>
+
+                    <div class="price-panel card">
+                      <div class="panel-hd price-head">
+                        <div>
+                          <div class="label muted">선택 의료진</div>
+                          <div class="content-title" id="doctorTitle">-</div>
+                        </div>
+                        <div class="content-meta" id="priceCount">0개 항목</div>
+                      </div>
+                      <div class="panel-bd">
+                        <table class="table" id="priceTable">
+                          <thead>
+                            <tr>
+                              <th style="width: 30%;">시술/항목</th>
+                              <th style="width: 20%; text-align:right;">금액</th>
+                              <th style="width: 30%;">시술/항목</th>
+                              <th style="width: 20%; text-align:right;">금액</th>
+                            </tr>
+                          </thead>
+                          <tbody id="priceTbody"></tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section class="guide-support" id="guideSupportDefault">
+                    <div class="support-card card">
+                      <div class="panel-hd">상담실장</div>
+                      <div class="panel-bd" id="consultants">-</div>
+                    </div>
+                    <div class="support-card card">
+                      <div class="panel-hd">사후관리</div>
+                      <div class="panel-bd" id="aftercare">-</div>
+                    </div>
+                  </section>
+                </section>
               </div>
             </section>
 
@@ -211,6 +336,7 @@
                   </div>
                   <div class="card-bd">
                     <div class="post-row post-row-head">
+                      <div class="post-select-head hidden"><input type="checkbox" id="postSelectAll" /></div>
                       <div>날짜</div>
                       <div>제목</div>
                       <div>조회</div>
@@ -221,6 +347,33 @@
                       <div>사진</div>
                     </div>
                     <div id="postList"></div>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <section class="section-block card" data-section-key="notices">
+              <button type="button" class="section-toggle" data-target="clinicNoticeSection" aria-expanded="true">
+                <span class="section-title">병원 공지사항</span>
+                <span class="section-toggle-icon" aria-hidden="true">▾</span>
+              </button>
+              <div id="clinicNoticeSection" class="section-body open">
+                <section class="clinic-notice-wrap">
+                  <div class="clinic-notice-list card">
+                    <div class="card-hd">
+                      <div class="clinic-notice-toolbar">
+                        <div class="card-title">공지 목록</div>
+                        <div class="clinic-notice-toolbar-actions">
+                          <button id="clinicNoticeOpenBtn" class="btn primary" type="button">공지 작성</button>
+                          <span id="clinicNoticeStatus" class="muted"></span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="card-bd">
+                      <div id="clinicNoticeList">
+                        <div class="muted">불러오는 중...</div>
+                      </div>
+                    </div>
                   </div>
                 </section>
               </div>
@@ -255,12 +408,68 @@
                 </div>
               </div>
             </section>
+
+            <section class="section-block card" data-section-key="comment-list">
+              <div class="section-toggle comment-titlebar" data-target="clinicCommentListSection" aria-expanded="true">
+                <span class="section-title">댓글/쪽지 리스트</span>
+                <div class="month-nav" id="commentMonthNav">
+                  <button class="month-btn" id="commentMonthPrev" type="button">◀</button>
+                  <div class="month-label" id="commentMonthLabel">-</div>
+                  <button class="month-btn" id="commentMonthNext" type="button">▶</button>
+                </div>
+                <span class="section-toggle-icon" aria-hidden="true">▾</span>
+                <input type="month" id="commentMonth" class="month-input hidden" />
+              </div>
+              <div id="clinicCommentListSection" class="section-body open">
+                <section class="comment-list-panel">
+                  <div id="clinicCommentBundleList" class="comment-list-body">
+                    <div class="muted">불러오는 중...</div>
+                  </div>
+                </section>
+              </div>
+            </section>
           </div>
         </div>
       </section>
     </div>
   </section>
 </main>
+  </div>
+</div>
+
+<div id="clinicNoticeModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="clinicNoticeModalTitle">공지 작성</div>
+        <div class="modal-sub">병원별 공지사항을 등록합니다.</div>
+      </div>
+      <button id="clinicNoticeModalClose" class="modal-close" type="button">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div class="clinic-notice-form">
+        <div class="ai-field">
+          <label>제목</label>
+          <input id="clinicNoticeTitle" class="input" placeholder="공지 제목" />
+        </div>
+        <div class="ai-field">
+          <label>내용</label>
+          <textarea id="clinicNoticeContent" class="textarea clinic-notice-textarea" placeholder="공지 내용을 입력하세요"></textarea>
+        </div>
+        <label class="clinic-notice-pin">
+          <input id="clinicNoticePinned" type="checkbox" />
+          <span>상단 고정</span>
+        </label>
+        <div class="clinic-notice-actions">
+          <span id="clinicNoticeModalStatus" class="muted"></span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button id="clinicNoticeModalCancel" class="btn" type="button">취소</button>
+      <button id="clinicNoticeSaveBtn" class="btn primary" type="button">저장</button>
+    </div>
   </div>
 </div>
 
@@ -287,6 +496,42 @@
     </div>
     <div class="modal-body">
       <div id="postPhotoList" class="photo-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="commentBundleModal" class="comment-bundle-overlay hidden">
+  <div class="comment-bundle-backdrop"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">댓글 작성 리스트</div>
+        <div class="modal-sub" id="commentBundleModalUrl">-</div>
+      </div>
+      <button id="commentBundleModalClose" class="modal-close" type="button">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div id="commentBundleModalList" class="comment-bundle-modal-list">
+        <div class="muted">데이터 없음</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="messageLogModal" class="comment-bundle-overlay hidden">
+  <div class="comment-bundle-backdrop"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">쪽지 리스트</div>
+        <div class="modal-sub" id="messageLogModalUrl">-</div>
+      </div>
+      <button id="messageLogModalClose" class="modal-close" type="button">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div id="messageLogModalList" class="message-log-list">
+        <div class="muted">데이터 없음</div>
+      </div>
     </div>
   </div>
 </div>
@@ -346,6 +591,10 @@
         <div class="summary-row">
           <span class="summary-label">사진</span>
           <span class="summary-value" id="aiConfirmPhotoText">-</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">댓글 묶음</span>
+          <span class="summary-value" id="aiConfirmCommentText">0개</span>
         </div>
         <div class="summary-row">
           <span class="summary-label">미리보기</span>
@@ -430,7 +679,7 @@
 <script src="js/sidebar.js"></script>
 <script src="js/header.js"></script>
 <script src="js/schedule_calendar.js"></script>
-<script src="js/clinic_page.js"></script>
+<script src="js/clinic_page.js?v=notice_ui_20260220_2"></script>
 <script>
   (async () => {
     await loadLayout();
@@ -439,3 +688,8 @@
 </script>
 </body>
 </html>
+
+
+
+
+

@@ -8,6 +8,7 @@ from django.utils.dateparse import parse_date, parse_datetime
 from datetime import date, datetime, time, timedelta
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
+from urllib.parse import urlsplit
 import json
 import re
 import uuid
@@ -20,6 +21,12 @@ from apps.data.models import (
     ClinicPrice,
     ClinicPost,
     ClinicPostPhoto,
+    ClinicCommentBundle,
+    ClinicMessageLog,
+    ClinicNotice,
+    ClinicNoticeRead,
+    GlobalNotice,
+    GlobalNoticeRead,
     CalendarMemo,
     ReviewSchedule,
     AttendanceCorrectionRequest,
@@ -35,7 +42,16 @@ from rest_framework import status
 from rest_framework.authentication import SessionAuthentication, BaseAuthentication
 
 from .models import FavoriteClinic, ClinicAssignee
-from .serializers import FavoriteClinicSerializer, ClinicPostSerializer, CalendarMemoSerializer, ReviewScheduleSerializer
+from .serializers import (
+    FavoriteClinicSerializer,
+    ClinicPostSerializer,
+    ClinicCommentBundleSerializer,
+    ClinicMessageLogSerializer,
+    ClinicNoticeSerializer,
+    GlobalNoticeSerializer,
+    CalendarMemoSerializer,
+    ReviewScheduleSerializer,
+)
 
 ATTENDANCE_MEMO_PLATFORM = "__attendance_correction__"
 VACATION_MEMO_PLATFORM = "__vacation__"
@@ -107,6 +123,77 @@ def _build_review_schedule_content(*, plan_id, label, detail, draft, plan_title=
     if dr:
         content += f"\n초안: {dr}"
     return content
+
+
+def _normalize_url(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    try:
+        parsed = urlsplit(raw)
+        if not parsed.scheme and not parsed.netloc:
+            parsed = urlsplit(f"https://{raw.lstrip('/')}")
+        host = str(parsed.netloc or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        if host.startswith("m."):
+            host = host[2:]
+        path = str(parsed.path or "").rstrip("/")
+        return f"{host}{path}" if host else path
+    except Exception:
+        return raw.rstrip("/")
+
+
+def _normalize_url_host_path(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return "", ""
+    try:
+        parsed = urlsplit(raw)
+        host = str(parsed.netloc or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        if host.startswith("m."):
+            host = host[2:]
+        path = str(parsed.path or "").rstrip("/")
+        return host, path
+    except Exception:
+        return "", ""
+
+
+def _find_clinic_post_by_url(clinic, url):
+    matches = _get_clinic_posts_by_url(clinic, url)
+    if not matches:
+        return None
+    return matches[0]
+
+
+def _get_clinic_posts_by_url(clinic, url):
+    normalized = _normalize_url(url)
+    if not normalized:
+        return []
+
+    candidates = ClinicPost.objects.filter(clinic=clinic).only("id", "url", "comments", "message_count", "updated_at")
+    target_host, target_path = _normalize_url_host_path(url)
+    if not target_host:
+        target_host, target_path = _normalize_url_host_path(f"https://{str(url or '').lstrip('/')}")
+    target_key = f"{target_host}{target_path}" if target_host else normalized
+
+    matched = []
+    for candidate in candidates:
+        candidate_key = _normalize_url(candidate.url)
+        host, path = _normalize_url_host_path(candidate.url)
+        host_path_key = f"{host}{path}" if host else candidate_key
+        if candidate_key == normalized or host_path_key == target_key:
+            matched.append(candidate)
+
+    if not matched:
+        return []
+    return sorted(matched, key=lambda x: x.updated_at or timezone.now(), reverse=True)
+
+
+def _clinic_has_post_url(clinic, url):
+    return _find_clinic_post_by_url(clinic, url) is not None
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
@@ -280,6 +367,15 @@ def _parse_bool(value):
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes", "y", "on"}
     return False
+
+
+def _can_manage_global_notice(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if user.is_superuser:
+        return True
+    role = normalize_user_role(user)
+    return role in {"admin", "ceo", "leader"}
 
 
 def _parse_datetime_value(raw):
@@ -541,9 +637,21 @@ class ClinicPostListCreateView(APIView):
         account_password = (payload.get("account_password") or "").strip()
         memo = (payload.get("memo") or "").strip()
         doctor_name = (payload.get("doctor_name") or "").strip()
+        message_type = (payload.get("message_type") or "").strip()
 
         if not url:
             return Response({"message": "url required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        is_message_like = (
+            message_type in {"prev_opinion", "comment_work"}
+            or title == "쪽지 작업"
+            or memo.startswith("쪽지구분:")
+        )
+        if is_message_like:
+            return Response(
+                {"message": "쪽지 작성 데이터는 게시글이 아니라 쪽지 API(/message-logs/)로 저장해야 합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if not title:
             title = "미제목"
@@ -594,6 +702,116 @@ class ClinicPostListCreateView(APIView):
             ClinicPostPhoto.objects.create(post=obj, image=f)
 
         return Response(ClinicPostSerializer(obj, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+
+class ClinicCommentBundleListCreateView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, clinic_id):
+        clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+        qs = ClinicCommentBundle.objects.filter(clinic=clinic)
+        data = ClinicCommentBundleSerializer(qs[:300], many=True, context={"request": request}).data
+        for row in data:
+            post = _find_clinic_post_by_url(clinic, row.get("url"))
+            row["post_id"] = post.id if post else None
+        return Response({"count": qs.count(), "results": data}, status=status.HTTP_200_OK)
+
+    def post(self, request, clinic_id):
+        clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+        raw_urls = request.data.get("comment_urls")
+        try:
+            parsed_urls = json.loads(raw_urls) if isinstance(raw_urls, str) else raw_urls
+        except (TypeError, ValueError):
+            parsed_urls = []
+        if not isinstance(parsed_urls, list):
+            parsed_urls = []
+
+        urls = []
+        for row in parsed_urls:
+            if isinstance(row, dict):
+                value = str(row.get("url") or "").strip()
+            else:
+                value = str(row or "").strip()
+            if value:
+                urls.append(value)
+
+        images = request.FILES.getlist("comment_images")
+        if not urls or not images:
+            return Response({"message": "comment_urls and comment_images required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        invalid_urls = [u for u in urls if not _clinic_has_post_url(clinic, u)]
+        if invalid_urls:
+            return Response(
+                {"message": "게시글 리스트에 없는 URL은 댓글로 저장할 수 없습니다.", "invalid_urls": invalid_urls},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created = []
+        for idx, url in enumerate(urls):
+            if idx >= len(images):
+                break
+            created.append(
+                ClinicCommentBundle.objects.create(
+                    clinic=clinic,
+                    created_by=request.user,
+                    url=url,
+                    image=images[idx],
+                )
+            )
+
+        data = ClinicCommentBundleSerializer(created, many=True, context={"request": request}).data
+        return Response({"ok": True, "count": len(created), "results": data}, status=status.HTTP_201_CREATED)
+
+
+class ClinicMessageLogListCreateView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, clinic_id):
+        clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+        qs = ClinicMessageLog.objects.filter(clinic=clinic)
+        data = ClinicMessageLogSerializer(qs[:300], many=True, context={"request": request}).data
+        for row in data:
+            post = _find_clinic_post_by_url(clinic, row.get("url"))
+            row["post_id"] = post.id if post else None
+        return Response({"count": qs.count(), "results": data}, status=status.HTTP_200_OK)
+
+    def post(self, request, clinic_id):
+        clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+        url = str(request.data.get("url") or "").strip()
+        platform = str(request.data.get("platform") or "").strip()
+        message_type = str(request.data.get("message_type") or "").strip()
+
+        try:
+            message_count = int(request.data.get("message_count") or 0)
+        except (TypeError, ValueError):
+            message_count = 0
+        message_count = max(0, message_count)
+
+        if not url:
+            return Response({"message": "url required"}, status=status.HTTP_400_BAD_REQUEST)
+        matched_posts = _get_clinic_posts_by_url(clinic, url)
+        if not matched_posts:
+            return Response({"message": "게시글 리스트에 없는 URL은 쪽지로 저장할 수 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+        if message_type not in {"prev_opinion", "comment_work"}:
+            return Response({"message": "valid message_type required"}, status=status.HTTP_400_BAD_REQUEST)
+        if message_count < 1:
+            return Response({"message": "쪽지수량은 1 이상이어야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        obj = ClinicMessageLog.objects.create(
+            clinic=clinic,
+            created_by=request.user,
+            url=url,
+            platform=platform,
+            message_type=message_type,
+            message_count=message_count,
+        )
+        for matched_post in matched_posts:
+            matched_post.message_count = int(matched_post.message_count or 0) + int(message_count or 0)
+            matched_post.save(update_fields=["message_count", "updated_at"])
+        data = ClinicMessageLogSerializer(obj, context={"request": request}).data
+        return Response(data, status=status.HTTP_201_CREATED)
     
 class ClinicAssigneeListView(APIView):
     authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
@@ -617,6 +835,228 @@ class ClinicAssigneeListView(APIView):
         ]
 
         return Response(data)
+
+
+class ClinicNoticeListCreateView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, clinic_id):
+        clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+        qs = ClinicNotice.objects.filter(clinic=clinic)
+        rows = list(qs[:300])
+        data = ClinicNoticeSerializer(rows, many=True, context={"request": request}).data
+        ids = [row.id for row in rows]
+        read_ids = set(
+            ClinicNoticeRead.objects
+            .filter(user=request.user, notice_id__in=ids)
+            .values_list("notice_id", flat=True)
+        )
+        for item in data:
+            item["is_new"] = int(item.get("id") or 0) not in read_ids
+        return Response({"count": qs.count(), "results": data}, status=status.HTTP_200_OK)
+
+    def post(self, request, clinic_id):
+        clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+        title = str(request.data.get("title") or "").strip()
+        content = str(request.data.get("content") or "").strip()
+        is_pinned = _parse_bool(request.data.get("is_pinned"))
+
+        if not title and not content:
+            return Response({"message": "title or content required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        obj = ClinicNotice.objects.create(
+            clinic=clinic,
+            created_by=request.user,
+            title=title,
+            content=content,
+            is_pinned=is_pinned,
+        )
+        data = ClinicNoticeSerializer(obj, context={"request": request}).data
+        return Response(data, status=status.HTTP_201_CREATED)
+
+
+class ClinicNoticeDetailView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, clinic_id, notice_id):
+        clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+        notice = get_object_or_404(ClinicNotice, id=notice_id, clinic=clinic)
+
+        payload = request.data or {}
+        updated_fields = []
+
+        if "title" in payload:
+            notice.title = str(payload.get("title") or "").strip()
+            updated_fields.append("title")
+
+        if "content" in payload:
+            notice.content = str(payload.get("content") or "").strip()
+            updated_fields.append("content")
+
+        if "is_pinned" in payload:
+            notice.is_pinned = _parse_bool(payload.get("is_pinned"))
+            updated_fields.append("is_pinned")
+
+        if not notice.title and not notice.content:
+            return Response({"message": "title or content required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if updated_fields:
+            notice.save(update_fields=[*set(updated_fields), "updated_at"])
+
+        data = ClinicNoticeSerializer(notice, context={"request": request}).data
+        return Response(data, status=status.HTTP_200_OK)
+
+    def delete(self, request, clinic_id, notice_id):
+        clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+        notice = get_object_or_404(ClinicNotice, id=notice_id, clinic=clinic)
+        notice.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ClinicNoticeReadView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, clinic_id, notice_id):
+        clinic = get_object_or_404(ClinicGuide, id=clinic_id, is_active=True)
+        notice = get_object_or_404(ClinicNotice, id=notice_id, clinic=clinic)
+        ClinicNoticeRead.objects.update_or_create(
+            notice=notice,
+            user=request.user,
+            defaults={},
+        )
+        return Response({"ok": True, "notice_id": notice.id}, status=status.HTTP_200_OK)
+
+
+class GlobalNoticeListCreateView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = GlobalNotice.objects.all()
+
+        pinned_only = _parse_bool(request.GET.get("pinned_only"))
+        unread_only = _parse_bool(request.GET.get("unread_only"))
+        limit_raw = request.GET.get("limit")
+
+        if pinned_only:
+            qs = qs.filter(is_pinned=True)
+
+        rows = list(qs[:300])
+        data = GlobalNoticeSerializer(rows, many=True, context={"request": request}).data
+        is_manager = _can_manage_global_notice(request.user)
+        author_map = {row.id: row.created_by_id for row in rows}
+        ids = [row.id for row in rows]
+        read_ids = set(
+            GlobalNoticeRead.objects
+            .filter(user=request.user, notice_id__in=ids)
+            .values_list("notice_id", flat=True)
+        )
+        for item in data:
+            item_id = int(item.get("id") or 0)
+            is_author = bool(author_map.get(item_id) and author_map.get(item_id) == request.user.id)
+            item["is_new"] = item_id not in read_ids
+            item["can_edit"] = bool(is_manager or is_author)
+            item["can_delete"] = bool(is_manager or is_author)
+
+        if unread_only:
+            data = [item for item in data if item.get("is_new")]
+
+        if limit_raw:
+            try:
+                limit = max(1, min(300, int(limit_raw)))
+            except ValueError:
+                limit = 50
+            data = data[:limit]
+
+        return Response({"count": qs.count(), "results": data}, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        if not _can_manage_global_notice(request.user):
+            return Response({"message": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        title = str(request.data.get("title") or "").strip()
+        content = str(request.data.get("content") or "").strip()
+        is_pinned = _parse_bool(request.data.get("is_pinned"))
+
+        if not title and not content:
+            return Response({"message": "title or content required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        obj = GlobalNotice.objects.create(
+            created_by=request.user,
+            title=title,
+            content=content,
+            is_pinned=is_pinned,
+        )
+        data = GlobalNoticeSerializer(obj, context={"request": request}).data
+        return Response(data, status=status.HTTP_201_CREATED)
+
+
+class GlobalNoticeDetailView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, notice_id):
+        notice = get_object_or_404(GlobalNotice, id=notice_id)
+        is_author = bool(notice.created_by_id and notice.created_by_id == request.user.id)
+        if not (_can_manage_global_notice(request.user) or is_author):
+            return Response({"message": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        payload = request.data or {}
+        updated_fields = []
+
+        if "title" in payload:
+            notice.title = str(payload.get("title") or "").strip()
+            updated_fields.append("title")
+
+        if "content" in payload:
+            notice.content = str(payload.get("content") or "").strip()
+            updated_fields.append("content")
+
+        if "is_pinned" in payload:
+            notice.is_pinned = _parse_bool(payload.get("is_pinned"))
+            updated_fields.append("is_pinned")
+
+        if not notice.title and not notice.content:
+            return Response({"message": "title or content required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if updated_fields:
+            notice.save(update_fields=[*set(updated_fields), "updated_at"])
+
+        data = GlobalNoticeSerializer(notice, context={"request": request}).data
+        return Response(data, status=status.HTTP_200_OK)
+
+    def delete(self, request, notice_id):
+        notice = get_object_or_404(GlobalNotice, id=notice_id)
+        is_author = bool(notice.created_by_id and notice.created_by_id == request.user.id)
+        if not (_can_manage_global_notice(request.user) or is_author):
+            return Response({"message": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        notice.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class GlobalNoticeReadView(APIView):
+    authentication_classes = [HeaderSessionAuthentication, CsrfExemptSessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, notice_id):
+        notice = get_object_or_404(GlobalNotice, id=notice_id)
+        confirmation_text = str(request.data.get("confirmation_text") or "").strip()
+        if notice.is_pinned and confirmation_text != "확인했습니다":
+            return Response(
+                {"message": "confirmation_text must be '확인했습니다'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        GlobalNoticeRead.objects.update_or_create(
+            notice=notice,
+            user=request.user,
+            defaults={},
+        )
+        return Response({"ok": True, "notice_id": notice.id}, status=status.HTTP_200_OK)
 
 
 class ClinicPostDetailView(APIView):

@@ -217,6 +217,33 @@ function initHtmlLinkTransition() {
 initPageTransitionState();
 initHtmlLinkTransition();
 
+function initGlobalClickDedupe() {
+  if (window.__globalClickDedupeBound) return;
+  window.__globalClickDedupeBound = true;
+
+  let lastTarget = null;
+  let lastTs = 0;
+  const CLICK_GUARD_MS = 300;
+  const clickableSelector = "button, .btn, a[href], [role='button'], input[type='button'], input[type='submit']";
+
+  document.addEventListener("click", (e) => {
+    if (!e.isTrusted) return;
+    const target = e.target?.closest?.(clickableSelector);
+    if (!target) return;
+
+    const now = Date.now();
+    if (target === lastTarget && now - lastTs < CLICK_GUARD_MS) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
+    lastTarget = target;
+    lastTs = now;
+  }, true);
+}
+
+initGlobalClickDedupe();
+
 // Fallback: close known overlays if they get stuck open.
 function releaseBlockingLayers() {
   const overlays = [
@@ -262,16 +289,26 @@ function closeStuckOverlays(exceptTarget) {
 // Hide orphaned backdrops that can block all inputs.
 function hideOrphanedBackdrops() {
   document
-    .querySelectorAll(".modal-backdrop, .photo-preview-backdrop, .review-loading-backdrop")
+    .querySelectorAll(
+      ".modal-backdrop, .photo-preview-backdrop, .review-loading-backdrop, .app-confirm-backdrop, .profile-crop-backdrop, .global-notice-gate-backdrop"
+    )
     .forEach((backdrop) => {
-      const modal = backdrop.closest(".modal, .photo-preview-modal");
+      const modal = backdrop.closest(
+        ".modal, .photo-preview-modal, .app-confirm, .profile-crop-modal, .global-notice-gate-modal"
+      );
+      const isGlobalNoticeGate = modal?.classList?.contains("global-notice-gate-modal");
       const modalVisible =
         modal &&
         !modal.classList.contains("hidden") &&
+        (!isGlobalNoticeGate || modal.classList.contains("is-open")) &&
         getComputedStyle(modal).display !== "none";
 
       if (modalVisible) return;
       if (modal) modal.classList.add("hidden");
+      if (modal?.classList?.contains("global-notice-gate-modal")) {
+        modal.classList.remove("is-open");
+        document.body.classList.remove("global-notice-gate-open");
+      }
       backdrop.classList.add("hidden");
       backdrop.style.display = "none";
     });

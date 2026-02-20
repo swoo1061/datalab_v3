@@ -145,25 +145,92 @@
     </div>
 
     <div class="user-area">
-      <!-- ✅ 이름만 클릭 -->
+      <!-- ✅ 이름 버튼 -->
       <div class="user-chip" id="userChip">
+        <span class="user-chip-avatar" aria-hidden="true">
+          <img id="userChipAvatarImage" src="" alt="프로필 사진" />
+          <span id="userChipAvatarFallback" class="user-chip-avatar-fallback hidden">U</span>
+        </span>
         <span id="userName">사용자</span>
       </div>
 
       <!-- 프로필 팝업 -->
       <div id="profilePopup" class="profile-popup hidden">
+        <div class="profile-avatar-wrap">
+          <div class="profile-avatar">
+            <img id="profileAvatarImage" src="" alt="프로필 사진" />
+            <div id="profileAvatarFallback" class="profile-avatar-fallback hidden">U</div>
+            <div class="avatar-overlay">✎</div>
+          </div>
+          <input id="profileAvatarInput" type="file" accept="image/*" class="hidden" />
+        </div>
         <div class="profile-row">
           <strong id="profileName">-</strong>
           <div id="profilePosition" class="position-text">-</div>
         </div>
+        <div class="status-hover-group">
+          <div class="status-hover-item" id="profileInfoHoverItem" tabindex="0">
+            <span>기본정보</span>
+            <span class="status-hover-arrow">›</span>
+            <div class="status-flyout status-flyout-left" id="profileInfoFlyout">
+              <div class="status-flyout-title">기본정보</div>
+              <div class="mini-info-list">
+                <div class="mini-info-row">
+                  <span>이름</span>
+                  <strong id="miniInfoName">-</strong>
+                </div>
+                <div class="mini-info-row">
+                  <span>이메일</span>
+                  <strong id="miniInfoEmail">-</strong>
+                </div>
+                <div class="mini-info-row">
+                  <span>전화번호</span>
+                  <strong id="miniInfoPhone">-</strong>
+                </div>
+                <div class="mini-info-row">
+                  <span>생년월일</span>
+                  <strong id="miniInfoBirth">-</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="status-hover-item" id="presenceHoverItem" tabindex="0">
+            <span>현재 상태</span>
+            <span class="status-hover-arrow">›</span>
+            <div class="status-flyout status-flyout-left" id="presenceFlyout">
+              <div class="status-flyout-title">현재 상태</div>
+              <div class="presence-select-wrap" id="presenceSelectWrap">
+                <button class="presence-select-trigger" id="presenceSelectTrigger" type="button">
+                  <span id="presenceSelectLabel">접속중</span>
+                  <span class="presence-select-caret">▾</span>
+                </button>
+                <div class="presence-select-menu hidden" id="presenceSelectMenu">
+                  <button class="presence-option" data-presence="online" type="button">접속중</button>
+                  <button class="presence-option" data-presence="away" type="button">자리비움</button>
+                  <button class="presence-option" data-presence="meeting" type="button">미팅중</button>
+                  <button class="presence-option" data-presence="dnd" type="button">방해금지</button>
+                  <button class="presence-option" data-presence="offline" type="button">오프라인</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="status-hover-item" id="staffHoverItem" tabindex="0">
+            <span>직원 상태</span>
+            <span class="status-hover-arrow">›</span>
+            <div class="status-flyout status-flyout-left" id="staffFlyout">
+              <div class="status-flyout-title">직원 상태</div>
+              <div id="staffPresenceList" class="staff-presence-list">
+                <div class="staff-presence-empty">불러오는 중...</div>
+              </div>
+            </div>
+          </div>
+          <div class="status-hover-item" data-action="global_notices" tabindex="0">
+            <span>공지사항</span>
+            <span class="status-hover-arrow">›</span>
+          </div>
+        </div>
 
         <hr />
-
-        <div class="profile-menu">
-            <div class="menu-item" data-action="profile">기본 정보</div>
-          </div>
-
-          <hr />
   
           <div class="popup-actions">
             <button class="popup-btn" onclick="logout()">로그아웃</button>
@@ -200,4 +267,3 @@
     <strong id="infoBirth">-</strong>
   </div>
 </div>
-

@@ -1121,6 +1121,167 @@ class ClinicPostPhoto(models.Model):
         return f"Photo {self.pk} for post {self.post_id}"
 
 
+class ClinicCommentBundle(models.Model):
+    clinic = models.ForeignKey("ClinicGuide", on_delete=models.CASCADE, related_name="comment_bundles")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="clinic_comment_bundles",
+    )
+    url = models.URLField(max_length=1000)
+    image = models.ImageField(upload_to="clinic_comment_bundles/%Y/%m/%d")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["clinic", "-created_at"]),
+        ]
+        verbose_name = "댓글"
+        verbose_name_plural = "댓글"
+
+    def __str__(self):
+        return f"CommentBundle {self.pk} ({self.clinic_id})"
+
+
+class ClinicMessageLog(models.Model):
+    MESSAGE_TYPE_CHOICES = [
+        ("prev_opinion", "지난여론쪽지"),
+        ("comment_work", "댓글작업쪽지"),
+    ]
+
+    clinic = models.ForeignKey("ClinicGuide", on_delete=models.CASCADE, related_name="message_logs")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="clinic_message_logs",
+    )
+    url = models.URLField(max_length=1000)
+    platform = models.CharField(max_length=30, blank=True, default="", db_index=True)
+    message_type = models.CharField(max_length=30, choices=MESSAGE_TYPE_CHOICES, db_index=True)
+    message_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["clinic", "-created_at"]),
+            models.Index(fields=["clinic", "message_type", "-created_at"]),
+        ]
+        verbose_name = "쪽지"
+        verbose_name_plural = "쪽지"
+
+    def __str__(self):
+        return f"MessageLog {self.pk} ({self.clinic_id})"
+
+
+class ClinicNotice(models.Model):
+    clinic = models.ForeignKey("ClinicGuide", on_delete=models.CASCADE, related_name="notices")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="clinic_notices",
+    )
+    title = models.CharField(max_length=200, blank=True, default="")
+    content = models.TextField(blank=True, default="")
+    is_pinned = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_pinned", "-updated_at"]
+        indexes = [
+            models.Index(fields=["clinic", "-updated_at"]),
+            models.Index(fields=["clinic", "-is_pinned", "-updated_at"]),
+        ]
+        verbose_name = "병원 공지사항"
+        verbose_name_plural = "병원 공지사항"
+
+    def __str__(self):
+        head = (self.title or self.content or "").strip()
+        return f"Notice {self.pk} ({self.clinic_id}) {head[:30]}"
+
+
+class ClinicNoticeRead(models.Model):
+    notice = models.ForeignKey("ClinicNotice", on_delete=models.CASCADE, related_name="reads")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="clinic_notice_reads",
+    )
+    read_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("notice", "user")
+        indexes = [
+            models.Index(fields=["user", "notice"]),
+            models.Index(fields=["notice", "user"]),
+        ]
+        verbose_name = "병원 공지 읽음"
+        verbose_name_plural = "병원 공지 읽음"
+
+    def __str__(self):
+        return f"NoticeRead {self.notice_id} by {self.user_id}"
+
+
+class GlobalNotice(models.Model):
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="global_notices",
+    )
+    title = models.CharField(max_length=200, blank=True, default="")
+    content = models.TextField(blank=True, default="")
+    is_pinned = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_pinned", "-updated_at"]
+        indexes = [
+            models.Index(fields=["-updated_at"]),
+            models.Index(fields=["-is_pinned", "-updated_at"]),
+        ]
+        verbose_name = "전체 공지사항"
+        verbose_name_plural = "전체 공지사항"
+
+    def __str__(self):
+        head = (self.title or self.content or "").strip()
+        return f"GlobalNotice {self.pk} {head[:30]}"
+
+
+class GlobalNoticeRead(models.Model):
+    notice = models.ForeignKey("GlobalNotice", on_delete=models.CASCADE, related_name="reads")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="global_notice_reads",
+    )
+    read_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("notice", "user")
+        indexes = [
+            models.Index(fields=["user", "notice"]),
+            models.Index(fields=["notice", "user"]),
+        ]
+        verbose_name = "전체 공지 읽음"
+        verbose_name_plural = "전체 공지 읽음"
+
+    def __str__(self):
+        return f"GlobalNoticeRead {self.notice_id} by {self.user_id}"
+
+
 class CrawledPostContent(models.Model):
     STATUS_CHOICES = [
         ("success", "성공"),

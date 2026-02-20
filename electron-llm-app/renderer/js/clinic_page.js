@@ -10,6 +10,7 @@ let currentClinicId = null;
 let currentClinicName = "";
 let currentPostMonth = getThisMonth();   // YYYY-MM
 let currentCalendarMonth = getThisMonth();   // YYYY-MM
+let currentCommentMonth = getThisMonth();   // YYYY-MM
 let currentType = "opinion";         // opinion | review
 let currentPlatform = "all";         // all | naver | ...
 let currentQuery = "";
@@ -20,6 +21,12 @@ let calendarSelectedDate = "";
 let postsCache = new Map();
 let editingAll = false;
 let assigneeNameMap = new Map();
+let commentBundleItemsByUrl = new Map();
+let messageLogItemsByUrl = new Map();
+let clinicPageInitialized = false;
+let currentClinicNotices = [];
+let editingNoticeId = null;
+let openNoticeId = null;
 
 // ================================
 // 플랫폼 정의
@@ -91,9 +98,35 @@ function formatMonthLabel(value) {
   return `${y}년 ${m}월`;
 }
 
+function formatHoursText(value) {
+  const raw = String(value || "").replace(/\r\n?/g, "\n").trim();
+  if (!raw) return "-";
+  if (raw.includes("\n")) return raw;
+  return raw.replace(/\s*,\s*/g, "\n");
+}
+
 function fmtDateTime(iso) {
   if (!iso) return "-";
   return new Date(iso).toLocaleString("ko-KR", { hour12: false });
+}
+
+function fmtDateTimeMinute(iso) {
+  if (!iso) return "-";
+  return new Date(iso).toLocaleString("ko-KR", {
+    hour12: false,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function fmtDateOnly(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.valueOf())) return "-";
+  return d.toLocaleDateString("ko-KR");
 }
 
 function formatMemoTime(remindAt) {
@@ -103,11 +136,88 @@ function formatMemoTime(remindAt) {
   return parsed.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function normalizeUrlKey(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    const host = String(parsed.hostname || "")
+      .toLowerCase()
+      .replace(/^www\./, "")
+      .replace(/^m\./, "");
+    const pathname = String(parsed.pathname || "").replace(/\/+$/, "");
+    return `${host}${pathname}`;
+  } catch (_) {
+    return raw
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .replace(/^m\./, "")
+      .replace(/\?.*$/, "")
+      .replace(/\/+$/, "");
+  }
+}
+
+function getCountUrlKey(value) {
+  return normalizeUrlKey(value);
+}
+
 function detectPlatformFromUrl(url) {
   const raw = String(url || "").toLowerCase();
   if (!raw) return null;
   const hit = PLATFORM_URL_MATCHERS.find((c) => c.match.some((m) => raw.includes(m)));
   return hit ? { key: hit.key, label: hit.label } : null;
+}
+
+function detectCafeFromUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return "-";
+  const CAFE_ID_NAME_MAP = {
+    imsanbu: "맘스홀릭",
+    cosmania: "파우더룸",
+    parisienlook: "시트먼트",
+    geahwa73: "안양군의왕과천맘",
+    feko: "여우야",
+    fox5282: "A+ 여우야",
+    juliett00: "성형위키",
+    luxury009: "가야사",
+    knife67: "재잘재잘",
+    suddes: "여생남정",
+    newsmaker: "지살사",
+  };
+
+  const matchedCafeId = Object.keys(CAFE_ID_NAME_MAP).find((id) => raw.toLowerCase().includes(id));
+  if (matchedCafeId) {
+    return CAFE_ID_NAME_MAP[matchedCafeId];
+  }
+
+  try {
+    const parsed = new URL(raw);
+    let host = String(parsed.hostname || "").toLowerCase();
+    host = host.replace(/^www\./, "").replace(/^m\./, "");
+    if (!host) return "-";
+    if (host.includes("cafe.naver.com")) {
+      const segments = String(parsed.pathname || "")
+        .split("/")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+      const cafeId = segments[0] || "";
+      if (cafeId && CAFE_ID_NAME_MAP[cafeId]) {
+        return CAFE_ID_NAME_MAP[cafeId];
+      }
+      if (cafeId) return cafeId;
+      return "네이버 카페";
+    }
+    if (host.includes("blog.naver.com")) return "네이버 블로그";
+    return host;
+  } catch (_) {
+    return "-";
+  }
+}
+
+function inferTypeLabelFromPlatformKey(platformKey) {
+  const reviewPlatforms = new Set(["gangnam", "babytok", "todaktok", "yeoshin"]);
+  return reviewPlatforms.has(String(platformKey || "").toLowerCase()) ? "후기" : "여론";
 }
 
 function escapeHtml(str) {
@@ -146,9 +256,13 @@ function getAssigneeDisplay(post) {
 // 초기 로드
 // ================================
 async function initClinicPage() {
+  if (clinicPageInitialized) return;
+  clinicPageInitialized = true;
+
   currentClinicId = normalizeClinicId(getClinicIdFromQuery()) || getRememberedClinicId();
   if (!currentClinicId) {
     window.showAlert?.("clinic_id 없음");
+    clinicPageInitialized = false;
     return;
   }
   rememberClinicId(currentClinicId);
@@ -158,9 +272,14 @@ async function initClinicPage() {
 
   initSectionToggles();
   initClinicWorkspaceNav();
+  initClinicNoticesSection();
   initAiIntakeForm();
   initClinicPostsSection();
   initClinicCalendar();
+  initCommentMonthNav();
+  initCommentBundleModal();
+  initMessageLogModal();
+  loadCommentBundleList();
   bindPostsDashboardLink();
 }
 
@@ -199,6 +318,135 @@ async function loadClinicInfo() {
   if (metaEl) {
     metaEl.innerText = `${c.location || ""} · ${c.hours || ""}`.trim();
   }
+  renderClinicGuideSection(data);
+}
+
+function renderClinicGuideSection(data) {
+  const clinic = data?.clinic || {};
+  const doctors = Array.isArray(data?.doctors) ? data.doctors : [];
+  const prices = Array.isArray(data?.price_list) ? data.price_list : [];
+  const consultants = Array.isArray(data?.consultants) ? data.consultants : [];
+
+  const clinicNameEl = document.getElementById("clinicName");
+  const clinicLocationEl = document.getElementById("clinicLocation");
+  const clinicHoursEl = document.getElementById("clinicHours");
+  const clinicParkingEl = document.getElementById("clinicParking");
+  const clinicProcessEl = document.getElementById("clinicProcess");
+  const doctorTabsEl = document.getElementById("doctorTabs");
+  const doctorTitleEl = document.getElementById("doctorTitle");
+  const priceCountEl = document.getElementById("priceCount");
+  const priceTbodyEl = document.getElementById("priceTbody");
+  const consultantsEl = document.getElementById("consultants");
+  const aftercareEl = document.getElementById("aftercare");
+  if (
+    !clinicNameEl || !clinicLocationEl || !clinicHoursEl || !clinicParkingEl || !clinicProcessEl ||
+    !doctorTabsEl || !doctorTitleEl || !priceCountEl || !priceTbodyEl || !consultantsEl || !aftercareEl
+  ) return;
+
+  clinicNameEl.textContent = clinic.name || "-";
+  clinicLocationEl.textContent = clinic.location || "-";
+  clinicHoursEl.textContent = formatHoursText(clinic.hours);
+  clinicParkingEl.textContent = clinic.parking || "-";
+  clinicProcessEl.textContent = clinic.process || "-";
+
+  doctorTabsEl.innerHTML = "";
+  doctors.forEach((doc) => {
+    const key = doc.code || doc.name;
+    const tab = document.createElement("div");
+    tab.className = "nav-item";
+    tab.dataset.key = String(key);
+    tab.innerHTML = `<span>${escapeHtml(doc.name || String(key))}</span>`;
+    tab.addEventListener("click", () => renderGuidePriceTable(data, String(key)));
+    doctorTabsEl.appendChild(tab);
+  });
+
+  if (prices.some((row) => !row.doctor_code)) {
+    const tab = document.createElement("div");
+    tab.className = "nav-item";
+    tab.dataset.key = "common";
+    tab.innerHTML = "<span>공통 수가</span>";
+    tab.addEventListener("click", () => renderGuidePriceTable(data, "common"));
+    doctorTabsEl.appendChild(tab);
+  }
+
+  const initialKey = doctors.length ? String(doctors[0].code || doctors[0].name) : "common";
+  renderGuidePriceTable(data, initialKey);
+
+  if (!consultants.length) {
+    consultantsEl.textContent = "-";
+  } else {
+    consultantsEl.innerHTML = consultants
+      .map((item) => {
+        if (typeof item === "string") {
+          return `<div class="consultant-card"><div class="consultant-name">${escapeHtml(item)}</div></div>`;
+        }
+        const name = item?.name || item?.label || "";
+        const style = item?.style || item?.desc || item?.description || "";
+        if (!name) return "";
+        return `
+          <div class="consultant-card">
+            <div class="consultant-name">${escapeHtml(name)}</div>
+            ${style ? `<div class="consultant-style">${escapeHtml(style)}</div>` : ""}
+          </div>
+        `;
+      })
+      .filter(Boolean)
+      .join("") || "-";
+  }
+
+  const aftercareItems = Array.isArray(data?.aftercare) ? data.aftercare : [];
+  aftercareEl.innerHTML = aftercareItems
+    .map((item) => `<div class="aftercare-item">${escapeHtml(item)}</div>`)
+    .join("") || "-";
+}
+
+function renderGuidePriceTable(data, key) {
+  const doctorTabsEl = document.getElementById("doctorTabs");
+  const doctorTitleEl = document.getElementById("doctorTitle");
+  const priceCountEl = document.getElementById("priceCount");
+  const priceTbodyEl = document.getElementById("priceTbody");
+  if (!doctorTabsEl || !doctorTitleEl || !priceCountEl || !priceTbodyEl) return;
+
+  const doctors = Array.isArray(data?.doctors) ? data.doctors : [];
+  const prices = Array.isArray(data?.price_list) ? data.price_list : [];
+  const normalizedKey = String(key || "common");
+
+  doctorTabsEl.querySelectorAll(".nav-item").forEach((node) => {
+    node.classList.toggle("active", String(node.dataset.key || "") === normalizedKey);
+  });
+
+  const filtered = prices.filter((row) => {
+    if (normalizedKey === "common") return !row.doctor_code;
+    return String(row.doctor_code || "") === normalizedKey;
+  });
+
+  const selectedDoctor = doctors.find((doc) => String(doc.code || doc.name) === normalizedKey);
+  doctorTitleEl.textContent = normalizedKey === "common" ? "공통 수가" : (selectedDoctor?.name || normalizedKey);
+  priceCountEl.textContent = `${filtered.length}개 항목`;
+
+  if (!filtered.length) {
+    priceTbodyEl.innerHTML = `
+      <tr>
+        <td colspan="4" class="muted">표시할 수가 정보가 없습니다.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  const rows = [];
+  for (let i = 0; i < filtered.length; i += 2) {
+    const left = filtered[i];
+    const right = filtered[i + 1];
+    rows.push(`
+      <tr>
+        <td class="procedure">${escapeHtml(left?.procedure || "-")}</td>
+        <td class="price">${escapeHtml(left?.price_display || "상담 필요")}</td>
+        <td class="procedure">${escapeHtml(right?.procedure || "-")}</td>
+        <td class="price">${escapeHtml(right?.price_display || (right ? "상담 필요" : "-"))}</td>
+      </tr>
+    `);
+  }
+  priceTbodyEl.innerHTML = rows.join("");
 }
 
 function initSectionToggles() {
@@ -245,6 +493,263 @@ function initClinicWorkspaceNav() {
 
   const defaultKey = navButtons[0]?.dataset.sectionKey;
   if (defaultKey) setActive(defaultKey);
+}
+
+// ================================
+// 병원 공지사항
+// ================================
+function initClinicNoticesSection() {
+  const openBtn = document.getElementById("clinicNoticeOpenBtn");
+  const saveBtn = document.getElementById("clinicNoticeSaveBtn");
+  const modalCloseBtn = document.getElementById("clinicNoticeModalClose");
+  const modalCancelBtn = document.getElementById("clinicNoticeModalCancel");
+  const modalEl = document.getElementById("clinicNoticeModal");
+  const listEl = document.getElementById("clinicNoticeList");
+  if (!openBtn || !saveBtn || !modalCloseBtn || !modalCancelBtn || !modalEl || !listEl) return;
+
+  openBtn.addEventListener("click", () => openClinicNoticeModal());
+  saveBtn.addEventListener("click", () => saveClinicNotice());
+  modalCloseBtn.addEventListener("click", () => closeClinicNoticeModal());
+  modalCancelBtn.addEventListener("click", () => closeClinicNoticeModal());
+  modalEl.addEventListener("click", (event) => {
+    if (event.target?.matches?.(".modal-backdrop[data-close='true']")) {
+      closeClinicNoticeModal();
+    }
+  });
+
+  listEl.addEventListener("click", async (event) => {
+    const toggleBtn = event.target.closest("[data-notice-toggle]");
+    const editBtn = event.target.closest("[data-notice-edit]");
+    const deleteBtn = event.target.closest("[data-notice-delete]");
+    if (toggleBtn) {
+      const id = Number(toggleBtn.dataset.noticeToggle || 0);
+      if (!id) return;
+      const willOpen = Number(openNoticeId) !== id;
+      openNoticeId = willOpen ? id : null;
+      if (willOpen) await markClinicNoticeRead(id);
+      renderClinicNoticeList();
+      return;
+    }
+    if (editBtn) {
+      const id = Number(editBtn.dataset.noticeEdit || 0);
+      if (!id) return;
+      const found = currentClinicNotices.find((row) => Number(row.id) === id);
+      if (!found) return;
+      openClinicNoticeModal(found);
+      return;
+    }
+    if (deleteBtn) {
+      const id = Number(deleteBtn.dataset.noticeDelete || 0);
+      if (!id) return;
+      const ok = typeof window.appConfirm === "function"
+        ? await window.appConfirm("이 공지사항을 삭제할까요?")
+        : window.confirm("이 공지사항을 삭제할까요?");
+      if (!ok) return;
+      await deleteClinicNotice(id);
+    }
+  });
+
+  loadClinicNotices();
+}
+
+function getClinicNoticeFormValues() {
+  const titleEl = document.getElementById("clinicNoticeTitle");
+  const contentEl = document.getElementById("clinicNoticeContent");
+  const pinnedEl = document.getElementById("clinicNoticePinned");
+  return {
+    title: String(titleEl?.value || "").trim(),
+    content: String(contentEl?.value || "").trim(),
+    is_pinned: Boolean(pinnedEl?.checked),
+  };
+}
+
+function setClinicNoticeStatus(text, isError = false) {
+  const headerStatusEl = document.getElementById("clinicNoticeStatus");
+  const modalStatusEl = document.getElementById("clinicNoticeModalStatus");
+  [headerStatusEl, modalStatusEl].forEach((statusEl) => {
+    if (!statusEl) return;
+    statusEl.textContent = text || "";
+    statusEl.style.color = isError ? "#b91c1c" : "";
+  });
+}
+
+function openClinicNoticeModal(notice = null) {
+  const titleEl = document.getElementById("clinicNoticeTitle");
+  const contentEl = document.getElementById("clinicNoticeContent");
+  const pinnedEl = document.getElementById("clinicNoticePinned");
+  const modalTitleEl = document.getElementById("clinicNoticeModalTitle");
+  const modalEl = document.getElementById("clinicNoticeModal");
+
+  editingNoticeId = Number(notice?.id || 0) || null;
+  if (titleEl) titleEl.value = notice?.title || "";
+  if (contentEl) contentEl.value = notice?.content || "";
+  if (pinnedEl) pinnedEl.checked = Boolean(notice?.is_pinned);
+  if (modalTitleEl) modalTitleEl.textContent = editingNoticeId ? "공지 수정" : "공지 작성";
+  setClinicNoticeStatus("");
+  if (modalEl) modalEl.classList.remove("hidden");
+}
+
+function closeClinicNoticeModal() {
+  const modalEl = document.getElementById("clinicNoticeModal");
+  editingNoticeId = null;
+  const titleEl = document.getElementById("clinicNoticeTitle");
+  const contentEl = document.getElementById("clinicNoticeContent");
+  const pinnedEl = document.getElementById("clinicNoticePinned");
+  if (titleEl) titleEl.value = "";
+  if (contentEl) contentEl.value = "";
+  if (pinnedEl) pinnedEl.checked = false;
+  setClinicNoticeStatus("");
+  if (modalEl) modalEl.classList.add("hidden");
+}
+
+function renderClinicNoticeList() {
+  const listEl = document.getElementById("clinicNoticeList");
+  if (!listEl) return;
+  if (!currentClinicNotices.length) {
+    listEl.innerHTML = `
+      <div class="clinic-notice-empty">
+        <div class="clinic-notice-empty-title">등록된 공지사항이 없습니다.</div>
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = currentClinicNotices
+    .map((row) => {
+      const writer = [row.created_by_name, row.created_by_position].filter(Boolean).join(" ");
+      const isOpen = Number(openNoticeId) === Number(row.id);
+      return `
+        <article class="clinic-notice-row ${isOpen ? "is-open" : ""} ${row.is_pinned ? "is-pinned" : ""}">
+          <button class="clinic-notice-line" type="button" data-notice-toggle="${row.id}">
+            <div class="clinic-notice-col notice-type">${row.is_pinned ? "중요공지" : "공지"}</div>
+            <div class="clinic-notice-col notice-title">
+              <div class="notice-title-text">
+                ${escapeHtml(row.title || "(제목 없음)")}
+                ${row.is_new ? '<span class="notice-new-badge">NEW</span>' : ""}
+              </div>
+            </div>
+            <div class="clinic-notice-col notice-date">
+              <div class="notice-writer-text">${escapeHtml(writer || "작성자 미상")}</div>
+              <div class="notice-date-text">${fmtDateTimeMinute(row.updated_at || row.created_at)}</div>
+            </div>
+            <div class="clinic-notice-col notice-icon">${isOpen ? "−" : "+"}</div>
+          </button>
+          <div class="clinic-notice-detail ${isOpen ? "" : "hidden"}">
+            <div class="clinic-notice-detail-body">${escapeHtml(row.content || "").replace(/\n/g, "<br/>") || '<span class="muted">내용 없음</span>'}</div>
+            <div class="clinic-notice-detail-foot">
+              <span class="clinic-notice-foot-writer">${escapeHtml(writer || "작성자 미상")}</span>
+              <div class="clinic-notice-item-actions">
+                <button class="btn notice-action-btn" type="button" data-notice-edit="${row.id}">수정</button>
+                <button class="btn notice-action-btn" type="button" data-notice-delete="${row.id}">삭제</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+async function markClinicNoticeRead(noticeId) {
+  const target = currentClinicNotices.find((row) => Number(row.id) === Number(noticeId));
+  if (!target || !target.is_new) return;
+  target.is_new = false;
+  try {
+    const headers = await buildAuthHeaders();
+    await fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/notices/${noticeId}/read/`, {
+      method: "POST",
+      credentials: "include",
+      headers,
+    });
+  } catch (_e) {
+    // Ignore mark-read failures; keep UI optimistic.
+  }
+}
+
+async function loadClinicNotices() {
+  if (!currentClinicId) return;
+  const listEl = document.getElementById("clinicNoticeList");
+  if (listEl) listEl.innerHTML = '<div class="muted">불러오는 중...</div>';
+  try {
+    const headers = await buildAuthHeaders();
+    const res = await fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/notices/`, {
+      credentials: "include",
+      headers,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+    currentClinicNotices = Array.isArray(payload?.results) ? payload.results : [];
+    if (!currentClinicNotices.length) openNoticeId = null;
+    renderClinicNoticeList();
+  } catch (e) {
+    console.error("notice load failed", e);
+    if (listEl) listEl.innerHTML = '<div class="muted">공지사항을 불러오지 못했습니다.</div>';
+  }
+}
+
+async function saveClinicNotice() {
+  if (!currentClinicId) return;
+  const values = getClinicNoticeFormValues();
+  const wasEditing = Boolean(editingNoticeId);
+  if (!values.title && !values.content) {
+    setClinicNoticeStatus("제목 또는 내용을 입력하세요.", true);
+    return;
+  }
+
+  try {
+    setClinicNoticeStatus(wasEditing ? "공지 수정 중..." : "공지 저장 중...");
+    const headers = await buildAuthHeaders();
+    const method = editingNoticeId ? "PATCH" : "POST";
+    const endpoint = editingNoticeId
+      ? `${API_BASE}/api/data/clinics/${currentClinicId}/notices/${editingNoticeId}/`
+      : `${API_BASE}/api/data/clinics/${currentClinicId}/notices/`;
+    const res = await fetch(endpoint, {
+      method,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...headers,
+      },
+      body: JSON.stringify(values),
+    });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try {
+        const errPayload = await res.json();
+        msg = errPayload?.message || msg;
+      } catch (_e) {}
+      throw new Error(msg);
+    }
+    closeClinicNoticeModal();
+    setClinicNoticeStatus(wasEditing ? "공지 수정 완료" : "공지 저장 완료");
+    await loadClinicNotices();
+    setClinicNoticeStatus("저장되었습니다.");
+  } catch (e) {
+    console.error("notice save failed", e);
+    setClinicNoticeStatus(`저장 실패: ${e.message || e}`, true);
+  }
+}
+
+async function deleteClinicNotice(noticeId) {
+  if (!currentClinicId || !noticeId) return;
+  try {
+    setClinicNoticeStatus("공지 삭제 중...");
+    const headers = await buildAuthHeaders();
+    const res = await fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/notices/${noticeId}/`, {
+      method: "DELETE",
+      credentials: "include",
+      headers,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (editingNoticeId && Number(editingNoticeId) === Number(noticeId)) {
+      closeClinicNoticeModal();
+    }
+    await loadClinicNotices();
+    setClinicNoticeStatus("삭제되었습니다.");
+  } catch (e) {
+    console.error("notice delete failed", e);
+    setClinicNoticeStatus(`삭제 실패: ${e.message || e}`, true);
+  }
 }
 
 // ================================
@@ -398,6 +903,21 @@ function initAiIntakeForm() {
   const photoInput = document.getElementById("aiIntakePhotos");
   const photoHint = document.getElementById("aiIntakePhotoHint");
   const reviewMenu = document.querySelector(".ai-review-menu");
+  const commentToggleBtn = document.getElementById("aiCommentToggleBtn");
+  const messageToggleBtn = document.getElementById("aiMessageToggleBtn");
+  const commentWorkspace = document.getElementById("aiCommentWorkspace");
+  const messageWorkspace = document.getElementById("aiMessageWorkspace");
+  const intakeContentSection = document.getElementById("aiIntakeContentSection");
+  const intakeAccountSection = document.getElementById("aiIntakeAccountSection");
+  const intakeAttachSection = document.getElementById("aiIntakeAttachSection");
+  const commentUrlInput = document.getElementById("aiCommentUrl");
+  const commentImageInput = document.getElementById("aiCommentImage");
+  const commentImageHint = document.getElementById("aiCommentImageHint");
+  const commentAddBtn = document.getElementById("aiCommentAddBtn");
+  const commentAddedCountEl = document.getElementById("aiCommentAddedCount");
+  const messageUrlInput = document.getElementById("aiMessageUrl");
+  const messageTypeSelect = document.getElementById("aiMessageType");
+  const messageQtyInput = document.getElementById("aiMessageQty");
 
   const confirmModal = document.getElementById("aiConfirmModal");
   const confirmUrl = document.getElementById("aiConfirmUrl");
@@ -425,6 +945,7 @@ function initAiIntakeForm() {
   const confirmDoctorText = document.getElementById("aiConfirmDoctorText");
   const confirmDateText = document.getElementById("aiConfirmDateText");
   const confirmPhotoText = document.getElementById("aiConfirmPhotoText");
+  const confirmCommentText = document.getElementById("aiConfirmCommentText");
   const confirmPhotoPreview = document.getElementById("aiConfirmPhotoPreview");
   const photoPreviewModal = document.getElementById("photoPreviewModal");
   const photoPreviewImage = document.getElementById("photoPreviewImage");
@@ -460,6 +981,10 @@ function initAiIntakeForm() {
   let intakeSubtypeManual = false;
   let intakeFiles = [];
   let confirmFiles = [];
+  let commentBundles = [];
+  let pendingCommentImage = null;
+  let isCommentMode = false;
+  let isMessageMode = false;
 
   const REVIEW_SUBTYPE_OPTIONS = [
     { value: "text", label: "텍스트 후기" },
@@ -558,11 +1083,58 @@ function initAiIntakeForm() {
     `;
   }
 
+  const renderCommentCount = () => {
+    if (!commentAddedCountEl) return;
+    commentAddedCountEl.textContent = `${commentBundles.length}개 추가됨`;
+  };
+
+  const resetCommentEditor = () => {
+    if (commentUrlInput) commentUrlInput.value = "";
+    if (commentImageInput) commentImageInput.value = "";
+    pendingCommentImage = null;
+    if (commentImageHint) commentImageHint.textContent = "선택된 파일 없음";
+  };
+
+  const applyModeVisibility = () => {
+    if (commentWorkspace) commentWorkspace.classList.toggle("hidden", !isCommentMode);
+    if (messageWorkspace) messageWorkspace.classList.toggle("hidden", !isMessageMode);
+    if (commentToggleBtn) commentToggleBtn.classList.toggle("active", isCommentMode);
+    if (messageToggleBtn) messageToggleBtn.classList.toggle("active", isMessageMode);
+    if (typePills) {
+      const typeButtons = Array.from(typePills.querySelectorAll(".seg-tab[data-type]"));
+      typeButtons.forEach((btn) => {
+        if (isCommentMode || isMessageMode) {
+          btn.classList.remove("active");
+        } else {
+          btn.classList.toggle("active", (btn.dataset.type || "") === currentIntakeType);
+        }
+      });
+    }
+    const hideDefault = isCommentMode || isMessageMode;
+    if (intakeContentSection) intakeContentSection.classList.toggle("hidden", hideDefault);
+    if (intakeAccountSection) intakeAccountSection.classList.toggle("hidden", hideDefault);
+    if (intakeAttachSection) intakeAttachSection.classList.toggle("hidden", hideDefault);
+  };
+
+  const setCommentMode = (enabled) => {
+    isCommentMode = Boolean(enabled);
+    if (isCommentMode) isMessageMode = false;
+    applyModeVisibility();
+  };
+
+  const setMessageMode = (enabled) => {
+    isMessageMode = Boolean(enabled);
+    if (isMessageMode) isCommentMode = false;
+    applyModeVisibility();
+  };
+
   if (typePills) {
-    typePills.querySelectorAll(".seg-tab").forEach((btn) => {
+    typePills.querySelectorAll(".seg-tab[data-type]").forEach((btn) => {
       btn.addEventListener("click", () => {
+        if (isCommentMode) setCommentMode(false);
+        if (isMessageMode) setMessageMode(false);
         currentIntakeType = btn.dataset.type || "opinion";
-        typePills.querySelectorAll(".seg-tab").forEach((b) => b.classList.toggle("active", b === btn));
+        typePills.querySelectorAll(".seg-tab[data-type]").forEach((b) => b.classList.toggle("active", b === btn));
         if (intakeSubtype) {
           if (currentIntakeType === "review") {
             renderSubtypeOptions(intakeSubtype, "review", currentReviewSubtype);
@@ -572,6 +1144,48 @@ function initAiIntakeForm() {
         }
         autoSetIntakeSubtype();
       });
+    });
+  }
+
+  if (commentToggleBtn && commentWorkspace) {
+    commentToggleBtn.addEventListener("click", () => {
+      setCommentMode(true);
+    });
+  }
+
+  if (messageToggleBtn && messageWorkspace) {
+    messageToggleBtn.addEventListener("click", () => {
+      setMessageMode(true);
+    });
+  }
+
+  if (commentImageInput && commentImageHint) {
+    commentImageInput.addEventListener("change", () => {
+      pendingCommentImage = commentImageInput.files?.[0] || null;
+      commentImageHint.textContent = pendingCommentImage ? pendingCommentImage.name : "선택된 파일 없음";
+    });
+  }
+
+  if (commentAddBtn) {
+    commentAddBtn.addEventListener("click", () => {
+      const url = String(commentUrlInput?.value || "").trim();
+      if (!url) {
+        if (statusEl) statusEl.textContent = "댓글 URL을 입력하세요.";
+        return;
+      }
+      if (!pendingCommentImage) {
+        if (statusEl) statusEl.textContent = "댓글 이미지를 선택하세요.";
+        return;
+      }
+      commentBundles.push({
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        url,
+        imageFile: pendingCommentImage,
+        previewUrl: URL.createObjectURL(pendingCommentImage),
+      });
+      renderCommentCount();
+      resetCommentEditor();
+      if (statusEl) statusEl.textContent = "댓글 묶음이 추가되었습니다.";
     });
   }
 
@@ -669,6 +1283,9 @@ function initAiIntakeForm() {
     }
     if (confirmPhotoText) {
       confirmPhotoText.textContent = intakeFiles.length ? `${intakeFiles.length}개` : "없음";
+    }
+    if (confirmCommentText) {
+      confirmCommentText.textContent = `${commentBundles.length}개`;
     }
     if (confirmPhotoPreview) {
       const files = intakeFiles;
@@ -770,64 +1387,90 @@ function initAiIntakeForm() {
     });
   }
 
-  submitBtn.onclick = () => {
-    const url = urlInput.value.trim();
-    if (!url) {
-      if (statusEl) statusEl.textContent = "URL을 입력하세요.";
-      return;
-    }
-    syncPlatformAuto();
-    openConfirmModal();
-  };
-
-  if (confirmSave) {
-    confirmSave.onclick = async () => {
-      const url = confirmUrl?.value.trim() || "";
-      const title = (confirmTitle?.value || "").trim();
+  const submitIntake = async () => {
+      const messageUrl = (messageUrlInput?.value || "").trim();
+      const url = isMessageMode ? messageUrl : (confirmUrl?.value.trim() || "");
+      const title = isMessageMode ? "쪽지 작업" : (confirmTitle?.value || "").trim();
       const account = (confirmAccount?.value || "").trim();
       const accountPassword = (confirmAccountPassword?.value || "").trim();
       const memo = (confirmMemo?.value || "").trim();
       const doctor = (confirmDoctor?.value || "").trim();
-      const platform = confirmPlatform?.value || "";
-      const type = confirmTypePills?.querySelector(".seg-tab.active")?.dataset?.type || currentIntakeType;
+      const platform = isMessageMode ? (detectPlatformFromUrl(url)?.key || "") : (confirmPlatform?.value || "");
+      const type = isMessageMode ? "opinion" : (confirmTypePills?.querySelector(".seg-tab.active")?.dataset?.type || currentIntakeType);
       const subtype = confirmSubtype?.value || "text";
+      const messageType = String(messageTypeSelect?.value || "").trim();
+      const messageQty = Number(messageQtyInput?.value || 1);
 
-      if (!url) {
-        if (statusEl) statusEl.textContent = "URL을 입력하세요.";
-        return;
-      }
-      if (!platform) {
-        if (statusEl) statusEl.textContent = "플랫폼을 선택하세요.";
-        return;
+      if (!isCommentMode) {
+        if (!url) {
+          if (statusEl) statusEl.textContent = "URL을 입력하세요.";
+          return;
+        }
+        if (!platform) {
+          if (statusEl) statusEl.textContent = isMessageMode ? "URL에서 플랫폼을 찾지 못했습니다." : "플랫폼을 선택하세요.";
+          return;
+        }
+        if (isMessageMode && !messageType) {
+          if (statusEl) statusEl.textContent = "쪽지구분을 선택하세요.";
+          return;
+        }
+        if (isMessageMode && (!Number.isFinite(messageQty) || messageQty < 1)) {
+          if (statusEl) statusEl.textContent = "쪽지수량은 1 이상이어야 합니다.";
+          return;
+        }
       }
 
       const form = new FormData();
-      form.append("url", url);
-      form.append("platform", platform);
-      form.append("title", title);
-      if (doctor) form.append("doctor_name", doctor);
-      if (account) form.append("account", account);
-      if (accountPassword) form.append("account_password", accountPassword);
-      if (memo) form.append("memo", memo);
-      form.append("type", type);
-      if (type === "review") {
-        form.append("review_subtype", subtype);
-      } else if (type === "opinion") {
-        form.append("opinion_subtype", subtype);
+      if (isCommentMode) {
+        form.append(
+          "comment_urls",
+          JSON.stringify(commentBundles.map((x) => ({ url: String(x?.url || "").trim() })).filter((x) => x.url))
+        );
+        commentBundles.forEach((bundle) => {
+          if (bundle?.imageFile) {
+            form.append("comment_images", bundle.imageFile);
+          }
+        });
+      } else if (isMessageMode) {
+        form.append("url", url);
+        form.append("platform", platform);
+        form.append("message_type", messageType);
+        form.append("message_count", String(Number.isFinite(messageQty) ? messageQty : 1));
+      } else {
+        form.append("url", url);
+        form.append("platform", platform);
+        form.append("title", title);
+        if (doctor) form.append("doctor_name", doctor);
+        if (account) form.append("account", account);
+        if (accountPassword) form.append("account_password", accountPassword);
+        if (memo) form.append("memo", memo);
+        form.append("type", type);
+        if (type === "review") {
+          form.append("review_subtype", subtype);
+        } else if (type === "opinion") {
+          form.append("opinion_subtype", subtype);
+        }
       }
 
-      const sourceFiles = confirmFiles.length ? confirmFiles : intakeFiles;
-      sourceFiles.forEach((file) => {
-        form.append("photos", file);
-      });
+      if (!isCommentMode && !isMessageMode) {
+        const sourceFiles = confirmFiles.length ? confirmFiles : intakeFiles;
+        sourceFiles.forEach((file) => {
+          form.append("photos", file);
+        });
+      }
 
       if (statusEl) statusEl.textContent = "처리 중...";
       confirmSave.disabled = true;
       submitBtn.disabled = true;
       try {
         const headers = await buildAuthHeaders();
+        const endpoint = isCommentMode
+          ? `${API_BASE}/api/data/clinics/${currentClinicId}/comment-bundles/`
+          : (isMessageMode
+              ? `${API_BASE}/api/data/clinics/${currentClinicId}/message-logs/`
+              : `${API_BASE}/api/data/clinics/${currentClinicId}/posts/`);
         const res = await fetch(
-          `${API_BASE}/api/data/clinics/${currentClinicId}/posts/`,
+          endpoint,
           {
             method: "POST",
             credentials: "include",
@@ -837,7 +1480,16 @@ function initAiIntakeForm() {
         );
 
         if (!res.ok) {
-          if (statusEl) statusEl.textContent = "저장 실패";
+          let failMessage = "저장 실패";
+          try {
+            const errorBody = await res.json();
+            if (errorBody?.message) {
+              failMessage = String(errorBody.message);
+            }
+          } catch (_) {
+            // ignore parse error
+          }
+          if (statusEl) statusEl.textContent = failMessage;
           return;
         }
 
@@ -848,17 +1500,30 @@ function initAiIntakeForm() {
         if (accountPasswordInput) accountPasswordInput.value = "";
         if (memoInput) memoInput.value = "";
         if (doctorInput) doctorInput.value = "";
+        if (messageUrlInput) messageUrlInput.value = "";
+        if (messageTypeSelect) messageTypeSelect.value = "";
+        if (messageQtyInput) messageQtyInput.value = "1";
         if (photoInput) photoInput.value = "";
         if (confirmPhotos) confirmPhotos.value = "";
         intakeFiles = [];
         confirmFiles = [];
+        commentBundles.forEach((item) => {
+          if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+        });
+        commentBundles = [];
         updateFileHint(photoHint, intakeFiles);
         updateFileHint(confirmPhotoHint, confirmFiles);
+        renderCommentCount();
+        resetCommentEditor();
         if (confirmPhotoPreview) confirmPhotoPreview.innerHTML = "";
         platformSelect.value = "";
         platformManual = false;
         closeConfirmModal();
-        await loadPosts();
+        await Promise.all([
+          loadCommentBundleList(),
+          loadPosts(),
+          refreshClinicCalendar(),
+        ]);
       } catch (e) {
         console.error("ai intake error", e);
         if (statusEl) statusEl.textContent = "저장 실패";
@@ -866,7 +1531,33 @@ function initAiIntakeForm() {
         confirmSave.disabled = false;
         submitBtn.disabled = false;
       }
-    };
+  };
+
+  submitBtn.onclick = () => {
+    if (isCommentMode) {
+      if (!commentBundles.length) {
+        if (statusEl) statusEl.textContent = "댓글 묶음을 1개 이상 추가하세요.";
+        return;
+      }
+      submitIntake();
+      return;
+    }
+    if (isMessageMode) {
+      submitIntake();
+      return;
+    }
+
+    const url = urlInput.value.trim();
+    if (!url) {
+      if (statusEl) statusEl.textContent = "URL을 입력하세요.";
+      return;
+    }
+    syncPlatformAuto();
+    openConfirmModal();
+  };
+
+  if (confirmSave) {
+    confirmSave.onclick = submitIntake;
   }
 
   if (reviewBtn) {
@@ -913,6 +1604,43 @@ function initAiIntakeForm() {
       updateFileHint(photoHint, intakeFiles);
       photoInput.value = "";
       autoSetIntakeSubtype();
+    });
+  }
+
+  renderCommentCount();
+  setCommentMode(false);
+}
+
+function initCommentMonthNav() {
+  const monthInput = document.getElementById("commentMonth");
+  const monthLabel = document.getElementById("commentMonthLabel");
+  const monthPrev = document.getElementById("commentMonthPrev");
+  const monthNext = document.getElementById("commentMonthNext");
+
+  const setCommentMonth = (value) => {
+    currentCommentMonth = value || getThisMonth();
+    if (monthInput) monthInput.value = currentCommentMonth;
+    if (monthLabel) monthLabel.textContent = formatMonthLabel(currentCommentMonth);
+  };
+
+  setCommentMonth(currentCommentMonth);
+
+  if (monthInput) {
+    monthInput.addEventListener("change", () => {
+      setCommentMonth(monthInput.value);
+      loadCommentBundleList();
+    });
+  }
+  if (monthPrev) {
+    monthPrev.addEventListener("click", () => {
+      setCommentMonth(shiftMonth(currentCommentMonth, -1));
+      loadCommentBundleList();
+    });
+  }
+  if (monthNext) {
+    monthNext.addEventListener("click", () => {
+      setCommentMonth(shiftMonth(currentCommentMonth, 1));
+      loadCommentBundleList();
     });
   }
 }
@@ -1136,6 +1864,310 @@ function getPlatformLabel(platformKey) {
   return match ? match.label : platformKey;
 }
 
+function formatCommentBundleDate(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.valueOf())) return "-";
+  return d.toLocaleDateString("ko-KR");
+}
+
+async function loadCommentBundleList() {
+  const root = document.getElementById("clinicCommentBundleList");
+  if (!root || !currentClinicId) return;
+  root.innerHTML = `<div class="muted">불러오는 중...</div>`;
+  try {
+    const headers = await buildAuthHeaders();
+    const buildParams = (type) => {
+      const params = new URLSearchParams({
+        type,
+        platform: "all",
+        month: currentCommentMonth,
+      });
+      return params;
+    };
+
+    const [opinionRes, reviewRes, commentFetch, messageFetch] = await Promise.all([
+      fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${buildParams("opinion")}`, {
+        credentials: "include",
+        headers,
+      }),
+      fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${buildParams("review")}`, {
+        credentials: "include",
+        headers,
+      }),
+      fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/comment-bundles/`, {
+        credentials: "include",
+        headers,
+      }),
+      fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/message-logs/`, {
+        credentials: "include",
+        headers,
+      }),
+    ]);
+
+    if (!opinionRes.ok || !reviewRes.ok) {
+      root.innerHTML = `<div class="muted">댓글/쪽지 리스트를 불러오지 못했습니다.</div>`;
+      return;
+    }
+
+    let commentData = { results: [] };
+    let messageData = { results: [] };
+    if (commentFetch?.ok) {
+      try {
+        commentData = await commentFetch.json();
+      } catch (_) {}
+    }
+    if (messageFetch?.ok) {
+      try {
+        messageData = await messageFetch.json();
+      } catch (_) {}
+    }
+
+    const [opinionData, reviewData] = await Promise.all([
+      opinionRes.json(),
+      reviewRes.json(),
+    ]);
+    const posts = [
+      ...(Array.isArray(opinionData?.results) ? opinionData.results : []),
+      ...(Array.isArray(reviewData?.results) ? reviewData.results : []),
+    ];
+    if (!posts.length) {
+      root.innerHTML = `<div class="muted">등록된 댓글이 없습니다.</div>`;
+      return;
+    }
+
+    const commentCountByUrl = new Map();
+    commentBundleItemsByUrl = new Map();
+    (Array.isArray(commentData?.results) ? commentData.results : [])
+      .forEach((row) => {
+        const key = getCountUrlKey(row?.url);
+        if (!key) return;
+        commentCountByUrl.set(key, (commentCountByUrl.get(key) || 0) + 1);
+        const list = commentBundleItemsByUrl.get(key) || [];
+        list.push({
+          id: row?.id,
+          url: String(row?.url || "").trim(),
+          image_url: String(row?.image_url || "").trim(),
+          created_at: row?.created_at,
+          created_by_name: row?.created_by_name || "-",
+        });
+        commentBundleItemsByUrl.set(key, list);
+      });
+
+    const messageCountByUrl = new Map();
+    messageLogItemsByUrl = new Map();
+    (Array.isArray(messageData?.results) ? messageData.results : [])
+      .forEach((row) => {
+        const key = getCountUrlKey(row?.url);
+        if (!key) return;
+        const count = Number(row?.message_count || 0);
+        messageCountByUrl.set(key, (messageCountByUrl.get(key) || 0) + count);
+        const list = messageLogItemsByUrl.get(key) || [];
+        list.push({
+          id: row?.id,
+          message_type: String(row?.message_type || ""),
+          message_count: Number(row?.message_count || 0),
+          created_at: row?.created_at,
+          cafe: detectCafeFromUrl(row?.url || ""),
+        });
+        messageLogItemsByUrl.set(key, list);
+      });
+
+    const rows = posts
+      .map((post) => {
+        const date = getPostDate(post) || "-";
+        const url = String(post?.url || "").trim();
+        const assignee = getAssigneeDisplay(post);
+        const typeLabel = post?.type === "review" ? "후기" : "여론";
+        const platform = getPlatformLabel(post?.platform) || "-";
+        const cafe = detectCafeFromUrl(post?.url || "");
+        const postUrlKey = getCountUrlKey(post?.url);
+        const comment_count = Number(commentCountByUrl.get(postUrlKey) || 0);
+        const message_count = Number(messageCountByUrl.get(postUrlKey) || 0);
+        return { date, url, urlKey: postUrlKey, assignee, typeLabel, platform, cafe, comment_count, message_count };
+      });
+
+    const tableRows = rows.sort((a, b) => {
+      if (a.date === b.date) return String(a.assignee).localeCompare(String(b.assignee), "ko");
+      return String(b.date).localeCompare(String(a.date));
+    });
+
+    root.innerHTML = `
+      <div class="comment-row comment-row-head">
+        <div>날짜</div>
+        <div>URL</div>
+        <div>작업자</div>
+        <div>댓글건수</div>
+        <div>쪽지건수</div>
+        <div>유형</div>
+        <div>플랫폼</div>
+        <div>카페</div>
+      </div>
+      ${tableRows
+        .map((row) => `
+          <div class="comment-row">
+            <div>${escapeHtml(row.date)}</div>
+            <div class="comment-url-cell" title="${escapeHtml(row.url)}">${escapeHtml(row.url)}</div>
+            <div>${escapeHtml(row.assignee)}</div>
+            <div>
+              <button
+                type="button"
+                class="comment-count-btn"
+                data-url-key="${escapeHtml(row.urlKey)}"
+                data-url="${escapeHtml(row.url)}"
+                ${row.comment_count > 0 ? "" : "disabled"}
+              >
+                ${row.comment_count}
+              </button>
+            </div>
+            <div>
+              <button
+                type="button"
+                class="message-count-btn"
+                data-url-key="${escapeHtml(row.urlKey)}"
+                data-url="${escapeHtml(row.url)}"
+                ${row.message_count > 0 ? "" : "disabled"}
+              >
+                ${row.message_count}
+              </button>
+            </div>
+            <div>${escapeHtml(row.typeLabel)}</div>
+            <div>${escapeHtml(row.platform)}</div>
+            <div>${escapeHtml(row.cafe)}</div>
+          </div>
+        `)
+        .join("")}
+    `;
+
+    root.querySelectorAll(".comment-count-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const urlKey = String(btn.dataset.urlKey || "");
+        const url = String(btn.dataset.url || "");
+        if (!urlKey) return;
+        openCommentBundleModal(urlKey, url);
+      });
+    });
+    root.querySelectorAll(".message-count-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const urlKey = String(btn.dataset.urlKey || "");
+        const url = String(btn.dataset.url || "");
+        if (!urlKey) return;
+        openMessageLogModal(urlKey, url);
+      });
+    });
+  } catch (e) {
+    console.error("comment bundle list load failed", e);
+    root.innerHTML = `<div class="muted">댓글 리스트를 불러오지 못했습니다.</div>`;
+  }
+}
+
+function initCommentBundleModal() {
+  const modal = document.getElementById("commentBundleModal");
+  const closeBtn = document.getElementById("commentBundleModalClose");
+  if (!modal) return;
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      modal.classList.add("hidden");
+    });
+  }
+}
+
+function openCommentBundleModal(urlKey, displayUrl) {
+  const modal = document.getElementById("commentBundleModal");
+  const urlEl = document.getElementById("commentBundleModalUrl");
+  const listEl = document.getElementById("commentBundleModalList");
+  if (!modal || !urlEl || !listEl) return;
+
+  const items = commentBundleItemsByUrl.get(urlKey) || [];
+  urlEl.textContent = displayUrl || "-";
+  if (!items.length) {
+    listEl.innerHTML = `<div class="muted">해당 URL의 댓글 작성 내역이 없습니다.</div>`;
+  } else {
+    const sorted = [...items].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+    listEl.innerHTML = sorted
+      .map((item) => `
+        <article class="comment-bundle-item">
+          ${
+            item.image_url
+              ? `<a class="comment-bundle-item-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">
+                  <img class="comment-bundle-item-img" src="${escapeHtml(item.image_url)}" alt="comment-bundle" />
+                </a>`
+              : `<a class="comment-bundle-item-url" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.url)}</a>`
+          }
+        </article>
+      `)
+      .join("");
+  }
+  modal.classList.remove("hidden");
+}
+
+window.openCommentBundleModalByUrl = (url) => {
+  const normalizedUrl = String(url || "").trim();
+  if (!normalizedUrl) return;
+  const urlKey = getCountUrlKey(normalizedUrl);
+  if (!urlKey) return;
+  openCommentBundleModal(urlKey, normalizedUrl);
+};
+
+function initMessageLogModal() {
+  const modal = document.getElementById("messageLogModal");
+  const closeBtn = document.getElementById("messageLogModalClose");
+  if (!modal) return;
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      modal.classList.add("hidden");
+    });
+  }
+}
+
+function getMessageTypeLabel(value) {
+  if (value === "prev_opinion") return "지난여론쪽지";
+  if (value === "comment_work") return "댓글작업쪽지";
+  return "-";
+}
+
+function openMessageLogModal(urlKey, displayUrl) {
+  const modal = document.getElementById("messageLogModal");
+  const urlEl = document.getElementById("messageLogModalUrl");
+  const listEl = document.getElementById("messageLogModalList");
+  if (!modal || !urlEl || !listEl) return;
+
+  const items = messageLogItemsByUrl.get(urlKey) || [];
+  urlEl.textContent = displayUrl || "-";
+  if (!items.length) {
+    listEl.innerHTML = `<div class="muted">해당 URL의 쪽지 내역이 없습니다.</div>`;
+  } else {
+    const sorted = [...items].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+    listEl.innerHTML = `
+      <div class="message-log-head">
+        <div>작성일</div>
+        <div>쪽지구분</div>
+        <div>수량</div>
+        <div>카페</div>
+      </div>
+      ${sorted
+        .map((item) => `
+          <div class="message-log-row">
+            <div>${escapeHtml(fmtDateOnly(item.created_at))}</div>
+            <div>${escapeHtml(getMessageTypeLabel(item.message_type))}</div>
+            <div>${Number(item.message_count || 0)}</div>
+            <div>${escapeHtml(item.cafe || "-")}</div>
+          </div>
+        `)
+        .join("")}
+    `;
+  }
+  modal.classList.remove("hidden");
+}
+
+window.openMessageLogModalByUrl = (url) => {
+  const normalizedUrl = String(url || "").trim();
+  if (!normalizedUrl) return;
+  const urlKey = getCountUrlKey(normalizedUrl);
+  if (!urlKey) return;
+  openMessageLogModal(urlKey, normalizedUrl);
+};
+
 async function refreshClinicCalendar() {
   const calendarId = "clinicCalendarBoard";
   const listId = "clinicCalendarList";
@@ -1143,10 +2175,32 @@ async function refreshClinicCalendar() {
   const list = document.getElementById(listId);
   if (!calendar || !list) return;
 
-  const [opinions, reviews] = await Promise.all([
+  const headers = await buildAuthHeaders();
+  const [opinions, reviews, commentBundleRes] = await Promise.all([
     fetchPostsByMonth("opinion"),
     fetchPostsByMonth("review"),
+    fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/comment-bundles/`, {
+      credentials: "include",
+      headers,
+    }),
   ]);
+
+  let commentBundleRows = [];
+  if (commentBundleRes?.ok) {
+    try {
+      const commentBundleData = await commentBundleRes.json();
+      commentBundleRows = Array.isArray(commentBundleData?.results) ? commentBundleData.results : [];
+    } catch (_) {
+      commentBundleRows = [];
+    }
+  }
+
+  const commentCountByUrl = new Map();
+  commentBundleRows.forEach((row) => {
+    const key = getCountUrlKey(row?.url);
+    if (!key) return;
+    commentCountByUrl.set(key, (commentCountByUrl.get(key) || 0) + 1);
+  });
 
   const mapPost = (post, type) => ({
     kind: "post",
@@ -1161,6 +2215,7 @@ async function refreshClinicCalendar() {
     opinion_subtype: post.opinion_subtype,
     views: post.views,
     comments: post.comments,
+    comment_work_count: Number(commentCountByUrl.get(getCountUrlKey(post.url)) || 0),
     message_count: post.message_count,
     account: post.account,
     account_password: post.account_password,
@@ -1408,68 +2463,107 @@ async function loadPosts() {
     return params;
   };
 
-  const headers = await buildAuthHeaders();
-  const [opinionRes, reviewRes, opinionTotalRes, reviewTotalRes] = await Promise.all([
-    fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${buildParams("opinion", currentPostMonth)}`, { credentials: "include", headers }),
-    fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${buildParams("review", currentPostMonth)}`, { credentials: "include", headers }),
-    fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${buildParams("opinion", null)}`, { credentials: "include", headers }),
-    fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${buildParams("review", null)}`, { credentials: "include", headers }),
-  ]);
+  try {
+    const headers = await buildAuthHeaders();
+    const [opinionRes, reviewRes, opinionTotalRes, reviewTotalRes] = await Promise.all([
+      fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${buildParams("opinion", currentPostMonth)}`, { credentials: "include", headers }),
+      fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${buildParams("review", currentPostMonth)}`, { credentials: "include", headers }),
+      fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${buildParams("opinion", null)}`, { credentials: "include", headers }),
+      fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/?${buildParams("review", null)}`, { credentials: "include", headers }),
+    ]);
 
-  const opinionData = await opinionRes.json();
-  const reviewData = await reviewRes.json();
-  const opinionTotalData = await opinionTotalRes.json();
-  const reviewTotalData = await reviewTotalRes.json();
-
-  const opinionCountEl = document.getElementById("opinionCount");
-  const reviewCountEl = document.getElementById("reviewCount");
-  const opinionTotalEl = document.getElementById("opinionTotalCount");
-  const reviewTotalEl = document.getElementById("reviewTotalCount");
-
-  if (opinionCountEl) opinionCountEl.textContent = opinionData.count ?? (opinionData.results ? opinionData.results.length : 0);
-  if (reviewCountEl) reviewCountEl.textContent = reviewData.count ?? (reviewData.results ? reviewData.results.length : 0);
-  if (opinionTotalEl) opinionTotalEl.textContent = opinionTotalData.count ?? (opinionTotalData.results ? opinionTotalData.results.length : 0);
-  if (reviewTotalEl) reviewTotalEl.textContent = reviewTotalData.count ?? (reviewTotalData.results ? reviewTotalData.results.length : 0);
-
-  const results = currentType === "review" ? reviewData.results : opinionData.results;
-  const sortedResults = sortPosts([...(results || [])]);
-  if (!assigneeNameMap.size) {
-    await loadAssignees();
-  }
-  sortedResults.forEach((post) => {
-    if (!post.assignee_name && post.assignee) {
-      const mapped = assigneeNameMap.get(String(post.assignee));
-      if (mapped) post.assignee_name = mapped;
+    const responses = [opinionRes, reviewRes, opinionTotalRes, reviewTotalRes];
+    const notOk = responses.find((res) => !res.ok);
+    if (notOk) {
+      let failMessage = "게시글을 불러오지 못했습니다.";
+      try {
+        const body = await notOk.json();
+        if (body?.message) failMessage = String(body.message);
+      } catch (_) {
+        // ignore
+      }
+      root.innerHTML = `<div class="muted">${escapeHtml(failMessage)}</div>`;
+      return;
     }
-  });
-  postsCache = new Map(sortedResults.map((post) => [String(post.id), post]));
-  if (!sortedResults.length) {
-    root.innerHTML = `<div class="muted">표시할 게시글이 없습니다.</div>`;
-    return;
-  }
 
-  root.innerHTML = sortedResults.map((post) => (
-    editingAll ? renderEditRow(post) : renderViewRow(post)
-  )).join("");
+    const opinionData = await opinionRes.json();
+    const reviewData = await reviewRes.json();
+    const opinionTotalData = await opinionTotalRes.json();
+    const reviewTotalData = await reviewTotalRes.json();
 
-  bindPhotoButtons();
-  if (editingAll) {
-    bindEditRowHandlers();
-    bindSelectionHandlers();
+    const opinionCountEl = document.getElementById("opinionCount");
+    const reviewCountEl = document.getElementById("reviewCount");
+    const opinionTotalEl = document.getElementById("opinionTotalCount");
+    const reviewTotalEl = document.getElementById("reviewTotalCount");
+
+    if (opinionCountEl) opinionCountEl.textContent = opinionData.count ?? (opinionData.results ? opinionData.results.length : 0);
+    if (reviewCountEl) reviewCountEl.textContent = reviewData.count ?? (reviewData.results ? reviewData.results.length : 0);
+    if (opinionTotalEl) opinionTotalEl.textContent = opinionTotalData.count ?? (opinionTotalData.results ? opinionTotalData.results.length : 0);
+    if (reviewTotalEl) reviewTotalEl.textContent = reviewTotalData.count ?? (reviewTotalData.results ? reviewTotalData.results.length : 0);
+
+    const results = currentType === "review" ? reviewData.results : opinionData.results;
+    const filtered = [...(results || [])].filter((post) => {
+      const title = String(post?.title || "").trim();
+      const memo = String(post?.memo || "").trim();
+      return !(title === "쪽지 작업" || memo.startsWith("쪽지구분:"));
+    });
+    const sortedResults = sortPosts(filtered);
+    if (!assigneeNameMap.size) {
+      await loadAssignees();
+    }
+    sortedResults.forEach((post) => {
+      if (!post.assignee_name && post.assignee) {
+        const mapped = assigneeNameMap.get(String(post.assignee));
+        if (mapped) post.assignee_name = mapped;
+      }
+    });
+    postsCache = new Map(sortedResults.map((post) => [String(post.id), post]));
+    if (!sortedResults.length) {
+      root.innerHTML = `<div class="muted">표시할 게시글이 없습니다.</div>`;
+      return;
+    }
+
+    root.innerHTML = sortedResults.map((post) => (
+      editingAll ? renderEditRow(post) : renderViewRow(post)
+    )).join("");
+
+    bindPhotoButtons();
+    if (editingAll) {
+      bindEditRowHandlers();
+      bindSelectionHandlers();
+    }
+  } catch (e) {
+    console.error("load posts failed", e);
+    root.innerHTML = `<div class="muted">게시글을 불러오지 못했습니다.</div>`;
   }
 }
 
 function bindSelectionHandlers() {
   const selectAll = document.getElementById("postSelectAll");
   const rows = Array.from(document.querySelectorAll(".row-select"));
+  const deleteBtn = document.getElementById("postDeleteSelectedBtn");
+
+  const syncDeleteState = () => {
+    if (!deleteBtn) return;
+    const anyChecked = rows.some((cb) => cb.checked);
+    deleteBtn.disabled = !anyChecked;
+  };
+
   if (selectAll) {
     selectAll.checked = false;
     selectAll.addEventListener("change", () => {
       rows.forEach((cb) => {
         cb.checked = selectAll.checked;
       });
+      syncDeleteState();
     });
   }
+
+  rows.forEach((cb) => {
+    cb.addEventListener("change", syncDeleteState);
+  });
+
+  syncDeleteState();
 }
 
 function bindMessageInputs() {
@@ -1593,32 +2687,37 @@ function renderEditRow(post) {
   const platformOptions = PLATFORM_PILLS.filter((p) => p.key !== "all")
     .map((p) => `<option value="${p.key}">${p.label}</option>`)
     .join("");
-  const subtypeVisible = post.type === "review";
-  const opinionSubtypeVisible = post.type === "opinion";
+  const reviewSubtypeOptions = `
+    <option value="text">텍스트</option>
+    <option value="photo">사진</option>
+    <option value="consultation">상담</option>
+  `;
+  const opinionSubtypeOptions = `
+    <option value="concern">고민</option>
+    <option value="hand">손품</option>
+    <option value="foot">발품</option>
+  `;
+  const subtypeOptions = post.type === "review" ? reviewSubtypeOptions : opinionSubtypeOptions;
+  const subtypeValue = post.type === "review" ? (post.review_subtype || "text") : (post.opinion_subtype || "concern");
 
   return `
     <div class="post-row editing" data-post-id="${post.id}">
       <div class="post-select"><input type="checkbox" class="row-select" data-post-id="${post.id}" /></div>
-      <div class="cell-meta">
+      <div class="post-date-edit">
         <input class="inline-input edit-date" type="date" value="${dateValue}" />
-        <select class="inline-select edit-type">
-          <option value="opinion" ${post.type === "opinion" ? "selected" : ""}>여론</option>
-          <option value="review" ${post.type === "review" ? "selected" : ""}>후기</option>
-        </select>
-        <select class="inline-select edit-subtype" style="${subtypeVisible ? "" : "display:none;"}">
-          <option value="text" ${post.review_subtype === "text" ? "selected" : ""}>텍스트</option>
-          <option value="photo" ${post.review_subtype === "photo" ? "selected" : ""}>사진</option>
-          <option value="consultation" ${post.review_subtype === "consultation" ? "selected" : ""}>상담</option>
-        </select>
-        <select class="inline-select edit-opinion-subtype" style="${opinionSubtypeVisible ? "" : "display:none;"}">
-          <option value="concern" ${post.opinion_subtype === "concern" ? "selected" : ""}>고민</option>
-          <option value="hand" ${post.opinion_subtype === "hand" ? "selected" : ""}>손품</option>
-          <option value="foot" ${post.opinion_subtype === "foot" ? "selected" : ""}>발품</option>
-        </select>
       </div>
       <div class="cell-title">
         <input class="inline-input edit-title" value="${escapeHtml(post.title || "")}" />
         <input class="inline-input edit-url" value="${escapeHtml(post.url || "")}" />
+        <div class="edit-meta-inline">
+          <select class="inline-select edit-type">
+            <option value="opinion" ${post.type === "opinion" ? "selected" : ""}>여론</option>
+            <option value="review" ${post.type === "review" ? "selected" : ""}>후기</option>
+          </select>
+          <select class="inline-select edit-subtype-common" data-type="${post.type}" data-initial-value="${subtypeValue}">
+            ${subtypeOptions}
+          </select>
+        </div>
       </div>
       <div class="post-num"><input class="inline-input edit-views" type="number" min="0" value="${post.views ?? 0}" /></div>
       <div class="post-num"><input class="inline-input edit-comments" type="number" min="0" value="${post.comments ?? 0}" /></div>
@@ -1648,16 +2747,30 @@ function bindEditRowHandlers() {
       selectEl.value = detected?.key || post.platform || "";
     }
   });
+  root.querySelectorAll(".edit-subtype-common").forEach((subtypeSelect) => {
+    const initialValue = subtypeSelect.dataset.initialValue || "";
+    if (initialValue) subtypeSelect.value = initialValue;
+  });
   root.querySelectorAll(".edit-type").forEach((typeSelect) => {
     typeSelect.addEventListener("change", () => {
       const row = typeSelect.closest(".post-row");
-      const subtypeSelect = row?.querySelector(".edit-subtype");
-      const opinionSubtypeSelect = row?.querySelector(".edit-opinion-subtype");
+      const subtypeSelect = row?.querySelector(".edit-subtype-common");
       if (subtypeSelect) {
-        subtypeSelect.style.display = typeSelect.value === "review" ? "block" : "none";
-      }
-      if (opinionSubtypeSelect) {
-        opinionSubtypeSelect.style.display = typeSelect.value === "opinion" ? "block" : "none";
+        if (typeSelect.value === "review") {
+          subtypeSelect.innerHTML = `
+            <option value="text">텍스트</option>
+            <option value="photo">사진</option>
+            <option value="consultation">상담</option>
+          `;
+          subtypeSelect.value = "text";
+        } else {
+          subtypeSelect.innerHTML = `
+            <option value="concern">고민</option>
+            <option value="hand">손품</option>
+            <option value="foot">발품</option>
+          `;
+          subtypeSelect.value = "concern";
+        }
       }
     });
   });
@@ -1665,7 +2778,7 @@ function bindEditRowHandlers() {
 
 function bindHeaderEditActions() {
   const editBtn = document.getElementById("clinicPostEditBtn");
-  const deleteBtn = document.getElementById("clinicPostDeleteBtn");
+  const deleteBtn = document.getElementById("postDeleteSelectedBtn");
   const saveBtn = document.getElementById("clinicPostSaveBtn");
   const cancelBtn = document.getElementById("clinicPostCancelBtn");
   const selectAll = document.getElementById("postSelectAll");
@@ -1676,6 +2789,7 @@ function bindHeaderEditActions() {
     if (table) table.classList.toggle("editing", editing);
     if (editBtn) editBtn.classList.toggle("hidden", editing);
     if (deleteBtn) deleteBtn.classList.toggle("hidden", !editing);
+    if (deleteBtn) deleteBtn.disabled = true;
     if (saveBtn) saveBtn.classList.toggle("hidden", !editing);
     if (cancelBtn) cancelBtn.classList.toggle("hidden", !editing);
     if (selectAll) {
@@ -1726,10 +2840,12 @@ function bindHeaderEditActions() {
     const headers = await buildAuthHeaders();
     const results = await Promise.all(rows.map(async (row) => {
       const postId = row.dataset.postId;
+      const selectedType = row.querySelector(".edit-type")?.value || "opinion";
+      const subtypeValue = row.querySelector(".edit-subtype-common")?.value || null;
       const payload = {
-        type: row.querySelector(".edit-type")?.value || "opinion",
-        review_subtype: row.querySelector(".edit-subtype")?.value || null,
-        opinion_subtype: row.querySelector(".edit-opinion-subtype")?.value || null,
+        type: selectedType,
+        review_subtype: selectedType === "review" ? subtypeValue : null,
+        opinion_subtype: selectedType === "opinion" ? subtypeValue : null,
         platform: row.querySelector(".edit-platform")?.value || "",
         title: row.querySelector(".edit-title")?.value || "",
         url: row.querySelector(".edit-url")?.value || "",
@@ -1738,12 +2854,6 @@ function bindHeaderEditActions() {
         message_count: Number(row.querySelector(".edit-messages")?.value || 0),
         published_at: row.querySelector(".edit-date")?.value || "",
       };
-      if (payload.type !== "review") {
-        payload.review_subtype = null;
-      }
-      if (payload.type !== "opinion") {
-        payload.opinion_subtype = null;
-      }
       const res = await fetch(`${API_BASE}/api/data/clinics/${currentClinicId}/posts/${postId}/`, {
         method: "PATCH",
         credentials: "include",

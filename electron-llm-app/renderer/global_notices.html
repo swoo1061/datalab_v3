@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Datalab90 | 전체 공지</title>
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/sidebar.css" />
+  <link rel="stylesheet" href="css/header.css" />
+  <link rel="stylesheet" href="css/business_mode.css" />
+  <link rel="stylesheet" href="css/clinic_page.css?v=notice_ui_20260220_2" />
+  <link rel="stylesheet" href="css/global_notices.css?v=20260220_1" />
+</head>
+<body class="theme-vivid tone-sidebar" data-nav="global_notices">
+
+<div class="app-root">
+  <div class="app-sidebar-slot" id="appSidebar"></div>
+  <div class="app-header-slot" id="appHeader"></div>
+
+  <div class="app-main">
+    <main class="page-scope global-notice-page">
+      <section class="page-canvas">
+        <section class="section-block card global-notice-section">
+          <div class="section-head">
+            <span class="section-title">전체 공지사항</span>
+          </div>
+          <div class="section-body open">
+            <section class="clinic-notice-wrap">
+              <div class="clinic-notice-list card">
+                <div class="card-hd">
+                  <div class="clinic-notice-toolbar">
+                    <div class="card-title">공지 목록</div>
+                    <div class="clinic-notice-toolbar-actions">
+                      <button id="globalNoticeOpenBtn" class="btn primary" type="button">공지 작성</button>
+                      <span id="globalNoticeStatus" class="muted"></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card-bd">
+                  <div id="globalNoticeList">
+                    <div class="muted">불러오는 중...</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="globalNoticeModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="true"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="globalNoticeModalTitle">공지 작성</div>
+        <div class="modal-sub">전체 직원에게 전달할 공지사항을 등록합니다.</div>
+      </div>
+      <button id="globalNoticeModalClose" class="modal-close" type="button">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div class="clinic-notice-form">
+        <div class="ai-field">
+          <label>제목</label>
+          <input id="globalNoticeTitle" class="input" placeholder="공지 제목" />
+        </div>
+        <div class="ai-field">
+          <label>내용</label>
+          <textarea id="globalNoticeContent" class="textarea clinic-notice-textarea" placeholder="공지 내용을 입력하세요"></textarea>
+        </div>
+        <label class="clinic-notice-pin">
+          <input id="globalNoticePinned" type="checkbox" />
+          <span>상단 고정</span>
+        </label>
+        <div class="clinic-notice-actions">
+          <span id="globalNoticeModalStatus" class="muted"></span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button id="globalNoticeModalCancel" class="btn" type="button">취소</button>
+      <button id="globalNoticeSaveBtn" class="btn primary" type="button">저장</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/header.js"></script>
+<script src="js/global_notices.js?v=20260220_1"></script>
+<script>
+  (async () => {
+    await loadLayout();
+    await loadHeader("전체 공지사항");
+  })();
+</script>
+</body>
+</html>

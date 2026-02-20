@@ -20,7 +20,16 @@
     <header class="topbar">
       <a href="{% url 'core:home' %}" class="logo">Datalab90</a>
       <nav class="topnav" aria-label="주요 메뉴">
-        
+        {% if request.user.profile.is_hospital_account %}
+        <div class="topnav-item">
+          <button class="topnav-trigger" type="button">보고서</button>
+          <div class="topnav-panel">
+            <a href="{% url 'dashboard:monthly_report' %}" class="{% if request.resolver_match.url_name == 'monthly_report' %}active{% endif %}">
+              월간 보고서
+            </a>
+          </div>
+        </div>
+        {% else %}
         <div class="topnav-item">
           <button class="topnav-trigger" type="button">리뷰 생성</button>
           <div class="topnav-panel">
@@ -122,8 +131,9 @@
             </a>
           </div>
         </div>
+        {% endif %}
       </nav>
-      <div class="topbar-meta">v2.0 · 내부용</div>
+      <div class="topbar-meta">v2.0 · {% if request.user.profile.is_hospital_account %}병원용{% else %}내부용{% endif %}</div>
     </header>
 
     <main class="content">

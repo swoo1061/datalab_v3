@@ -4,6 +4,10 @@ from apps.data.models import (
     ClinicGuide,
     FavoriteClinic,
     ClinicPost,
+    ClinicCommentBundle,
+    ClinicMessageLog,
+    ClinicNotice,
+    GlobalNotice,
     CalendarMemo,
     ReviewSchedule,
     InternalMessage,
@@ -149,6 +153,179 @@ class CalendarMemoSerializer(serializers.ModelSerializer):
             label = position_label_map.get(position, position)
             return f"{profile.name} {label}".strip() if label else profile.name
         return obj.user.get_full_name() or obj.user.username
+
+
+class ClinicCommentBundleSerializer(serializers.ModelSerializer):
+    clinic_id = serializers.IntegerField(source="clinic.id", read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    created_by_position = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClinicCommentBundle
+        fields = [
+            "id",
+            "clinic_id",
+            "url",
+            "image_url",
+            "created_by_name",
+            "created_by_position",
+            "created_at",
+        ]
+
+    def get_created_by_name(self, obj):
+        if not obj.created_by:
+            return ""
+        profile = getattr(obj.created_by, "profile", None)
+        if profile and getattr(profile, "name", None):
+            return profile.name
+        return obj.created_by.get_full_name() or obj.created_by.username
+
+    def get_created_by_position(self, obj):
+        if not obj.created_by:
+            return ""
+        profile = getattr(obj.created_by, "profile", None)
+        position = getattr(profile, "position", "") if profile else ""
+        label_map = {
+            "admin": "계정",
+            "manager": "매니저",
+            "leader": "팀장",
+            "ceo": "대표이사",
+        }
+        return label_map.get(position, position or "")
+
+    def get_image_url(self, obj):
+        request = self.context.get("request")
+        try:
+            url = obj.image.url
+        except Exception:
+            return ""
+        if request:
+            return request.build_absolute_uri(url)
+        return url
+
+
+class ClinicMessageLogSerializer(serializers.ModelSerializer):
+    clinic_id = serializers.IntegerField(source="clinic.id", read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    created_by_position = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClinicMessageLog
+        fields = [
+            "id",
+            "clinic_id",
+            "url",
+            "platform",
+            "message_type",
+            "message_count",
+            "created_by_name",
+            "created_by_position",
+            "created_at",
+        ]
+
+    def get_created_by_name(self, obj):
+        if not obj.created_by:
+            return ""
+        profile = getattr(obj.created_by, "profile", None)
+        if profile and getattr(profile, "name", None):
+            return profile.name
+        return obj.created_by.get_full_name() or obj.created_by.username
+
+    def get_created_by_position(self, obj):
+        if not obj.created_by:
+            return ""
+        profile = getattr(obj.created_by, "profile", None)
+        position = getattr(profile, "position", "") if profile else ""
+        label_map = {
+            "admin": "계정",
+            "manager": "매니저",
+            "leader": "팀장",
+            "ceo": "대표이사",
+        }
+        return label_map.get(position, position or "")
+
+
+class ClinicNoticeSerializer(serializers.ModelSerializer):
+    clinic_id = serializers.IntegerField(source="clinic.id", read_only=True)
+    clinic_name = serializers.CharField(source="clinic.name", read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    created_by_position = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClinicNotice
+        fields = [
+            "id",
+            "clinic_id",
+            "clinic_name",
+            "title",
+            "content",
+            "is_pinned",
+            "created_by_name",
+            "created_by_position",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_created_by_name(self, obj):
+        if not obj.created_by:
+            return ""
+        profile = getattr(obj.created_by, "profile", None)
+        if profile and getattr(profile, "name", None):
+            return profile.name
+        return obj.created_by.get_full_name() or obj.created_by.username
+
+    def get_created_by_position(self, obj):
+        if not obj.created_by:
+            return ""
+        profile = getattr(obj.created_by, "profile", None)
+        position = getattr(profile, "position", "") if profile else ""
+        label_map = {
+            "admin": "계정",
+            "manager": "매니저",
+            "leader": "팀장",
+            "ceo": "대표이사",
+        }
+        return label_map.get(position, position or "")
+
+
+class GlobalNoticeSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+    created_by_position = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GlobalNotice
+        fields = [
+            "id",
+            "title",
+            "content",
+            "is_pinned",
+            "created_by_name",
+            "created_by_position",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_created_by_name(self, obj):
+        if not obj.created_by:
+            return ""
+        profile = getattr(obj.created_by, "profile", None)
+        if profile and getattr(profile, "name", None):
+            return profile.name
+        return obj.created_by.get_full_name() or obj.created_by.username
+
+    def get_created_by_position(self, obj):
+        if not obj.created_by:
+            return ""
+        profile = getattr(obj.created_by, "profile", None)
+        position = getattr(profile, "position", "") if profile else ""
+        label_map = {
+            "admin": "계정",
+            "manager": "매니저",
+            "leader": "팀장",
+            "ceo": "대표이사",
+        }
+        return label_map.get(position, position or "")
 
 
 class ReviewScheduleSerializer(serializers.ModelSerializer):

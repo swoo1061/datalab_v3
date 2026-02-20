@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from .forms import SignupForm
 from .models import UserProfile
+from apps.data.models import ClinicAssignee
 from apps.data.permissions import can_access_web_dashboard
 
 # Create your views here.
@@ -38,9 +39,17 @@ def login_view(request):
         login(request, user)
 
         profile = getattr(user, "profile", None)
+        has_active_clinic = ClinicAssignee.objects.filter(user=user, is_active=True).exists()
+        if has_active_clinic and profile and not getattr(profile, "is_hospital_account", False):
+            profile.is_hospital_account = True
+            profile.save(update_fields=["is_hospital_account"])
+        if profile and getattr(profile, "force_password_change", False):
+            return redirect("accounts:password_change_required")
+        if (profile and getattr(profile, "is_hospital_account", False)) or has_active_clinic:
+            return redirect("accounts:doctor_report")
         if can_access_web_dashboard(user):
             return redirect(reverse("dashboard:index"))
-        return render(request, "core/forbidden.html", status=403)
+        return redirect("dashboard:monthly_report")
 
     return render(request, "accounts/login.html")
 
@@ -80,8 +89,55 @@ def signup_view(request):
 
 @login_required
 def doctor_report_view(request):
-    user = request.user
-    if can_access_web_dashboard(user):
-        return redirect("dashboard:index")
-    return render(request, "core/forbidden.html", status=403)
+    profile = getattr(request.user, "profile", None)
+    has_active_clinic = ClinicAssignee.objects.filter(user=request.user, is_active=True).exists()
+    if not ((profile and getattr(profile, "is_hospital_account", False)) or has_active_clinic):
+        if can_access_web_dashboard(request.user):
+            return redirect("dashboard:index")
+    return redirect("dashboard:monthly_report")
+
+
+@login_required
+def password_change_required_view(request):
+    profile = getattr(request.user, "profile", None)
+    has_active_clinic = ClinicAssignee.objects.filter(user=request.user, is_active=True).exists()
+    if not profile or not getattr(profile, "force_password_change", False):
+        if (profile and getattr(profile, "is_hospital_account", False)) or has_active_clinic:
+            return redirect("accounts:doctor_report")
+        if can_access_web_dashboard(request.user):
+            return redirect("dashboard:index")
+        return redirect("dashboard:monthly_report")
+
+    if request.method == "POST":
+        current_password = str(request.POST.get("current_password") or "")
+        new_password = str(request.POST.get("new_password") or "")
+        confirm_password = str(request.POST.get("confirm_password") or "")
+
+        if not new_password:
+            messages.error(request, "새 비밀번호를 입력하세요.")
+            return redirect("accounts:password_change_required")
+        if len(new_password) < 4:
+            messages.error(request, "비밀번호는 4자 이상 입력해 주세요.")
+            return redirect("accounts:password_change_required")
+        if new_password != confirm_password:
+            messages.error(request, "새 비밀번호 확인이 일치하지 않습니다.")
+            return redirect("accounts:password_change_required")
+        if current_password and not request.user.check_password(current_password):
+            messages.error(request, "현재 비밀번호가 올바르지 않습니다.")
+            return redirect("accounts:password_change_required")
+
+        request.user.set_password(new_password)
+        request.user.save(update_fields=["password"])
+        profile.force_password_change = False
+        profile.save(update_fields=["force_password_change"])
+        login(request, request.user)
+        messages.success(request, "비밀번호가 변경되었습니다.")
+
+        if (profile and getattr(profile, "is_hospital_account", False)) or has_active_clinic:
+            return redirect("accounts:doctor_report")
+        if can_access_web_dashboard(request.user):
+            return redirect("dashboard:index")
+        return redirect("dashboard:monthly_report")
+
+    return render(request, "accounts/password_change_required.html")
 

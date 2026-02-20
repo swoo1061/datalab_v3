@@ -1,6 +1,8 @@
 console.log("header.js loaded");
 
 window.API_BASE = window.API_BASE || window?.config?.apiBase || "http://127.0.0.1:8000";
+const GLOBAL_NOTICE_CONFIRM_TEXT = "확인했습니다";
+let globalPinnedNoticeGateActive = false;
 
 // ================================
 // 직급 표시용 매핑
@@ -35,6 +37,17 @@ let aiCatWalkRefCenterX = null;
 let aiCatWalkRefScale = null;
 let aiCatWalkRefFootY = null;
 let agentSending = false;
+let currentPresenceStatus = "offline";
+let currentMeId = null;
+
+function isElectronRuntime() {
+  try {
+    if (typeof navigator !== "undefined" && /electron/i.test(String(navigator.userAgent || ""))) return true;
+    return Boolean(window?.api?.quitApp);
+  } catch (_e) {
+    return false;
+  }
+}
 // Walk cycle order (0-based frame index into walk-f*).
 // Blend cat10~15(=index 9~14) into base walk and repeat cat13(index 12)
 // to reduce the "fixed hind leg" feel.
@@ -55,6 +68,473 @@ const AGENT_ACTION_LABEL = {
   gugong_review: "구공이 리뷰 생성",
   gangnam_review: "강남언니 후기 생성",
 };
+
+function resolveProfileImageUrl(me) {
+  const candidates = [
+    me?.profile_image_url,
+    me?.profile_image,
+    me?.avatar_url,
+    me?.avatar,
+    me?.image_url,
+    me?.image,
+    me?.photo_url,
+    me?.photo,
+  ];
+  const raw = candidates.find((v) => typeof v === "string" && v.trim());
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith("data:")) return trimmed;
+  if (trimmed.startsWith("/")) return `${window.API_BASE}${trimmed}`;
+  return `${window.API_BASE}/${trimmed.replace(/^\.?\//, "")}`;
+}
+
+function getProfileInitial(name) {
+  const normalized = String(name || "").trim();
+  if (!normalized) return "U";
+  return normalized[0].toUpperCase();
+}
+
+function renderAvatarByIds({ imageId, fallbackId, profileImageUrl, displayName }) {
+  const imageEl = document.getElementById(imageId);
+  const fallbackEl = document.getElementById(fallbackId);
+  if (!imageEl || !fallbackEl) return;
+
+  fallbackEl.textContent = getProfileInitial(displayName);
+
+  if (!profileImageUrl) {
+    imageEl.src = "";
+    imageEl.classList.add("hidden");
+    fallbackEl.classList.remove("hidden");
+    return;
+  }
+
+  imageEl.classList.remove("hidden");
+  fallbackEl.classList.add("hidden");
+  imageEl.src = profileImageUrl;
+  imageEl.onerror = () => {
+    imageEl.classList.add("hidden");
+    fallbackEl.classList.remove("hidden");
+  };
+}
+
+function renderProfileAvatar(me, displayName) {
+  const profileImageUrl = resolveProfileImageUrl(me);
+  renderAvatarByIds({
+    imageId: "profileAvatarImage",
+    fallbackId: "profileAvatarFallback",
+    profileImageUrl,
+    displayName,
+  });
+  renderAvatarByIds({
+    imageId: "userChipAvatarImage",
+    fallbackId: "userChipAvatarFallback",
+    profileImageUrl,
+    displayName,
+  });
+}
+
+function bindProfileAvatarUpload(displayName) {
+  const avatarWrap = document.querySelector(".profile-avatar");
+  const inputEl = document.getElementById("profileAvatarInput");
+  if (!avatarWrap || !inputEl) return;
+
+  avatarWrap.onclick = () => inputEl.click();
+  inputEl.onchange = async () => {
+    const file = inputEl.files?.[0];
+    if (!file) return;
+
+    const okType = String(file.type || "").toLowerCase().startsWith("image/");
+    if (!okType) {
+      await window.showAlert?.("이미지 파일만 업로드할 수 있습니다.");
+      inputEl.value = "";
+      return;
+    }
+
+    try {
+      const croppedBlob = await openProfileImageCropper(file);
+      if (!croppedBlob) {
+        inputEl.value = "";
+        return;
+      }
+
+      const uploadFile = new File([croppedBlob], "profile.jpg", { type: "image/jpeg" });
+      const form = new FormData();
+      form.append("profile_image", uploadFile);
+
+      const headers = await buildHeaderAuthHeaders();
+      const res = await fetch(`${window.API_BASE}/api/accounts/me/profile-image/`, {
+        method: "POST",
+        credentials: "include",
+        headers,
+        body: form,
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || `HTTP ${res.status}`);
+
+      renderProfileAvatar({ profile_image_url: payload?.profile_image_url || "" }, displayName);
+      await window.showAlert?.("프로필 사진이 변경되었습니다.");
+    } catch (e) {
+      console.error("profile image upload failed", e);
+      await window.showAlert?.("프로필 사진 업로드에 실패했습니다.");
+    } finally {
+      inputEl.value = "";
+    }
+  };
+}
+
+function renderPresenceSelect(statusValue) {
+  const normalized = String(statusValue || "").trim().toLowerCase() || "offline";
+  currentPresenceStatus = normalized;
+  const labelEl = document.getElementById("presenceSelectLabel");
+  const labelMap = {
+    online: "접속중",
+    away: "자리비움",
+    meeting: "미팅중",
+    dnd: "방해금지",
+    offline: "오프라인",
+  };
+  if (labelEl) labelEl.textContent = labelMap[normalized] || "오프라인";
+  document.querySelectorAll("#presenceSelectMenu .presence-option").forEach((btn) => {
+    const key = String(btn.dataset.presence || "").toLowerCase();
+    btn.classList.toggle("active", key === normalized);
+  });
+}
+
+function bindPresenceControls() {
+  const wrapEl = document.getElementById("presenceSelectWrap");
+  const triggerEl = document.getElementById("presenceSelectTrigger");
+  const menuEl = document.getElementById("presenceSelectMenu");
+  if (!wrapEl || !triggerEl || !menuEl) return;
+
+  triggerEl.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = menuEl.classList.contains("hidden");
+    menuEl.classList.toggle("hidden", !willOpen);
+    wrapEl.classList.toggle("open", willOpen);
+  });
+
+  menuEl.addEventListener("click", async (e) => {
+    const option = e.target.closest(".presence-option[data-presence]");
+    if (!option) return;
+    const next = String(option.dataset.presence || "").trim().toLowerCase();
+    if (!next || next === currentPresenceStatus) return;
+
+    try {
+      const headers = await buildHeaderAuthHeaders();
+      headers["Content-Type"] = "application/json";
+      const res = await fetch(`${window.API_BASE}/api/accounts/me/presence/`, {
+        method: "POST",
+        credentials: "include",
+        headers,
+        body: JSON.stringify({ presence_status: next }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      renderPresenceSelect(next);
+      loadStaffPresenceList();
+      menuEl.classList.add("hidden");
+      wrapEl.classList.remove("open");
+    } catch (err) {
+      console.error("presence update failed", err);
+      await window.showAlert?.("상태 변경에 실패했습니다.");
+      renderPresenceSelect(currentPresenceStatus);
+    }
+  });
+
+  document.addEventListener("click", () => {
+    menuEl.classList.add("hidden");
+    wrapEl.classList.remove("open");
+  });
+}
+
+function bindStatusFlyouts() {
+  const items = Array.from(document.querySelectorAll(".status-hover-item")).filter(
+    (item) => Boolean(item.querySelector(".status-flyout"))
+  );
+  if (!items.length) return;
+
+  const closeAll = () => {
+    items.forEach((x) => {
+      x.classList.remove("open");
+      x.classList.remove("locked");
+      x.classList.remove("suppress-hover");
+    });
+  };
+
+  items.forEach((item) => {
+    const flyout = item.querySelector(".status-flyout");
+    flyout?.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+  });
+
+  items.forEach((item) => {
+    item.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (e.target.closest(".status-flyout")) return;
+
+      const isLockedOpen = item.classList.contains("open") && item.classList.contains("locked");
+      if (isLockedOpen) {
+        item.classList.remove("open");
+        item.classList.remove("locked");
+        return;
+      }
+
+      closeAll();
+      item.classList.add("open");
+      item.classList.add("locked");
+    });
+  });
+
+  document.addEventListener("click", () => {
+    closeAll();
+  });
+}
+
+function presenceLabel(status) {
+  const map = {
+    online: "접속중",
+    away: "자리비움",
+    meeting: "미팅중",
+    dnd: "방해금지",
+    offline: "오프라인",
+  };
+  return map[String(status || "").toLowerCase()] || "오프라인";
+}
+
+function renderStaffPresenceList(rows) {
+  const listEl = document.getElementById("staffPresenceList");
+  if (!listEl) return;
+  const items = Array.isArray(rows) ? rows : [];
+  if (!items.length) {
+    listEl.innerHTML = '<div class="staff-presence-empty">표시할 직원이 없습니다.</div>';
+    return;
+  }
+
+  const rank = { online: 0, away: 1, meeting: 2, dnd: 3, offline: 4 };
+  items.sort((a, b) => {
+    const ra = rank[String(a?.presence_status || "offline").toLowerCase()] ?? 9;
+    const rb = rank[String(b?.presence_status || "offline").toLowerCase()] ?? 9;
+    if (ra !== rb) return ra - rb;
+    return String(a?.name || a?.username || "").localeCompare(String(b?.name || b?.username || ""), "ko");
+  });
+
+  listEl.innerHTML = items
+    .map((u) => {
+      const s = String(u?.presence_status || "offline").toLowerCase();
+      const name = String(u?.name || u?.username || "사용자");
+      const mine = Number(u?.id || 0) && Number(u?.id || 0) === Number(currentMeId || 0) ? " (나)" : "";
+      return `
+        <div class="staff-presence-item">
+          <span class="staff-presence-name">
+            <span class="staff-presence-dot ${s}"></span>
+            <span>${name}${mine}</span>
+          </span>
+          <span class="staff-presence-badge">${presenceLabel(s)}</span>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+async function loadStaffPresenceList() {
+  const listEl = document.getElementById("staffPresenceList");
+  if (!listEl) return;
+
+  try {
+    const headers = await buildHeaderAuthHeaders();
+    const res = await fetch(`${window.API_BASE}/api/accounts/users/`, {
+      credentials: "include",
+      headers,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    renderStaffPresenceList(Array.isArray(data?.results) ? data.results : []);
+  } catch (e) {
+    console.error("staff presence load failed", e);
+    listEl.innerHTML = '<div class="staff-presence-empty">직원 상태를 불러오지 못했습니다.</div>';
+  }
+}
+
+function ensureProfileCropModal() {
+  let modal = document.getElementById("profileImageCropModal");
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = "profileImageCropModal";
+  modal.className = "profile-crop-modal hidden";
+  modal.innerHTML = `
+    <div class="profile-crop-backdrop"></div>
+    <div class="profile-crop-card">
+      <div class="profile-crop-title">프로필 사진 조정</div>
+      <canvas id="profileCropCanvas" width="320" height="320"></canvas>
+      <div class="profile-crop-controls">
+        <label for="profileCropZoom">확대</label>
+        <input id="profileCropZoom" type="range" min="1" max="3" step="0.01" value="1" />
+      </div>
+      <div class="profile-crop-actions">
+        <button id="profileCropCancel" class="btn" type="button">취소</button>
+        <button id="profileCropApply" class="btn primary" type="button">적용</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = String(reader.result || "");
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function canvasToBlob(canvas, type = "image/jpeg", quality = 0.92) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob || null), type, quality);
+  });
+}
+
+async function openProfileImageCropper(file) {
+  const modal = ensureProfileCropModal();
+  const canvas = document.getElementById("profileCropCanvas");
+  const zoomEl = document.getElementById("profileCropZoom");
+  const applyBtn = document.getElementById("profileCropApply");
+  const cancelBtn = document.getElementById("profileCropCancel");
+  if (!modal || !canvas || !zoomEl || !applyBtn || !cancelBtn) return null;
+
+  let img;
+  try {
+    img = await loadImageFromFile(file);
+  } catch (_e) {
+    await window.showAlert?.("이미지를 불러오지 못했습니다.");
+    return null;
+  }
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const state = {
+    zoom: 1,
+    minScale: Math.max(canvas.width / img.width, canvas.height / img.height),
+    x: 0,
+    y: 0,
+    dragging: false,
+    sx: 0,
+    sy: 0,
+  };
+  state.zoom = state.minScale;
+
+  const clamp = () => {
+    const drawW = img.width * state.zoom;
+    const drawH = img.height * state.zoom;
+    const minX = canvas.width - drawW;
+    const minY = canvas.height - drawH;
+    if (drawW <= canvas.width) state.x = (canvas.width - drawW) / 2;
+    else state.x = Math.min(0, Math.max(minX, state.x));
+    if (drawH <= canvas.height) state.y = (canvas.height - drawH) / 2;
+    else state.y = Math.min(0, Math.max(minY, state.y));
+  };
+
+  const render = () => {
+    clamp();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#f1f5f9";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const drawW = img.width * state.zoom;
+    const drawH = img.height * state.zoom;
+    ctx.drawImage(img, state.x, state.y, drawW, drawH);
+
+    // circular guide
+    ctx.save();
+    ctx.strokeStyle = "rgba(79,70,229,0.9)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2 - 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const cleanupHandlers = () => {
+    canvas.onmousedown = null;
+    canvas.onmousemove = null;
+    canvas.onmouseup = null;
+    canvas.onmouseleave = null;
+    canvas.onwheel = null;
+    zoomEl.oninput = null;
+    applyBtn.onclick = null;
+    cancelBtn.onclick = null;
+    modal.querySelector(".profile-crop-backdrop").onclick = null;
+  };
+
+  zoomEl.min = String(state.minScale.toFixed(2));
+  zoomEl.max = String(Math.max(state.minScale * 3, state.minScale + 0.1).toFixed(2));
+  zoomEl.value = String(state.minScale.toFixed(2));
+  state.x = (canvas.width - img.width * state.zoom) / 2;
+  state.y = (canvas.height - img.height * state.zoom) / 2;
+  render();
+
+  modal.classList.remove("hidden");
+
+  return new Promise((resolve) => {
+    const close = (result) => {
+      cleanupHandlers();
+      modal.classList.add("hidden");
+      resolve(result);
+    };
+
+    canvas.onmousedown = (e) => {
+      state.dragging = true;
+      state.sx = e.clientX;
+      state.sy = e.clientY;
+    };
+    canvas.onmousemove = (e) => {
+      if (!state.dragging) return;
+      state.x += e.clientX - state.sx;
+      state.y += e.clientY - state.sy;
+      state.sx = e.clientX;
+      state.sy = e.clientY;
+      render();
+    };
+    canvas.onmouseup = () => { state.dragging = false; };
+    canvas.onmouseleave = () => { state.dragging = false; };
+    canvas.onwheel = (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.05 : 0.05;
+      state.zoom = Math.max(Number(zoomEl.min), Math.min(Number(zoomEl.max), state.zoom + delta));
+      zoomEl.value = String(state.zoom);
+      render();
+    };
+
+    zoomEl.oninput = () => {
+      state.zoom = Number(zoomEl.value || state.minScale);
+      render();
+    };
+
+    modal.querySelector(".profile-crop-backdrop").onclick = () => close(null);
+    cancelBtn.onclick = () => close(null);
+    applyBtn.onclick = async () => {
+      const temp = document.createElement("canvas");
+      temp.width = canvas.width;
+      temp.height = canvas.height;
+      const tctx = temp.getContext("2d");
+      if (!tctx) {
+        close(null);
+        return;
+      }
+      tctx.drawImage(canvas, 0, 0);
+      const blob = await canvasToBlob(temp, "image/jpeg", 0.92);
+      close(blob);
+    };
+  });
+}
 
 // ================================
 // 헤더 로드
@@ -106,6 +586,7 @@ async function loadHeader(pageTitle = "") {
   }
 
   const userKey = me?.id ? `user:${me.id}` : `user:${me?.username || me?.email || "unknown"}`;
+  currentMeId = Number(me?.id || 0) || null;
   localStorage.setItem("currentUserKey", userKey);
   agentChatsStorageKey = `${AGENT_CHATS_STORAGE_PREFIX}${userKey}`;
   agentActiveChatStorageKey = `${AGENT_ACTIVE_CHAT_STORAGE_PREFIX}${userKey}`;
@@ -127,25 +608,193 @@ async function loadHeader(pageTitle = "") {
   const profileNameEl = document.getElementById("profileName");
   const profilePositionEl = document.getElementById("profilePosition");
   const profileEmailEl = document.getElementById("profileEmail");
+  const miniInfoNameEl = document.getElementById("miniInfoName");
+  const miniInfoEmailEl = document.getElementById("miniInfoEmail");
+  const miniInfoPhoneEl = document.getElementById("miniInfoPhone");
+  const miniInfoBirthEl = document.getElementById("miniInfoBirth");
 
   if (profileNameEl) profileNameEl.innerText = name;
   if (profilePositionEl) profilePositionEl.innerText = position;
   if (profileEmailEl) profileEmailEl.innerText = email;
+  if (miniInfoNameEl) miniInfoNameEl.innerText = name || "-";
+  if (miniInfoEmailEl) miniInfoEmailEl.innerText = email || "-";
+  if (miniInfoPhoneEl) miniInfoPhoneEl.innerText = me?.phone || "-";
+  if (miniInfoBirthEl) miniInfoBirthEl.innerText = me?.birth_date || "-";
+  renderProfileAvatar(me, name);
+  bindProfileAvatarUpload(name);
+  renderPresenceSelect(me?.presence_status || "offline");
 
   // ----------------
   // 이벤트 바인딩
   // ----------------
-  document
-    .getElementById("userChip")
-    ?.addEventListener("click", toggleProfile);
+  document.getElementById("userChip")?.addEventListener("click", toggleProfile);
 
   bindProfileMenu();
+  bindPresenceControls();
+  bindStatusFlyouts();
+  loadStaffPresenceList();
   // ⭐ 헤더 전용 기능들
   bindHeaderModeAndAgent();
   renderAgentChatSelector();
   renderAgentMessages();
   startLiveClock();
   bindNotifications();
+  await maybeShowPinnedGlobalNoticeGate(me);
+}
+
+async function buildHeaderAuthHeaders() {
+  const headers = {};
+  try {
+    const sessionKey = await window.session?.getKey?.();
+    if (sessionKey) headers["X-Sessionid"] = sessionKey;
+  } catch (_e) {}
+  return headers;
+}
+
+function shouldForceGlobalNoticeGate(me) {
+  if (!me) return false;
+  const role = String(me.position || me.role || "").trim().toLowerCase();
+  if (role === "admin" || role === "ceo" || role === "leader") return false;
+  return true;
+}
+
+function createGlobalNoticeGateModal(notice) {
+  let modal = document.getElementById("globalNoticeGateModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "globalNoticeGateModal";
+    modal.className = "global-notice-gate-modal";
+    modal.innerHTML = `
+      <div class="global-notice-gate-backdrop"></div>
+      <div class="global-notice-gate-card">
+        <div class="global-notice-gate-title">중요 공지 확인</div>
+        <div class="global-notice-gate-meta" id="globalNoticeGateMeta"></div>
+        <div class="global-notice-gate-subject" id="globalNoticeGateSubject"></div>
+        <div class="global-notice-gate-content" id="globalNoticeGateContent"></div>
+        <div class="global-notice-gate-input-wrap">
+          <label for="globalNoticeGateInput">아래 문구를 입력해야 닫을 수 있습니다</label>
+          <input id="globalNoticeGateInput" class="input" type="text" placeholder="확인했습니다" autocomplete="off" />
+        </div>
+        <div class="global-notice-gate-actions">
+          <span id="globalNoticeGateError" class="global-notice-gate-error"></span>
+          <button id="globalNoticeGateConfirmBtn" class="btn primary" type="button" disabled>확인</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  const metaEl = document.getElementById("globalNoticeGateMeta");
+  const subjectEl = document.getElementById("globalNoticeGateSubject");
+  const contentEl = document.getElementById("globalNoticeGateContent");
+  const inputEl = document.getElementById("globalNoticeGateInput");
+  const confirmBtn = document.getElementById("globalNoticeGateConfirmBtn");
+  const errorEl = document.getElementById("globalNoticeGateError");
+
+  const writer = notice.created_by_name || "관리자";
+  const dateText = notice.updated_at
+    ? new Date(notice.updated_at).toLocaleString("ko-KR", {
+      hour12: false,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+    : "-";
+
+  if (metaEl) metaEl.textContent = `${writer} · ${dateText}`;
+  if (subjectEl) subjectEl.textContent = notice.title || "(제목 없음)";
+  if (contentEl) contentEl.textContent = notice.content || "";
+  if (inputEl) inputEl.value = "";
+  if (errorEl) errorEl.textContent = "";
+  if (confirmBtn) confirmBtn.disabled = true;
+
+  if (inputEl) {
+    inputEl.oninput = () => {
+      if (!confirmBtn) return;
+      const ok = String(inputEl.value || "").trim() === GLOBAL_NOTICE_CONFIRM_TEXT;
+      confirmBtn.disabled = !ok;
+      if (ok && errorEl) errorEl.textContent = "";
+    };
+    inputEl.onkeydown = (e) => {
+      if (e.key === "Enter" && confirmBtn && !confirmBtn.disabled) {
+        e.preventDefault();
+        confirmBtn.click();
+      }
+    };
+  }
+
+  return { modal, inputEl, confirmBtn, errorEl };
+}
+
+async function showPinnedGlobalNoticeGateItem(notice) {
+  const { modal, inputEl, confirmBtn, errorEl } = createGlobalNoticeGateModal(notice);
+  modal.classList.add("is-open");
+  document.body.classList.add("global-notice-gate-open");
+
+  return new Promise((resolve) => {
+    if (!confirmBtn) {
+      resolve(false);
+      return;
+    }
+
+    confirmBtn.onclick = async () => {
+      const typed = String(inputEl?.value || "").trim();
+      if (typed !== GLOBAL_NOTICE_CONFIRM_TEXT) {
+        if (errorEl) errorEl.textContent = "문구를 정확히 입력해 주세요.";
+        return;
+      }
+
+      confirmBtn.disabled = true;
+      try {
+        const ackHeaders = await buildHeaderAuthHeaders();
+        ackHeaders["Content-Type"] = "application/json";
+        const ackRes = await fetch(`${window.API_BASE}/api/data/global-notices/${notice.id}/read/`, {
+          method: "POST",
+          credentials: "include",
+          headers: ackHeaders,
+          body: JSON.stringify({ confirmation_text: typed }),
+        });
+        if (!ackRes.ok) throw new Error(`HTTP ${ackRes.status}`);
+        resolve(true);
+      } catch (_e) {
+        if (errorEl) errorEl.textContent = "확인 처리에 실패했습니다. 다시 시도해 주세요.";
+        confirmBtn.disabled = false;
+      }
+    };
+  });
+}
+
+async function maybeShowPinnedGlobalNoticeGate(me) {
+  if (globalPinnedNoticeGateActive) return;
+  if (!isElectronRuntime()) return;
+  if (!shouldForceGlobalNoticeGate(me)) return;
+  if (window.location.pathname.includes("login")) return;
+
+  globalPinnedNoticeGateActive = true;
+  try {
+    const headers = await buildHeaderAuthHeaders();
+    const res = await fetch(
+      `${window.API_BASE}/api/data/global-notices/?pinned_only=1&unread_only=1&limit=50`,
+      { credentials: "include", headers },
+    );
+    if (!res.ok) return;
+
+    const payload = await res.json();
+    const notices = Array.isArray(payload?.results) ? payload.results : [];
+    if (!notices.length) return;
+
+    for (const notice of notices) {
+      await showPinnedGlobalNoticeGateItem(notice);
+    }
+  } catch (_e) {
+  } finally {
+    const modal = document.getElementById("globalNoticeGateModal");
+    modal?.classList.remove("is-open");
+    document.body.classList.remove("global-notice-gate-open");
+    globalPinnedNoticeGateActive = false;
+  }
 }
 
 // ================================
@@ -153,7 +802,11 @@ async function loadHeader(pageTitle = "") {
 // ================================
 function toggleProfile() {
   const popup = document.getElementById("profilePopup");
-  if (popup) popup.classList.toggle("hidden");
+  if (!popup) return;
+  popup.classList.toggle("hidden");
+  if (!popup.classList.contains("hidden")) {
+    loadStaffPresenceList();
+  }
 }
 
 function closeProfilePopup() {
@@ -381,12 +1034,14 @@ function normalizeWalkFrameImage(frameEl, frameIndex) {
 // 프로필 메뉴
 // ================================
 function bindProfileMenu() {
-  document.querySelectorAll(".menu-item").forEach((item) => {
+  document.querySelectorAll("#profilePopup [data-action]").forEach((item) => {
     item.onclick = () => {
       const action = item.dataset.action;
       if (action === "profile") openProfileInfo();
       if (action === "attendance") window.showAlert?.("출퇴근 기록 준비중");
       if (action === "my_dashboard") window.nav.go("my_dashboard");
+      if (action === "global_notices") goAgentActionPage("global_notices");
+      document.getElementById("profilePopup")?.classList.add("hidden");
     };
   });
 }
